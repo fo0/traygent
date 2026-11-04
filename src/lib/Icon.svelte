@@ -89,6 +89,8 @@
       line(14, 11, 14, 17),
     ],
     arrow: [line(4, 12, 20, 12), wire('14,6 20,12 14,18')],
+    // A pencil: „Bearbeiten …“ of a „Zuletzt“ row.
+    edit: [wire('4,20 4,16 15.5,4.5 19.5,8.5 8,20 4,20'), line(13, 7, 17, 11)],
     copy: [
       box(8.5, 8.5, 12, 12),
       {

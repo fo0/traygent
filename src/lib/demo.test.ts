@@ -198,6 +198,9 @@ describe('demo bridge', () => {
       expect(snapshot.revision).toBe(start + 4);
       expect(await revision(bridge.removeRecent(recent.id))).toBe(start + 5);
       expect(await revision(bridge.restoreRecent(recent))).toBe(start + 6);
+      expect(
+        await revision(bridge.updateRecent(recent.id, recent.options, [])),
+      ).toBe(start + 7);
     } finally {
       vi.useRealTimers();
     }
@@ -233,6 +236,37 @@ describe('demo bridge', () => {
     expect(after.recents.map((r) => r.id)).not.toContain(removed.id);
     const restored = await bridge.restoreRecent(removed);
     expect(restored.recents.map((r) => r.id)).toEqual(before.map((r) => r.id));
+  });
+
+  it('edits a recent in place and refuses what a start refuses', async () => {
+    const bridge = createDemoBridge(0);
+    const before = (await bridge.snapshot()).recents;
+    const docker = before.find((r) => r.env === 'docker')!;
+    const local = before.find((r) => r.env === 'local')!;
+    const options = {
+      ...docker.options,
+      permission: 'bypass' as const,
+      extraArgs: ' --verbose ',
+    };
+    const after = await bridge.updateRecent(docker.id, options, [' 3000 ']);
+    expect(after.recents.map((r) => r.id)).toEqual(before.map((r) => r.id));
+    const edited = after.recents.find((r) => r.id === docker.id)!;
+    expect(edited.options).toEqual({ ...options, extraArgs: '--verbose' });
+    expect(edited.ports).toEqual(['127.0.0.1:3000:3000']);
+    expect(edited.lastStartedAt).toBe(docker.lastStartedAt);
+    expect(edited.starts).toBe(docker.starts);
+    await expect(
+      bridge.updateRecent(local.id, local.options, ['3000']),
+    ).rejects.toThrow('Ports lassen sich nur für Docker-Sessions freigeben.');
+    await expect(
+      bridge.updateRecent(local.id, { ...local.options, extraArgs: '"x"' }, []),
+    ).rejects.toThrow('Extra-Argumente: Keine Anführungszeichen.');
+    await expect(
+      bridge.updateRecent(local.id, { ...local.options, effort: 'turbo' }, []),
+    ).rejects.toThrow('Unbekannte Denkstufe für Claude Code.');
+    await expect(bridge.updateRecent('weg', local.options, [])).rejects.toThrow(
+      'Diese Session steht nicht mehr in „Zuletzt“.',
+    );
   });
 
   it('saves settings, picks a fake folder and opens nothing', async () => {

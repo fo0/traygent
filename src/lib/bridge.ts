@@ -15,6 +15,8 @@ const nativeBridge: Bridge = {
   launchSession: (request) => call('launch_session', { request }),
   removeRecent: (id) => call('remove_recent', { id }),
   restoreRecent: (recent) => call('restore_recent', { recent }),
+  updateRecent: (id, options, ports) =>
+    call('update_recent', { id, options, ports }),
   pickFolder: (initial) => call('pick_folder', { initial }),
   installAgent: (agent) => call('install_agent', { agent }),
   openFolder: (path) => call('open_folder', { path }),

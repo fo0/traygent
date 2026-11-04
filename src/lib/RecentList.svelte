@@ -9,6 +9,7 @@
     launching,
     onRestart,
     onAdopt,
+    onEdit,
     onOpenFolder,
     onRemove,
     onInstall,
@@ -18,6 +19,7 @@
     launching: boolean;
     onRestart: (recent: RecentSession) => void;
     onAdopt: (recent: RecentSession) => void;
+    onEdit: (recent: RecentSession) => void;
     onOpenFolder: (path: string) => void;
     onRemove: (recent: RecentSession) => Promise<void>;
     onInstall: (agent: AgentId) => void;
@@ -34,6 +36,7 @@
         {launching}
         {onRestart}
         {onAdopt}
+        {onEdit}
         {onOpenFolder}
         {onRemove}
         {onInstall}

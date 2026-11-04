@@ -3,6 +3,7 @@
   import AppBar from './lib/AppBar.svelte';
   import AppFooter from './lib/AppFooter.svelte';
   import Dashboard from './lib/Dashboard.svelte';
+  import RecentEditDialog from './lib/RecentEditDialog.svelte';
   import SettingsDialog from './lib/SettingsDialog.svelte';
   import StatusBanners from './lib/StatusBanners.svelte';
   import appPackage from '../package.json';
@@ -46,6 +47,15 @@
     const next = await panel.refresh();
     if (native && recovering && next) void updater.check(true);
   }
+  // „Bearbeiten …“ of an entry that is gone (removed elsewhere) closes.
+  $effect(() => {
+    if (
+      modals.kind === 'recent' &&
+      snapshot &&
+      !snapshot.recents.some((item) => item.id === modals.recentId)
+    )
+      modals.close();
+  });
   const shortcuts = createShortcuts({
     blocked: () => modals.kind !== null,
     refresh: () => void (canRefresh && refreshPanel()),
@@ -91,6 +101,7 @@
         {snapshot}
         {panel}
         onInstall={(agent) => modals.openInstall(agent)}
+        onEdit={(recent) => modals.openRecent(recent.id)}
         onConnectGithub={() => modals.openSettings('github')}
       />
     </div>
@@ -126,4 +137,20 @@
     onInstalled={() => panel.announceInstall()}
     onClose={modals.close}
   />
+{/if}
+<!-- Follows the entry in every snapshot; one removed meanwhile closes it
+     (the effect above), so the page never stays inert without a dialog. -->
+{#if modals.kind === 'recent'}
+  {@const recent = snapshot?.recents.find(
+    (item) => item.id === modals.recentId,
+  )}
+  {#if snapshot && recent}
+    <RecentEditDialog
+      {snapshot}
+      {recent}
+      returnFocus={modals.returnFocus}
+      onSave={(options, ports) => panel.updateRecent(recent, options, ports)}
+      onClose={modals.close}
+    />
+  {/if}
 {/if}

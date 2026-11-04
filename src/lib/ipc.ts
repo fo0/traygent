@@ -3,6 +3,7 @@ import type {
   AgentId,
   AppSettings,
   DownloadProgress,
+  LaunchOptions,
   LaunchOutcome,
   LocalAccounts,
   LaunchRequest,
@@ -34,6 +35,11 @@ export interface Commands {
   remove_recent: { args: { id: string }; result: Snapshot };
   /** The undo of `remove_recent`: puts the removed entry back. */
   restore_recent: { args: { recent: RecentSession }; result: Snapshot };
+  /** „Bearbeiten …“: the options and ports the next restart sends. */
+  update_recent: {
+    args: { id: string; options: LaunchOptions; ports: string[] };
+    result: Snapshot;
+  };
   /** Native folder dialog; `null` when cancelled. */
   pick_folder: { args: { initial: string | null }; result: string | null };
   /** Opens a terminal that runs the catalog install command. */
@@ -78,6 +84,7 @@ const REGISTERED: Record<Command, true> = {
   launch_session: true,
   remove_recent: true,
   restore_recent: true,
+  update_recent: true,
   pick_folder: true,
   install_agent: true,
   open_folder: true,

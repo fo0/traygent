@@ -135,6 +135,7 @@ test('„Entfernen“ offers „Rückgängig“, which puts the row back', async
   const menu = page.getByRole('menu', { name: 'Aktionen für kunden-portal' });
   await expect(menu.getByRole('menuitem')).toHaveText([
     'In Composer übernehmen',
+    'Bearbeiten …',
     'Ordner öffnen',
     'Entfernen',
   ]);

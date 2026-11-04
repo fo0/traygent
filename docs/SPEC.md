@@ -65,13 +65,17 @@ Brand top left: icon + „Traygent“. Window ~480×760, frameless, tray popup l
    first letter of the first word after the last `/`, e.g. `google/gemini-2.5-flash` G), the
    thinking level as five signal bars (Niedrig 1 … Maximal 5, „Standard“ all dim) wherever the
    agent sends one, the permission icon (bypass a bolt in the warning colour) — each with its German label as
-   accessible name, relative time (right-aligned, fixed width), „⋯“ menu (In Composer übernehmen, Ordner öffnen, Entfernen with
-   8 s „Rückgängig“) and ▶ at the far right. A click anywhere on the row (or Enter / Space on
+   accessible name, relative time (right-aligned, fixed width), „⋯“ menu (In Composer übernehmen, Bearbeiten …, Ordner öffnen,
+   Entfernen with 8 s „Rückgängig“) and ▶ at the far right. A click anywhere on the row (or Enter / Space on
    ▶) restarts with exactly those settings — once per press: the rest of a double-click, a
    held key and a second start of the same row within 1.5 s after it started are ignored;
    „⋯“ and its menu never start, nor does a press that only closes a popup (a row menu, the
    „Ports“ popover, the folder suggestions). Hiding an environment is a display preference, not
-   a ban: its recents keep their environment and ▶ restarts them unchanged.
+   a ban: its recents keep their environment and ▶ restarts them unchanged. „Bearbeiten …“
+   (#3) opens a staged dialog with the row's model, thinking level, permission, extra
+   arguments and (Docker) ports; „Speichern“ stores them on the entry without a start
+   (`update_recent`, validated like a start; the dialog also applies the npm-shim argument rule) — place, start time and count stay, the next ▶
+   sends them. The agent, environment and folder define the entry and are not editable.
 4. Footer: Docker state („Docker 27.5 bereit“ / „Docker nicht erreichbar“, only while Docker is
    shown) · „Stand hh:mm“.
 
@@ -127,6 +131,7 @@ Commands (Rust `#[tauri::command]`, German `Err` strings; panel calls only via `
 | `launch_session`                   | `{ request }`                                                                                    | `LaunchOutcome` (validates, opens terminal, records recent)   |
 | `remove_recent`                    | `{ id }`                                                                                         | `Snapshot`                                                    |
 | `restore_recent`                   | `{ recent }`                                                                                     | `Snapshot` (undo of remove)                                   |
+| `update_recent`                    | `{ id, options, ports }`                                                                         | `Snapshot` (edit, no start)                                   |
 | `pick_folder`                      | `{ initial?: string }`                                                                           | `string \| null` (native folder dialog)                       |
 | `install_agent`                    | `{ agent }`                                                                                      | `void` (opens a terminal running the catalog install command) |
 | `open_folder`                      | `{ path }`                                                                                       | `void` (Explorer)                                             |

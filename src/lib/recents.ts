@@ -3,7 +3,13 @@
  * (folder, agent, env), at most `RECENT_LIMIT`. The native core owns the real
  * list; the demo and the panel's undo use these rules to mirror it.
  */
-import type { AgentId, EnvId, LaunchRequest, RecentSession } from './types';
+import type {
+  AgentId,
+  EnvId,
+  LaunchOptions,
+  LaunchRequest,
+  RecentSession,
+} from './types';
 
 export const RECENT_LIMIT = 20;
 
@@ -75,6 +81,29 @@ export function restoreRecent(
   };
   if (list.some((item) => item.id === entry.id)) return [...list];
   return [...list, entry].sort(newestFirst).slice(0, RECENT_LIMIT);
+}
+
+/**
+ * „Bearbeiten …“, as natively (src-tauri/src/service.rs → update_recent): new
+ * options (trimmed, a blank model or effort `default`) and ports on the entry; its place, start time and count
+ * stay. Null when the id is no longer listed.
+ */
+export function editRecent(
+  list: readonly RecentSession[],
+  id: string,
+  options: LaunchOptions,
+  ports: readonly string[],
+): RecentSession[] | null {
+  if (!list.some((item) => item.id === id)) return null;
+  const trimmed = {
+    ...options,
+    model: options.model.trim() || 'default',
+    effort: options.effort.trim() || 'default',
+    extraArgs: options.extraArgs.trim(),
+  };
+  return list.map((item) =>
+    item.id === id ? { ...item, options: trimmed, ports: [...ports] } : item,
+  );
 }
 
 /** Distinct folders of the recent sessions, newest first. */

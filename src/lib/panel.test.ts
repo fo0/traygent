@@ -29,6 +29,7 @@ function bridgeWith(overrides: Partial<Bridge> = {}): Bridge {
     removeRecent: async (id) =>
       snapshot({ recents: snapshot().recents.filter((r) => r.id !== id) }),
     restoreRecent: async () => snapshot(),
+    updateRecent: async () => snapshot(),
     pickFolder: async () => null,
     installAgent: async () => {},
     openFolder: async () => {},
@@ -245,6 +246,22 @@ describe('Panel', () => {
     notice?.action?.run();
     await vi.waitFor(() => expect(restoreRecent).toHaveBeenCalledWith(removed));
     expect(panel.notices.get(`recent:${removed.id}`)).toBeUndefined();
+  });
+
+  it('stores an edited recent and rejects with the German message', async () => {
+    const edited = snapshot({ revision: 7 });
+    const updateRecent = vi.fn(async () => edited);
+    const panel = panelWith({ updateRecent });
+    panel.accept(snapshot());
+    const recent = panel.snapshot!.recents[0]!;
+    const options = { ...recent.options, permission: 'bypass' as const };
+    await panel.updateRecent(recent, options, []);
+    expect(updateRecent).toHaveBeenCalledWith(recent.id, options, []);
+    expect(panel.snapshot).toBe(edited);
+    updateRecent.mockRejectedValueOnce(new Error('Ungültiges Modell.'));
+    await expect(panel.updateRecent(recent, options, [])).rejects.toThrow(
+      'Ungültiges Modell.',
+    );
   });
 
   it('opens the install terminal without detecting again at once', async () => {

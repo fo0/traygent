@@ -472,4 +472,6 @@ fn nonces_are_six_hex_digits() {
 
 mod ports;
 
+mod recent_edit;
+
 mod repo;

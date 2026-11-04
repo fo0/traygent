@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import {
   RECENT_LIMIT,
+  editRecent,
   recentFolders,
   recentId,
   recordStart,
@@ -117,5 +118,25 @@ describe('recents', () => {
       'C:\\c',
     ]);
     expect(recentFolders(list, 2)).toEqual(['C:\\a', 'C:\\b']);
+  });
+
+  it('edits options and ports in place and keeps time and count', () => {
+    const list = [recent('C:\\a', 1), recent('C:\\b', 2)];
+    const next = { ...options, model: ' opus ', permission: 'bypass' as const };
+    const edited = editRecent(list, list[1]!.id, next, ['127.0.0.1:80:80'])!;
+    expect(edited.map((r) => r.id)).toEqual(list.map((r) => r.id));
+    expect(edited[1]).toEqual({
+      ...list[1],
+      options: { ...next, model: 'opus' },
+      ports: ['127.0.0.1:80:80'],
+    });
+    expect(edited[0]).toBe(list[0]);
+    expect(editRecent(list, 'unknown', next, [])).toBeNull();
+    const blank = { ...options, model: ' ', effort: '' };
+    expect(editRecent(list, list[0]!.id, blank, [])![0]!.options).toEqual({
+      ...options,
+      model: 'default',
+      effort: 'default',
+    });
   });
 });
