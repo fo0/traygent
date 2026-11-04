@@ -8,6 +8,7 @@ import {
   demoRepos,
 } from './demoGithub';
 import {
+  editRecent,
   recordStart,
   restoreRecent,
   upsertRecent,
@@ -147,6 +148,24 @@ export function createDemoBridge(latency = 150, detection = 600): DemoBridge {
       if (!restored)
         throw new Error('Eintrag kann nicht wiederhergestellt werden.');
       change({ recents: restored });
+      return copy();
+    },
+    async updateRecent(id, options, ports) {
+      await delay();
+      const recent = data.recents.find((item) => item.id === id);
+      if (!recent)
+        throw new Error('Diese Session steht nicht mehr in „Zuletzt“.');
+      const problem =
+        optionsProblem({ agent: recent.agent, options }) ||
+        launchPortsProblem({ env: recent.env, ports });
+      if (problem) throw new Error(problem);
+      const edited = editRecent(
+        data.recents,
+        id,
+        structuredClone(options),
+        normalizePorts(ports),
+      );
+      if (edited) change({ recents: edited });
       return copy();
     },
     async pickFolder() {

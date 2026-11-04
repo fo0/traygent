@@ -7,6 +7,7 @@ import { Notices, PANEL_NOTICE } from './notices.svelte';
 import type {
   AgentId,
   AppSettings,
+  LaunchOptions,
   LaunchRequest,
   RecentSession,
   Snapshot,
@@ -220,6 +221,18 @@ export class Panel {
     } catch (cause) {
       this.showNotice(errorMessage(cause), 'danger');
     }
+  }
+
+  /**
+   * „Bearbeiten …“ of a „Zuletzt“ row; rejects with the German message, so
+   * the dialog stays open and shows it.
+   */
+  async updateRecent(
+    recent: RecentSession,
+    options: LaunchOptions,
+    ports: string[],
+  ) {
+    this.accept(await this.#bridge.updateRecent(recent.id, options, ports));
   }
 
   /** Saves the whole settings object; rejects with the German message. */

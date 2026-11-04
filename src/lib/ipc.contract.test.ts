@@ -6,6 +6,7 @@ import { COMMAND_NAMES, type Command, type Commands } from './ipc';
 import type {
   AgentId,
   AppSettings,
+  LaunchOptions,
   LaunchRequest,
   RecentSession,
 } from './types';
@@ -75,6 +76,11 @@ const ARGS: { [K in Command]?: Exclude<Commands[K]['args'], undefined> } = {
   launch_session: { request: {} as LaunchRequest },
   remove_recent: { id: 'local:claude:c:\\x' },
   restore_recent: { recent: {} as RecentSession },
+  update_recent: {
+    id: 'local:claude:c:\\x',
+    options: {} as LaunchOptions,
+    ports: [],
+  },
   pick_folder: { initial: null },
   install_agent: { agent: 'claude' as AgentId },
   open_folder: { path: 'C:\\x' },

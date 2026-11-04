@@ -6,7 +6,8 @@ use traygent_core::detect::{self, Host, RealFs, SystemRunner};
 use traygent_core::launch::{self, LaunchPlan};
 use traygent_core::service::{self, DetectionEnd, Service};
 use traygent_core::{
-    spawn, AgentId, AppSettings, LaunchOutcome, LaunchRequest, PerAgent, RecentSession,
+    spawn, AgentId, AppSettings, LaunchOptions, LaunchOutcome, LaunchRequest, PerAgent,
+    RecentSession,
 };
 
 /// Panel event carrying the snapshot of a finished detection.
@@ -122,6 +123,19 @@ pub async fn restore_recent(
     recent: RecentSession,
 ) -> Result<traygent_core::Snapshot, String> {
     work(app, move |service| service.restore_recent(recent)).await
+}
+
+#[tauri::command]
+pub async fn update_recent(
+    app: AppHandle,
+    id: String,
+    options: LaunchOptions,
+    ports: Vec<String>,
+) -> Result<traygent_core::Snapshot, String> {
+    work(app, move |service| {
+        service.update_recent(&id, options, ports)
+    })
+    .await
 }
 
 /// The native folder dialog, owned by the panel so the popup stays open while it shows.

@@ -2,6 +2,7 @@
 import type {
   AgentId,
   AppSettings,
+  LaunchOptions,
   LaunchOutcome,
   LaunchRequest,
   LocalAccounts,
@@ -23,6 +24,12 @@ export interface Bridge {
   launchSession(request: LaunchRequest): Promise<LaunchOutcome>;
   removeRecent(id: string): Promise<Snapshot>;
   restoreRecent(recent: RecentSession): Promise<Snapshot>;
+  /** Stores new options and ports on a recent; rejects with a German message. */
+  updateRecent(
+    id: string,
+    options: LaunchOptions,
+    ports: string[],
+  ): Promise<Snapshot>;
   /** A folder dialog; `null` when cancelled. */
   pickFolder(initial: string | null): Promise<string | null>;
   installAgent(agent: AgentId): Promise<void>;

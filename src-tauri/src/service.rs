@@ -4,8 +4,8 @@
 use crate::detect::Detection;
 use crate::launch;
 use crate::models::{
-    AgentId, AgentStatus, AppSettings, EnvId, EnvStatus, GithubState, LaunchRequest, ProbeState,
-    RecentSession, Snapshot,
+    AgentId, AgentStatus, AppSettings, EnvId, EnvStatus, GithubState, LaunchOptions, LaunchRequest,
+    ProbeState, RecentSession, Snapshot,
 };
 use crate::store::{self, Persisted};
 use crate::{catalog, ports, recents, settings};
@@ -17,6 +17,7 @@ mod launch_prep;
 pub use github::Listing;
 pub use launch_prep::Prepared;
 
+pub const RECENT_GONE: &str = "Diese Session steht nicht mehr in „Zuletzt“.";
 pub const SAVE_FAILED: &str = "Einstellungen und Sessions werden nicht gespeichert: state.json konnte nicht geschrieben werden.";
 
 pub struct Service {
@@ -244,6 +245,30 @@ impl Service {
             ..recent
         };
         recents::restore(&mut list, recent)?;
+        self.commit_recents(list)
+    }
+
+    /// „Bearbeiten …“ of a „Zuletzt“ row: replaces the options and ports the next restart
+    /// sends, validated like a start; the entry keeps its place, start time and count.
+    pub fn update_recent(
+        &mut self,
+        id: &str,
+        options: LaunchOptions,
+        ports: Vec<String>,
+    ) -> Result<Snapshot, String> {
+        let mut list = self.state.recents.clone();
+        let recent = list
+            .iter_mut()
+            .find(|recent| recent.id == id)
+            .ok_or(RECENT_GONE)?;
+        let options = settings::normalize_options(options);
+        settings::validate_options(recent.agent, &options)?;
+        let ports = ports::normalize_ports(&ports)?;
+        if !ports.is_empty() && recent.env != EnvId::Docker {
+            return Err(ports::DOCKER_ONLY.into());
+        }
+        recent.options = options;
+        recent.ports = ports;
         self.commit_recents(list)
     }
 

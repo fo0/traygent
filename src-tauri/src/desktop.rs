@@ -129,6 +129,7 @@ pub fn run() {
             crate::desktop_agents::launch_session,
             crate::desktop_agents::remove_recent,
             crate::desktop_agents::restore_recent,
+            crate::desktop_agents::update_recent,
             crate::desktop_agents::pick_folder,
             crate::desktop_agents::install_agent,
             crate::desktop_agents::open_folder,

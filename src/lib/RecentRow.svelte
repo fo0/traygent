@@ -30,6 +30,7 @@
     launching,
     onRestart,
     onAdopt,
+    onEdit,
     onOpenFolder,
     onRemove,
     onInstall,
@@ -43,6 +44,8 @@
     /** Starts exactly these options again, as a new session. */
     onRestart: (recent: RecentSession) => void;
     onAdopt: (recent: RecentSession) => void;
+    /** „Bearbeiten …“: the options and ports the start sends. */
+    onEdit: (recent: RecentSession) => void;
     onOpenFolder: (path: string) => void;
     onRemove: (recent: RecentSession) => Promise<void>;
     onInstall: (agent: AgentId) => void;
@@ -136,11 +139,13 @@
   let initial = $state<MenuFocus>('first');
   let trigger = $state<HTMLButtonElement>();
 
+  /** Height of the row menu's four items, for the direction it opens. */
+  const MENU_HEIGHT = 165;
   /** Opens upwards when the menu would run past the bottom of the list. */
   function openMenu(focus: MenuFocus) {
     const bottom = trigger?.closest('.content')?.getBoundingClientRect().bottom;
     const below = trigger?.getBoundingClientRect().bottom ?? 0;
-    up = bottom !== undefined && below + 130 > bottom;
+    up = bottom !== undefined && below + MENU_HEIGHT > bottom;
     initial = focus;
     open = true;
   }
@@ -245,6 +250,13 @@
           class="menu-item"
           onclick={() => choose(() => onAdopt(recent))}
           ><Icon name="arrow" size={14} />In Composer übernehmen</button
+        >
+        <button
+          type="button"
+          role="menuitem"
+          class="menu-item"
+          onclick={() => choose(() => onEdit(recent))}
+          ><Icon name="edit" size={14} />Bearbeiten …</button
         >
         <button
           type="button"

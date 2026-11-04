@@ -14,12 +14,15 @@
     snapshot,
     panel,
     onInstall,
+    onEdit,
     onConnectGithub,
   }: {
     snapshot: Snapshot | null;
     panel: Panel;
     /** Opens Einstellungen → Agenten at that agent. */
     onInstall: (agent: AgentId) => void;
+    /** „Bearbeiten …“ of a „Zuletzt“ row. */
+    onEdit: (recent: RecentSession) => void;
     /** Opens Einstellungen → GitHub. */
     onConnectGithub: () => void;
   } = $props();
@@ -103,6 +106,7 @@
         launching={panel.launching}
         onRestart={restart}
         onAdopt={adopt}
+        {onEdit}
         onOpenFolder={(path) => void panel.openFolder(path)}
         onRemove={(recent) => panel.removeRecent(recent)}
         {onInstall}
