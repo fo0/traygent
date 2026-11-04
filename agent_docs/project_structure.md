@@ -12,7 +12,7 @@ fixtures/   snapshot.default.json — golden native snapshot (written by a Rust 
             targets.json, port-vectors.json — test vectors shared by the panel and Rust
 tests/      Playwright specs (browser demo + labelled IPC mock), support/
 scripts/    icon generator, README capture, release/updater helpers + node:test
-docs/       SPEC.md, AGENT_RECIPES.md, release docs, adr/, ARCHITECTURE.md + .mmd, images/
+docs/       USAGE.md (user guide), SPEC.md, AGENT_RECIPES.md, release docs, adr/, ARCHITECTURE.md + .mmd, images/
 .github/    ci.yml (pull requests), release.yml (manual), dependabot.yml
 ```
 
