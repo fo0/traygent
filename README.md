@@ -79,7 +79,7 @@ Open http://127.0.0.1:1420. The preview is labelled **Demo**.
 
 ## Privacy and security
 
-- **Your GitHub token stays in the Windows Credential Manager.** It only checks your account and reads your repository list; it never reaches a clone, a command line, an environment variable or the state file. Cloning uses your own Git credentials.
+- **Your GitHub token stays in the Windows Credential Manager.** It only checks your account and reads your repository list; it never reaches a clone, a command line, an environment variable or the state file. Cloning uses your own Git credentials. Exception, off by default: **GitHub-Token weitergeben** forwards `gh auth token` to Docker sessions as `GH_TOKEN`, by name only ([details](docs/USAGE.md#docker-sessions)).
 - **No shell strings.** Every launch is an argument list of quoted literals ([ADR-0003](docs/adr/0003-launch-through-a-powershell-argv.md)).
 - **Docker ports bind to `127.0.0.1`** unless you type an IP.
 - **Network access:** Traygent itself contacts only the GitHub API (update check, account check, your repository list) and GitHub release downloads. `git clone`, agent installers and container image pulls run visibly in the terminal Traygent opens for the session or install.
