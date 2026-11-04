@@ -261,6 +261,9 @@ describe('demo bridge', () => {
     await expect(
       bridge.updateRecent(local.id, { ...local.options, extraArgs: '"x"' }, []),
     ).rejects.toThrow('Extra-Argumente: Keine Anführungszeichen.');
+    await expect(
+      bridge.updateRecent(local.id, { ...local.options, effort: 'turbo' }, []),
+    ).rejects.toThrow('Unbekannte Denkstufe für Claude Code.');
     await expect(bridge.updateRecent('weg', local.options, [])).rejects.toThrow(
       'Diese Session steht nicht mehr in „Zuletzt“.',
     );

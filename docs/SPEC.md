@@ -74,7 +74,7 @@ Brand top left: icon + „Traygent“. Window ~480×760, frameless, tray popup l
    a ban: its recents keep their environment and ▶ restarts them unchanged. „Bearbeiten …“
    (#3) opens a staged dialog with the row's model, thinking level, permission, extra
    arguments and (Docker) ports; „Speichern“ stores them on the entry without a start
-   (`update_recent`, validated like a start) — place, start time and count stay, the next ▶
+   (`update_recent`, validated like a start; the dialog also applies the npm-shim argument rule) — place, start time and count stay, the next ▶
    sends them. The agent, environment and folder define the entry and are not editable.
 4. Footer: Docker state („Docker 27.5 bereit“ / „Docker nicht erreichbar“, only while Docker is
    shown) · „Stand hh:mm“.

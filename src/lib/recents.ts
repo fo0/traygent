@@ -85,7 +85,7 @@ export function restoreRecent(
 
 /**
  * „Bearbeiten …“, as natively (src-tauri/src/service.rs → update_recent): new
- * options (trimmed) and ports on the entry; its place, start time and count
+ * options (trimmed, a blank model or effort `default`) and ports on the entry; its place, start time and count
  * stay. Null when the id is no longer listed.
  */
 export function editRecent(
@@ -97,8 +97,8 @@ export function editRecent(
   if (!list.some((item) => item.id === id)) return null;
   const trimmed = {
     ...options,
-    model: options.model.trim(),
-    effort: options.effort.trim(),
+    model: options.model.trim() || 'default',
+    effort: options.effort.trim() || 'default',
     extraArgs: options.extraArgs.trim(),
   };
   return list.map((item) =>

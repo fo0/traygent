@@ -1,4 +1,4 @@
-import { agentLabel, agentStatus, envStatus } from './agents';
+import { agentLabel, agentStatus, effortProblem, envStatus } from './agents';
 import type { Bridge, ObserveSnapshots } from './bridgeTypes';
 import { DEMO_PICKED_FOLDER, demoSnapshot } from './demoData';
 import {
@@ -155,8 +155,10 @@ export function createDemoBridge(latency = 150, detection = 600): DemoBridge {
       const recent = data.recents.find((item) => item.id === id);
       if (!recent)
         throw new Error('Diese Session steht nicht mehr in „Zuletzt“.');
+      const entry = data.catalog.find((item) => item.id === recent.agent);
       const problem =
         optionsProblem({ agent: recent.agent, options }) ||
+        effortProblem(entry, options) ||
         launchPortsProblem({ env: recent.env, ports });
       if (problem) throw new Error(problem);
       const edited = editRecent(

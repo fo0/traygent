@@ -47,6 +47,15 @@
     const next = await panel.refresh();
     if (native && recovering && next) void updater.check(true);
   }
+  // „Bearbeiten …“ of an entry that is gone (removed elsewhere) closes.
+  $effect(() => {
+    if (
+      modals.kind === 'recent' &&
+      snapshot &&
+      !snapshot.recents.some((item) => item.id === modals.recentId)
+    )
+      modals.close();
+  });
   const shortcuts = createShortcuts({
     blocked: () => modals.kind !== null,
     refresh: () => void (canRefresh && refreshPanel()),
@@ -129,7 +138,8 @@
     onClose={modals.close}
   />
 {/if}
-<!-- Follows the entry in every snapshot; one removed meanwhile closes it. -->
+<!-- Follows the entry in every snapshot; one removed meanwhile closes it
+     (the effect above), so the page never stays inert without a dialog. -->
 {#if modals.kind === 'recent'}
   {@const recent = snapshot?.recents.find(
     (item) => item.id === modals.recentId,

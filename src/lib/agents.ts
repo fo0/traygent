@@ -166,6 +166,21 @@ export function effortNeedsModel(
   return !!entry?.efforts.length && !effortChoices(entry, model).length;
 }
 
+/**
+ * Why native refuses the effort a start would send (`validate_options`): one
+ * the catalog no longer lists. Empty when it is fine or not sent.
+ */
+export function effortProblem(
+  entry: AgentCatalogEntry | undefined,
+  options: LaunchOptions,
+) {
+  const sent = sentOptions(entry, options).effort;
+  if (!entry || sent === 'default') return '';
+  return entry.efforts.some((choice) => choice.id === sent)
+    ? ''
+    : `Unbekannte Denkstufe für ${entry.label}.`;
+}
+
 /** The options a start sends and records: an inapplicable effort is `default`. */
 export function sentOptions(
   entry: AgentCatalogEntry | undefined,

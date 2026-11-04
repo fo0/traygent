@@ -3,11 +3,23 @@
   import Modal from './Modal.svelte';
   import OptionFields from './OptionFields.svelte';
   import PortPicker from './PortPicker.svelte';
-  import { catalogEntry, envInfo, folderName, sentOptions } from './agents';
+  import {
+    catalogEntry,
+    effortProblem,
+    envInfo,
+    folderName,
+    sentOptions,
+    shimStart,
+  } from './agents';
   import { errorMessage } from './format';
   import { normalizePorts } from './ports';
   import type { LaunchOptions, RecentSession, Snapshot } from './types';
-  import { argsProblem, launchPortsProblem, modelProblem } from './validation';
+  import {
+    argsProblem,
+    launchPortsProblem,
+    modelProblem,
+    shimArgsProblem,
+  } from './validation';
 
   // „Bearbeiten …“ of a „Zuletzt“ row: the options and ports its ▶ sends.
   // Staged like the settings; „Speichern“ stores them without a start.
@@ -36,9 +48,16 @@
   onDestroy(() => (alive = false));
 
   const model = $derived(modelProblem(options.model, recent.agent));
-  const args = $derived(argsProblem(options.extraArgs));
+  /** As the row's ▶ checks them: an npm `.cmd` shim re-parses the arguments. */
+  const args = $derived(
+    argsProblem(options.extraArgs) ||
+      (shimStart(snapshot, recent.agent, recent.env)
+        ? shimArgsProblem(options.extraArgs)
+        : ''),
+  );
+  const effort = $derived(effortProblem(entry, options));
   const portsProblem = $derived(launchPortsProblem({ env: recent.env, ports }));
-  const invalid = $derived(!!(model || args || portsProblem));
+  const invalid = $derived(!!(model || args || effort || portsProblem));
   /** What „Speichern“ would store, compared with what the row has. */
   const next = $derived({
     options: sentOptions(entry, options),
@@ -104,8 +123,8 @@
         </OptionFields>
       {/if}
     </div>
-    {#if error}<div class="dialog-alert danger" role="alert">
-        {error}
+    {#if error || effort}<div class="dialog-alert danger" role="alert">
+        {error || effort}
       </div>{/if}
     <div class="modal-actions">
       <button

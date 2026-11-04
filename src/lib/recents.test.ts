@@ -132,5 +132,11 @@ describe('recents', () => {
     });
     expect(edited[0]).toBe(list[0]);
     expect(editRecent(list, 'unknown', next, [])).toBeNull();
+    const blank = { ...options, model: ' ', effort: '' };
+    expect(editRecent(list, list[0]!.id, blank, [])![0]!.options).toEqual({
+      ...options,
+      model: 'default',
+      effort: 'default',
+    });
   });
 });
