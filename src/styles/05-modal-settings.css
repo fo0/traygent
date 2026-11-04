@@ -1,0 +1,104 @@
+.modal-backdrop {
+  position: fixed;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 18px;
+  background: var(--backdrop);
+  backdrop-filter: blur(6px);
+  z-index: 20;
+}
+.modal {
+  background: var(--surface);
+  border: 1px solid var(--border-strong);
+  border-radius: 13px;
+  box-shadow: var(--shadow);
+  width: 440px;
+  max-width: 100%;
+  max-height: calc(100dvh - 40px);
+  display: flex;
+  flex-direction: column;
+  outline: none;
+  overflow: hidden;
+}
+.modal-heading {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 14px;
+  padding: 19px 20px 16px;
+  border-bottom: 1px solid var(--border);
+  flex-shrink: 0;
+}
+.eyebrow {
+  font-size: var(--font-size-meta);
+  font-weight: 600;
+  letter-spacing: 1.8px;
+  color: var(--text-3);
+}
+.modal-heading h2 {
+  font-size: 19px;
+  letter-spacing: -0.5px;
+  font-weight: 550;
+  color: var(--text);
+  margin-top: 7px;
+}
+.modal-heading > .icon-button {
+  margin-top: 1px;
+}
+.modal-body {
+  padding: 18px 20px;
+  overflow: auto;
+  scrollbar-width: thin;
+  scrollbar-color: var(--scrollbar) transparent;
+}
+.modal form {
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+}
+.modal-actions {
+  padding: 14px 20px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 11px;
+  border-top: 1px solid var(--border);
+  flex-shrink: 0;
+  background: var(--surface);
+}
+.primary-button,
+.secondary-button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 7px;
+  border-radius: 6px;
+  font-size: var(--font-size-meta);
+  font-weight: 600;
+  padding: 7px 11px;
+  min-height: var(--control-height);
+  white-space: nowrap;
+}
+.primary-button {
+  background: var(--accent);
+  color: var(--on-accent);
+  border: 1px solid var(--accent);
+}
+.primary-button:hover:not(:disabled):not([aria-disabled='true']) {
+  background: var(--accent-hover);
+}
+.secondary-button {
+  color: var(--text);
+  background: var(--raised);
+  border: 1px solid var(--border-strong);
+}
+.secondary-button:hover:not(:disabled) {
+  background: var(--hover);
+}
+.secondary-button.compact {
+  padding: 6px 9px;
+  min-height: var(--control-height);
+  font-size: var(--font-size-meta);
+}

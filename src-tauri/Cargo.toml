@@ -1,0 +1,59 @@
+[package]
+name = "traygent"
+default-run = "traygent"
+version = "0.1.0"
+description = "A tray launcher for coding-agent sessions"
+edition = "2021"
+license = "MIT"
+publish = false
+
+[lib]
+name = "traygent_core"
+path = "src/lib.rs"
+
+[[bin]]
+name = "traygent"
+path = "src/main.rs"
+required-features = ["desktop"]
+
+[features]
+default = []
+# The Windows tray shell; pulls the update client in.
+desktop = ["dep:tauri", "dep:tauri-build", "dep:tauri-plugin-dialog", "dep:tauri-plugin-opener", "dep:tauri-plugin-single-instance", "dep:tauri-plugin-updater", "dep:windows-sys", "dep:winreg", "updates", "vault"]
+# In-app updates: release check, installer download and verification.
+updates = ["dep:reqwest", "dep:semver"]
+# The GitHub token in the OS credential vault (Windows Credential Manager); never a
+# plaintext or in-memory fallback.
+vault = ["dep:keyring"]
+
+[dependencies]
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+chrono = { version = "0.4", features = ["clock", "serde"] }
+# SHA-256 for recent-session ids, the Docker project dir name and update verification.
+sha2 = "0.11"
+# keyring v1: Windows Credential Manager, macOS Keychain, Linux Secret Service.
+keyring = { version = "4.2", default-features = false, features = ["v1"], optional = true }
+tauri = { version = "2", features = ["tray-icon", "image-png"], optional = true }
+tauri-plugin-dialog = { version = "2", optional = true }
+tauri-plugin-opener = { version = "2", optional = true }
+tauri-plugin-single-instance = { version = "2", optional = true }
+tauri-plugin-updater = { version = "2.14.1", optional = true }
+
+reqwest = { version = "0.12", default-features = false, features = ["blocking", "json", "rustls-tls"], optional = true }
+semver = { version = "1", optional = true }
+
+[build-dependencies]
+tauri-build = { version = "2", features = [], optional = true }
+
+# Smaller installer. Panic stays `unwind`: a panicked worker or probe ends as an error, the
+# service mutex recovers from poisoning and the other locks fail soft with an error.
+[profile.release]
+codegen-units = 1
+lto = true
+opt-level = "s"
+strip = true
+
+[target.'cfg(windows)'.dependencies]
+winreg = { version = "0.56", optional = true }
+windows-sys = { version = "0.61", optional = true, features = ["Win32_Foundation", "Win32_Graphics_Gdi", "Win32_UI_HiDpi", "Win32_UI_Input_KeyboardAndMouse", "Win32_UI_WindowsAndMessaging"] }

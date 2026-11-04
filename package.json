@@ -1,0 +1,59 @@
+{
+  "name": "traygent",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "packageManager": "pnpm@11.19.0",
+  "engines": {
+    "node": ">=24"
+  },
+  "scripts": {
+    "dev": "vite --host 127.0.0.1 --port 1420",
+    "build": "vite build",
+    "preview": "vite preview --host 127.0.0.1 --port 1420",
+    "check": "svelte-check --tsconfig ./tsconfig.app.json && svelte-check --tsconfig ./tsconfig.node.json",
+    "test": "vitest run",
+    "test:e2e": "playwright test",
+    "lint": "prettier --check . && eslint .",
+    "lint:fix": "eslint --fix . && prettier --write .",
+    "format": "prettier --write .",
+    "tauri": "tauri",
+    "desktop:dev": "tauri dev --features desktop",
+    "desktop:build": "tauri build --features desktop",
+    "build:installer": "tauri build --features desktop --bundles nsis",
+    "capture:readme": "node scripts/capture-readme.mjs",
+    "icons:generate": "node scripts/generate-icons.mjs",
+    "icons:check": "node scripts/generate-icons.mjs --check",
+    "verify": "pnpm lint && pnpm icons:check && pnpm check && pnpm test && pnpm release:test && pnpm build",
+    "release:test": "node --test scripts/release.test.mjs scripts/updater.test.mjs scripts/release-workflow.test.mjs",
+    "prepare": "husky"
+  },
+  "dependencies": {
+    "@tauri-apps/api": "^2.10.1",
+    "svelte": "^5.0.0"
+  },
+  "devDependencies": {
+    "@eslint/js": "^10.0.1",
+    "@playwright/test": "^1.56.0",
+    "@sveltejs/vite-plugin-svelte": "^7.3.1",
+    "@tauri-apps/cli": "^2.10.1",
+    "@types/node": "^24.0.0",
+    "eslint": "^10.14.0",
+    "eslint-config-prettier": "^10.1.8",
+    "eslint-plugin-svelte": "^3.23.1",
+    "globals": "^17.13.0",
+    "husky": "^9.1.7",
+    "lint-staged": "^17.6.0",
+    "prettier": "^3.6.0",
+    "prettier-plugin-svelte": "^4.1.1",
+    "svelte-check": "^4.3.0",
+    "typescript": "^6.0.3",
+    "typescript-eslint": "^8.72.1",
+    "vite": "^8.3.5",
+    "vitest": "^5.1.0"
+  },
+  "lint-staged": {
+    "*": "prettier --write --ignore-unknown",
+    "*.rs": "rustfmt --edition 2021"
+  }
+}

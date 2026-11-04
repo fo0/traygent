@@ -1,0 +1,141 @@
+.desktop {
+  min-height: 100dvh;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 24px 18px;
+  background: var(--page);
+}
+.tray {
+  width: 480px;
+  height: 760px;
+  max-height: calc(100dvh - 48px);
+  min-height: 520px;
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  background: var(--surface);
+  color: var(--text);
+  box-shadow: var(--shadow);
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  position: relative;
+}
+
+/* App bar: brand, refresh and settings in one row. */
+.app-bar {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 56px;
+  padding: 10px 12px 10px 16px;
+  flex-shrink: 0;
+}
+.brand {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  margin-right: auto;
+  min-width: 0;
+  font-size: 15px;
+  font-weight: 680;
+  letter-spacing: -0.01em;
+  line-height: 1.2;
+  white-space: nowrap;
+}
+/* The brand leads home: icon and name in one borderless button. */
+.brand-home {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  min-width: 0;
+  margin: -4px -6px;
+  padding: 4px 6px;
+  border: 0;
+  border-radius: 9px;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  letter-spacing: inherit;
+  cursor: pointer;
+}
+.brand-home:hover {
+  background: var(--hover);
+}
+.brand-home:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 1px;
+}
+.brand-icon {
+  width: 26px;
+  height: 26px;
+  flex-shrink: 0;
+  display: grid;
+  place-items: center;
+  border-radius: 8px;
+  background: var(--accent);
+  color: var(--on-accent);
+}
+.app-bar-actions {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  min-width: 0;
+}
+.demo-tag {
+  font-weight: 650;
+  letter-spacing: 0.2px;
+  color: var(--text-2);
+}
+
+/* Popup menus (menu.ts handles keys and outside clicks). */
+.menu {
+  position: absolute;
+  z-index: 10;
+  min-width: 230px;
+  max-width: min(300px, calc(100vw - 24px));
+  padding: 5px;
+  border: 1px solid var(--border-strong);
+  border-radius: 11px;
+  background: var(--raised);
+  box-shadow: var(--menu-shadow);
+  color: var(--text);
+}
+
+.icon-button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  background: transparent;
+  color: var(--text-2);
+  border-radius: 8px;
+  padding: 5px;
+  min-width: 32px;
+  min-height: 32px;
+  transition:
+    background 0.15s,
+    color 0.15s;
+}
+.icon-button:hover:not(:disabled) {
+  background: var(--hover);
+  color: var(--text);
+}
+.app-bar .icon-button {
+  min-width: 34px;
+  min-height: 34px;
+  border-radius: 9px;
+}
+.icon-button.small {
+  padding: 3px;
+  min-width: 32px;
+  min-height: 32px;
+}
+.content {
+  padding: 16px 18px 15px;
+  overflow: auto;
+  flex: 1;
+  min-height: 0;
+  scrollbar-width: thin;
+  scrollbar-color: var(--scrollbar) transparent;
+}

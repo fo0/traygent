@@ -1,0 +1,26 @@
+node_modules/
+dist/
+src-tauri/target/
+playwright-report/
+test-results/
+.env
+.env.*
+!.env.example
+.DS_Store
+
+src-tauri/gen/schemas/
+
+# Screenshot acceptance files are delivered privately, never published.
+docs/review/
+
+release-work/
+
+# Local verification tools and logs.
+.local-tools/
+
+# Local agent worktrees.
+.claude/worktrees/
+
+# Local Claude Code files.
+.claude/settings.local.json
+CLAUDE.local.md

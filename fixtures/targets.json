@@ -1,0 +1,121 @@
+{
+  "$comment": "Shared test vectors for the folder field's classification (docs/SPEC.md → Repositories); checked by src/lib/target.test.ts and the Rust repo tests.",
+  "cases": [
+    { "input": "", "kind": "empty" },
+    { "input": "   ", "kind": "empty" },
+    { "input": "C:\\dev\\app", "kind": "folder" },
+    { "input": "c:/dev/app", "kind": "folder" },
+    { "input": "\\\\server\\share\\app", "kind": "folder" },
+    { "input": "//server/share/app", "kind": "folder" },
+    { "input": "\\\\", "kind": "search", "query": "\\\\" },
+    {
+      "input": "fo0/traygent",
+      "kind": "repo",
+      "owner": "fo0",
+      "name": "traygent"
+    },
+    {
+      "input": "  fo0/traygent  ",
+      "kind": "repo",
+      "owner": "fo0",
+      "name": "traygent"
+    },
+    {
+      "input": "fo0/traygent.git",
+      "kind": "repo",
+      "owner": "fo0",
+      "name": "traygent"
+    },
+    {
+      "input": "https://github.com/fo0/traygent",
+      "kind": "repo",
+      "owner": "fo0",
+      "name": "traygent"
+    },
+    {
+      "input": "https://github.com/fo0/traygent/",
+      "kind": "repo",
+      "owner": "fo0",
+      "name": "traygent"
+    },
+    {
+      "input": "https://github.com/fo0/traygent.git",
+      "kind": "repo",
+      "owner": "fo0",
+      "name": "traygent"
+    },
+    {
+      "input": "https://github.com/fo0/traygent/tree/main/src",
+      "kind": "repo",
+      "owner": "fo0",
+      "name": "traygent"
+    },
+    {
+      "input": "https://github.com/fo0/traygent?tab=readme",
+      "kind": "repo",
+      "owner": "fo0",
+      "name": "traygent"
+    },
+    {
+      "input": "https://github.com/fo0/traygent#readme",
+      "kind": "repo",
+      "owner": "fo0",
+      "name": "traygent"
+    },
+    {
+      "input": "http://github.com/fo0/traygent",
+      "kind": "repo",
+      "owner": "fo0",
+      "name": "traygent"
+    },
+    {
+      "input": "https://www.github.com/fo0/traygent",
+      "kind": "repo",
+      "owner": "fo0",
+      "name": "traygent"
+    },
+    {
+      "input": "github.com/fo0/traygent",
+      "kind": "repo",
+      "owner": "fo0",
+      "name": "traygent"
+    },
+    {
+      "input": "git@github.com:fo0/traygent.git",
+      "kind": "repo",
+      "owner": "fo0",
+      "name": "traygent"
+    },
+    {
+      "input": "git@github.com:fo0/traygent",
+      "kind": "repo",
+      "owner": "fo0",
+      "name": "traygent"
+    },
+    {
+      "input": "Some-Org/my.repo_name-2",
+      "kind": "repo",
+      "owner": "Some-Org",
+      "name": "my.repo_name-2"
+    },
+    { "input": "fo0", "kind": "search", "query": "fo0" },
+    { "input": "tray agent", "kind": "search", "query": "tray agent" },
+    { "input": "-bad/repo", "kind": "search", "query": "-bad/repo" },
+    { "input": "bad-/repo", "kind": "search", "query": "bad-/repo" },
+    { "input": "fo0/..", "kind": "search", "query": "fo0/.." },
+    { "input": "fo0/.", "kind": "search", "query": "fo0/." },
+    { "input": "fo0/a/b", "kind": "search", "query": "fo0/a/b" },
+    { "input": "fo0/re po", "kind": "search", "query": "fo0/re po" },
+    {
+      "input": "https://gitlab.com/fo0/traygent",
+      "kind": "search",
+      "query": "https://gitlab.com/fo0/traygent"
+    },
+    {
+      "input": "https://github.com/fo0",
+      "kind": "search",
+      "query": "https://github.com/fo0"
+    },
+    { "input": "dev\\app", "kind": "search", "query": "dev\\app" }
+  ]
+}

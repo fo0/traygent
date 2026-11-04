@@ -1,0 +1,327 @@
+{
+  "about": "Shared port vectors (docs/SPEC.md → Ports): src/lib/ports.test.ts and src-tauri/src/ports/tests.rs both check every entry, so panel and native side refuse and normalize alike.",
+  "ports": [
+    {
+      "input": "3000",
+      "normalized": "127.0.0.1:3000:3000"
+    },
+    {
+      "input": "  5173 ",
+      "normalized": "127.0.0.1:5173:5173"
+    },
+    {
+      "input": "\t3000\n",
+      "normalized": "127.0.0.1:3000:3000"
+    },
+    {
+      "input": "\u00853000\u3000",
+      "normalized": "127.0.0.1:3000:3000"
+    },
+    {
+      "input": "1",
+      "normalized": "127.0.0.1:1:1"
+    },
+    {
+      "input": "65535",
+      "normalized": "127.0.0.1:65535:65535"
+    },
+    {
+      "input": "03000",
+      "normalized": "127.0.0.1:3000:3000"
+    },
+    {
+      "input": "8080:80",
+      "normalized": "127.0.0.1:8080:80"
+    },
+    {
+      "input": "0.0.0.0:3000:3000",
+      "normalized": "0.0.0.0:3000:3000"
+    },
+    {
+      "input": "192.168.1.20:8443:443",
+      "normalized": "192.168.1.20:8443:443"
+    },
+    {
+      "input": "8000-8002",
+      "normalized": "127.0.0.1:8000-8002:8000-8002"
+    },
+    {
+      "input": "9000-9001:3000-3001",
+      "normalized": "127.0.0.1:9000-9001:3000-3001"
+    },
+    {
+      "input": "3000-3000",
+      "normalized": "127.0.0.1:3000:3000"
+    },
+    {
+      "input": "8000-8099",
+      "normalized": "127.0.0.1:8000-8099:8000-8099"
+    },
+    {
+      "input": "53/UDP",
+      "normalized": "127.0.0.1:53:53/udp"
+    },
+    {
+      "input": "8080:80/TCP",
+      "normalized": "127.0.0.1:8080:80"
+    },
+    {
+      "input": "0.0.0.0:8080:80/udp",
+      "normalized": "0.0.0.0:8080:80/udp"
+    },
+    {
+      "input": "",
+      "error": "Port „“ ist ungültig."
+    },
+    {
+      "input": "  ",
+      "error": "Port „“ ist ungültig."
+    },
+    {
+      "input": "abc",
+      "error": "Port „abc“ ist ungültig."
+    },
+    {
+      "input": "-1",
+      "error": "Port „-1“ ist ungültig."
+    },
+    {
+      "input": "1-2-3",
+      "error": "Port „1-2-3“ ist ungültig."
+    },
+    {
+      "input": "3001-3000",
+      "error": "Port „3001-3000“ ist ungültig."
+    },
+    {
+      "input": ":3000",
+      "error": "Port „:3000“ ist ungültig."
+    },
+    {
+      "input": "3000:",
+      "error": "Port „3000:“ ist ungültig."
+    },
+    {
+      "input": "1:2:3:4",
+      "error": "Port „1:2:3:4“ ist ungültig."
+    },
+    {
+      "input": "[::1]:80:80",
+      "error": "Port „[::1]:80:80“ ist ungültig."
+    },
+    {
+      "input": "3000 3001",
+      "error": "Port „3000 3001“ ist ungültig."
+    },
+    {
+      "input": "3000/sctp",
+      "error": "Port „3000/sctp“ ist ungültig."
+    },
+    {
+      "input": "3000/",
+      "error": "Port „3000/“ ist ungültig."
+    },
+    {
+      "input": "3000/udp/tcp",
+      "error": "Port „3000/udp/tcp“ ist ungültig."
+    },
+    {
+      "input": "/udp",
+      "error": "Port „/udp“ ist ungültig."
+    },
+    {
+      "input": "0",
+      "error": "Port „0“ liegt außerhalb von 1–65535."
+    },
+    {
+      "input": "65536",
+      "error": "Port „65536“ liegt außerhalb von 1–65535."
+    },
+    {
+      "input": "123456",
+      "error": "Port „123456“ liegt außerhalb von 1–65535."
+    },
+    {
+      "input": "8080:0",
+      "error": "Port „8080:0“ liegt außerhalb von 1–65535."
+    },
+    {
+      "input": "70000-abc",
+      "error": "Port „70000-abc“ liegt außerhalb von 1–65535."
+    },
+    {
+      "input": "localhost:80:80",
+      "error": "IP-Adresse in „localhost:80:80“ ist ungültig (nur IPv4)."
+    },
+    {
+      "input": "1.2.3:80:80",
+      "error": "IP-Adresse in „1.2.3:80:80“ ist ungültig (nur IPv4)."
+    },
+    {
+      "input": "01.2.3.4:80:80",
+      "error": "IP-Adresse in „01.2.3.4:80:80“ ist ungültig (nur IPv4)."
+    },
+    {
+      "input": "256.0.0.1:80:80",
+      "error": "IP-Adresse in „256.0.0.1:80:80“ ist ungültig (nur IPv4)."
+    },
+    {
+      "input": "8000-8002:80-81",
+      "error": "Host- und Container-Bereich in „8000-8002:80-81“ müssen gleich lang sein."
+    },
+    {
+      "input": "1-200:1-2",
+      "error": "Host- und Container-Bereich in „1-200:1-2“ müssen gleich lang sein."
+    },
+    {
+      "input": "1-2:1-200",
+      "error": "Host- und Container-Bereich in „1-2:1-200“ müssen gleich lang sein."
+    },
+    {
+      "input": "1.2.3.4:1-200:1-2",
+      "error": "Host- und Container-Bereich in „1.2.3.4:1-200:1-2“ müssen gleich lang sein."
+    },
+    {
+      "input": "1-200:abc",
+      "error": "Port „1-200:abc“ ist ungültig."
+    },
+    {
+      "input": "8000-8100",
+      "error": "Bereich in „8000-8100“ umfasst mehr als 100 Ports."
+    },
+    {
+      "input": "1-200:1-200",
+      "error": "Bereich in „1-200:1-200“ umfasst mehr als 100 Ports."
+    },
+    {
+      "input": "1111111111111111111111111111111111111111111111111111111111111111111111",
+      "error": "Port „11111111111111111111111111111111…“ ist ungültig."
+    },
+    {
+      "input": "30\u000700",
+      "error": "Port „3000“ ist ungültig."
+    },
+    {
+      "input": "30\t00",
+      "error": "Port „3000“ ist ungültig."
+    },
+    {
+      "input": "30\u202e00",
+      "error": "Port „3000“ ist ungültig."
+    },
+    {
+      "input": "\u200b3000",
+      "error": "Port „3000“ ist ungültig."
+    },
+    {
+      "input": "\ufeff3000",
+      "error": "Port „3000“ ist ungültig."
+    },
+    {
+      "input": "ä3000",
+      "error": "Port „3000“ ist ungültig."
+    },
+    {
+      "input": "\u200b\u200b\u200b\u200b\u200b\u200b\u200b\u200b\u200b\u200b1111111111111111111111111111111111111111",
+      "error": "Port „11111111111111111111111111111111…“ ist ungültig."
+    }
+  ],
+  "lists": [
+    {
+      "list": [],
+      "normalized": []
+    },
+    {
+      "list": ["  ", ""],
+      "normalized": []
+    },
+    {
+      "list": [" 3000 ", "", "0.0.0.0:8080:80/udp", "5173/tcp"],
+      "normalized": [
+        "127.0.0.1:3000:3000",
+        "0.0.0.0:8080:80/udp",
+        "127.0.0.1:5173:5173"
+      ]
+    },
+    {
+      "list": ["53/tcp", "53/udp"],
+      "normalized": ["127.0.0.1:53:53", "127.0.0.1:53:53/udp"]
+    },
+    {
+      "list": ["127.0.0.1:3000:3000", "0.0.0.0:3000:80"],
+      "error": "Host-Port 3000 ist doppelt belegt."
+    },
+    {
+      "list": ["8000-8005", "8003:80"],
+      "error": "Host-Port 8003 ist doppelt belegt."
+    },
+    {
+      "list": ["3004-3008", "3000-3005"],
+      "error": "Host-Port 3004 ist doppelt belegt."
+    },
+    {
+      "list": ["53/udp", "0.0.0.0:50-60:50-60/udp"],
+      "error": "Host-Port 53/udp ist doppelt belegt."
+    },
+    {
+      "list": ["3000", " 3o00 "],
+      "error": "Port „3o00“ ist ungültig."
+    },
+    {
+      "list": ["\ufeff"],
+      "error": "Port „“ ist ungültig."
+    },
+    {
+      "list": [
+        "10000",
+        "10001",
+        "10002",
+        "10003",
+        "10004",
+        "10005",
+        "10006",
+        "10007",
+        "10008",
+        "10009",
+        "10010",
+        "10011",
+        "10012",
+        "10013",
+        "10014",
+        "10015",
+        "10016",
+        "10017",
+        "10018",
+        "10019",
+        "10020"
+      ],
+      "error": "Höchstens 20 Port-Angaben erlaubt."
+    },
+    {
+      "list": [
+        "10000",
+        "10001",
+        "10002",
+        "10003",
+        "10004",
+        "10005",
+        "10006",
+        "10007",
+        "10008",
+        "10009",
+        "10010",
+        "10011",
+        "10012",
+        "10013",
+        "10014",
+        "10015",
+        "10016",
+        "10017",
+        "10018",
+        "10019",
+        "x"
+      ],
+      "error": "Höchstens 20 Port-Angaben erlaubt."
+    }
+  ]
+}

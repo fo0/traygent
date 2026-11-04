@@ -1,0 +1,10 @@
+/* Settings: tab badges. */
+
+@media (forced-colors: active) {
+  /* Tab dots are fills and would vanish. */
+  .tab-update-dot,
+  .tab-update-dot[data-tone='danger'] {
+    forced-color-adjust: none;
+    background: CanvasText;
+  }
+}

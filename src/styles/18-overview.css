@@ -1,0 +1,54 @@
+/*
+ * Dashboard sections („Ein Blick“): section headers with an uppercase title,
+ * an optional count and actions. Tokens from 00-tokens.css only.
+ */
+
+/* Text for assistive tech only, e.g. the unit of a section count. */
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+}
+
+/* Section header: uppercase title, count and actions. */
+.section-header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 32px;
+  margin: 10px 2px 6px;
+}
+.section-header :is(h2, h3) {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 0;
+  min-width: 0;
+  font-size: var(--font-size-meta);
+  font-weight: 650;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--text-3);
+  white-space: nowrap;
+}
+.section-header :is(h2, h3) > svg {
+  flex-shrink: 0;
+}
+.section-count {
+  font-size: var(--font-size-meta);
+  font-weight: 500;
+  color: var(--text-3);
+  font-variant-numeric: tabular-nums;
+}
+.section-actions {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  margin-left: auto;
+}
+.content {
+  scrollbar-gutter: stable;
+}

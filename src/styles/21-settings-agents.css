@@ -1,0 +1,181 @@
+/*
+ * Settings → „Agenten“ and „Umgebung“: probe lines, the install command and
+ * compact label/control grids. Tokens from 00-tokens.css only.
+ */
+.modal-body h3 {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text);
+}
+.modal-body > .segmented:first-child {
+  margin-bottom: 14px;
+}
+/* Every settings control is --control-height tall: a segmented control's
+   segments fill it inside the track's 2 px padding and 1 px border. Each
+   segment sizes to its label first, so a name is cut only when the row is
+   too narrow for all of them. */
+.modal-body .segment {
+  flex: 1 1 auto;
+  gap: 5px;
+  min-height: calc(var(--control-height) - 6px);
+  padding: 3px 5px;
+}
+.settings-group + .settings-group {
+  margin-top: 18px;
+}
+.settings-group h3 {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin: 0 0 10px;
+}
+.settings-group .field-help {
+  margin-top: 6px;
+}
+.info-tip {
+  display: inline-flex;
+  color: var(--text-3);
+  cursor: help;
+}
+
+/* Lokal and Docker probe of the selected agent. */
+.status-lines {
+  display: grid;
+  gap: 6px;
+  margin: 0;
+}
+.status-lines > div {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  min-height: var(--control-height);
+  padding: 4px 10px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--raised);
+  font-size: var(--font-size-meta);
+}
+.status-lines dt {
+  display: flex;
+  flex-shrink: 0;
+  align-items: center;
+  gap: 7px;
+  color: var(--text-2);
+}
+/* One line: the probe's note follows the state and is cut off with „…“. */
+.status-lines dd {
+  min-width: 0;
+  margin: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--text-2);
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+}
+.status-lines dd[data-state='ready'] {
+  color: var(--ok);
+}
+.status-lines dd[data-state='missing'] {
+  color: var(--text-3);
+}
+.status-lines dd[data-state='stopped'] {
+  color: var(--wait);
+}
+.status-detail {
+  color: var(--text-3);
+  font-weight: 400;
+}
+
+/* Install command with copy button, then the immediate „Installieren“. */
+.install-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.copy-field {
+  position: relative;
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  align-items: center;
+}
+.copy-field .text-field {
+  padding-right: 36px;
+  text-overflow: ellipsis;
+}
+.copy-field .icon-button {
+  position: absolute;
+  right: 1px;
+}
+.install-note {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-top: 8px;
+  color: var(--ok);
+  font-size: var(--font-size-meta);
+}
+
+/* „Umgebungen“: one checkbox per environment, like the port presets. */
+.env-toggles {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0 6px;
+}
+.env-toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-height: var(--row-height);
+  padding: 0 6px 0 4px;
+  border-radius: 6px;
+  color: var(--text);
+  font-size: var(--font-size-meta);
+  white-space: nowrap;
+  cursor: pointer;
+}
+.env-toggle:hover:not(:has(input[aria-disabled='true'])) {
+  background: var(--hover);
+}
+/* The last usable one: locked on, still focusable for its reason. */
+.env-toggle:has(input[aria-disabled='true']) {
+  cursor: default;
+}
+.env-toggle input[aria-disabled='true'] {
+  opacity: 0.5;
+}
+.env-toggle input {
+  margin: 0;
+  accent-color: var(--accent);
+}
+.env-toggle svg {
+  color: var(--text-2);
+}
+
+/* Label left, control right; one column in narrow windows. The label column
+   has one minimum width, so the controls of every group and tab line up. */
+.field-grid {
+  display: grid;
+  grid-template-columns: minmax(96px, max-content) minmax(0, 1fr);
+  align-items: center;
+  gap: 8px 12px;
+}
+.field-grid > label,
+.field-label {
+  color: var(--text-2);
+  font-size: var(--font-size-meta);
+}
+.field-cell {
+  min-width: 0;
+}
+@media (max-width: 420px) {
+  .field-grid {
+    grid-template-columns: minmax(0, 1fr);
+    gap: 4px;
+  }
+  .field-grid > :is(label, .field-label) {
+    margin-top: 6px;
+  }
+}

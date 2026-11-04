@@ -1,0 +1,99 @@
+/*
+ * Dashboard domain: the „Neue Session“ composer card and the footer's Docker
+ * state; the „Zuletzt“ rows live in 26-recent-rows.css. Tokens only.
+ */
+.composer {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 10px;
+}
+
+/* Folder: path field, recent-folder menu and the browse button in one box. */
+.folder-field {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  min-height: 34px;
+  padding-right: 1px;
+  border: 1px solid var(--border-strong);
+  border-radius: 8px;
+  background: var(--bg);
+}
+.folder-field:has(.folder-input:focus-visible) {
+  outline: 2px solid var(--accent);
+  outline-offset: 1px;
+}
+.folder-input {
+  flex: 1;
+  min-width: 0;
+  height: 32px;
+  padding: 0 10px;
+  border: 0;
+  background: transparent;
+  color: var(--text);
+  font-size: 13px;
+  text-overflow: ellipsis;
+}
+.folder-input:focus-visible {
+  outline: none;
+}
+.folder-field .icon-button.small {
+  min-width: 30px;
+  min-height: 30px;
+}
+.folder-menu {
+  top: calc(100% + 4px);
+  right: 0;
+  left: 0;
+  max-width: none;
+}
+
+/* Chips wrap among themselves; „Starten“ stays at the bottom right. */
+.composer-actions {
+  display: flex;
+  align-items: flex-end;
+  gap: 6px;
+}
+.option-chips {
+  display: flex;
+  flex: 1 1 0;
+  flex-wrap: wrap;
+  gap: 4px;
+  min-width: 0;
+}
+/* „Starten“: about as tall as the chip row and only as wide as its label, so
+   the chips keep one row at 480 px. */
+.composer-actions .composer-start {
+  flex-shrink: 0;
+  gap: 5px;
+  min-height: 30px;
+  padding: 0 10px;
+}
+
+/* Footer: the Docker probe next to Demo/Lokal. */
+.docker-state {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  margin-left: 6px;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.docker-state[data-state='missing'],
+.docker-state[data-state='stopped'] {
+  color: var(--wait);
+}
+
+/* Narrow windows: a tighter composer. */
+@media (max-width: 420px) {
+  .composer {
+    padding: 8px;
+  }
+  .segment {
+    padding: 4px 5px;
+    gap: 5px;
+  }
+}

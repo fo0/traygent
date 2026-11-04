@@ -1,0 +1,111 @@
+name: Release
+# Started by hand on main: CI for that commit, then build and publish the unsigned
+# Windows EXE with a CalVer version and GitHub-generated changelog.
+on:
+  workflow_dispatch:
+permissions:
+  contents: read
+concurrency:
+  group: release
+  cancel-in-progress: false
+jobs:
+  ci:
+    # Started on another branch, nothing runs.
+    if: github.ref == 'refs/heads/main'
+    uses: ./.github/workflows/ci.yml
+    permissions:
+      contents: read
+      pull-requests: read # Required by CI's change filter, unused on main.
+
+  release:
+    needs: ci
+    runs-on: windows-latest
+    timeout-minutes: 60
+    permissions:
+      contents: write # Create the tag and publish the release.
+      actions: read # Read this run's immutable created_at for retry-stable versions.
+    env:
+      RELEASE_SOURCE_SHA: ${{ github.sha }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+          fetch-depth: 0
+      - uses: pnpm/action-setup@ea17c68df8912ef543352723c149a84f56e3d413 # v6.1.0
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version-file: .node-version
+          cache: pnpm
+      - name: Prepare automatic release
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          if ($env:GITHUB_REF -ne 'refs/heads/main') { throw 'Release must be started from main' }
+          if ($env:RELEASE_SOURCE_SHA -ne (git rev-parse HEAD)) { throw 'Checkout differs from release source' }
+          git merge-base --is-ancestor HEAD origin/main
+          if ($LASTEXITCODE -ne 0) { throw 'Release must be on main' }
+          New-Item -ItemType Directory -Force release-work | Out-Null
+          $createdAt = gh api "repos/$env:GITHUB_REPOSITORY/actions/runs/$env:GITHUB_RUN_ID" --jq '.created_at'
+          if ($LASTEXITCODE -ne 0) { throw 'Run timestamp unavailable' }
+          node scripts/release.mjs plan $createdAt $env:RELEASE_SOURCE_SHA release-work/release-meta.json
+          if ($LASTEXITCODE -ne 0) { throw 'Release version generation failed' }
+          $metadata = Get-Content release-work/release-meta.json -Raw | ConvertFrom-Json
+          $existingTag = git tag --list $metadata.tag
+          if ($LASTEXITCODE -ne 0 -or $existingTag) { throw 'Release tag already exists or cannot be checked' }
+          gh api "repos/$env:GITHUB_REPOSITORY/releases?per_page=100" --paginate --slurp | Out-File -Encoding utf8 release-work/release-history.json
+          if ($LASTEXITCODE -ne 0) { throw 'Release history unavailable' }
+          node scripts/release.mjs check-history release-work/release-meta.json release-work/release-history.json
+          if ($LASTEXITCODE -ne 0) { throw 'Release exists or would downgrade latest' }
+          gh api --method POST "repos/$env:GITHUB_REPOSITORY/releases/generate-notes" --raw-field "tag_name=$($metadata.tag)" --raw-field "target_commitish=$env:RELEASE_SOURCE_SHA" --jq '.body' | Out-File -Encoding utf8 release-work/generated-notes.md
+          if ($LASTEXITCODE -ne 0) { throw 'Automatic changelog generation failed' }
+          node scripts/release.mjs prepare release-work/release-meta.json release-work/generated-notes.md release-work/release-notes.md
+          if ($LASTEXITCODE -ne 0) { throw 'Release preflight failed' }
+          "RELEASE_TAG=$($metadata.tag)" | Out-File -Encoding utf8 -Append $env:GITHUB_ENV
+          "RELEASE_VERSION=$($metadata.version)" | Out-File -Encoding utf8 -Append $env:GITHUB_ENV
+          "RELEASE_TITLE=$($metadata.title)" | Out-File -Encoding utf8 -Append $env:GITHUB_ENV
+      - name: Install Rust stable
+        run: rustup toolchain install stable --profile minimal --no-self-update && rustup default stable
+      - name: Cache Rust dependencies
+        uses: Swatinem/rust-cache@d1527c8f67ef9af357290475d4af4b0fab8f12e0 # v2.9.3
+        with:
+          workspaces: src-tauri -> target
+          shared-key: windows-installer
+          cache-bin: false
+      - run: pnpm install --frozen-lockfile
+      - name: Build unsigned Windows installer
+        id: build
+        run: pnpm tauri build --features desktop --bundles nsis --config src-tauri/tauri.release.conf.json
+      - name: Verify installer download and publish release
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          $version = $env:RELEASE_VERSION
+          $installer = "src-tauri/target/release/bundle/nsis/Traygent_${version}_x64-setup.exe"
+          if (!(Test-Path $installer)) { throw 'Installer missing' }
+          gh api "repos/$env:GITHUB_REPOSITORY/releases?per_page=100" --paginate --slurp | Out-File -Encoding utf8 release-work/release-history.json
+          if ($LASTEXITCODE -ne 0) { throw 'Release history unavailable' }
+          node scripts/release.mjs check-history release-work/release-meta.json release-work/release-history.json
+          if ($LASTEXITCODE -ne 0) { throw 'Release exists or would downgrade latest' }
+          # The checkout keeps no credentials, so query the tag through the API, not git.
+          $remoteTags = gh api "repos/$env:GITHUB_REPOSITORY/git/matching-refs/tags/$env:RELEASE_TAG" --jq '.[].ref'
+          if ($LASTEXITCODE -ne 0) { throw 'Release tag cannot be checked' }
+          if ($remoteTags -contains "refs/tags/$env:RELEASE_TAG") { throw 'Release tag appeared during build' }
+          gh release create $env:RELEASE_TAG $installer --target $env:RELEASE_SOURCE_SHA --title $env:RELEASE_TITLE --notes-file release-work/release-notes.md --latest
+          if ($LASTEXITCODE -ne 0) { throw 'Release creation/upload failed' }
+          $isDraft = gh release view $env:RELEASE_TAG --json isDraft --jq '.isDraft'
+          if ($LASTEXITCODE -ne 0 -or $isDraft -ne 'false') { throw 'Release was not published' }
+          $filename = Split-Path $installer -Leaf
+          gh release download $env:RELEASE_TAG --pattern $filename --dir release-work/download-check
+          if ($LASTEXITCODE -ne 0) { throw 'Release exists, but download verification failed' }
+          $downloaded = Join-Path release-work/download-check $filename
+          if ((Get-FileHash $downloaded -Algorithm SHA256).Hash -ne (Get-FileHash $installer -Algorithm SHA256).Hash) { throw 'Release exists, but downloaded installer differs' }
+      - name: Keep the built EXE when publishing failed
+        if: failure() && steps.build.outcome == 'success'
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: Traygent-Windows-release
+          path: src-tauri/target/release/bundle/nsis/*.exe
+          retention-days: 7
+          if-no-files-found: error

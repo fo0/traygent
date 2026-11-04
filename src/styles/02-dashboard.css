@@ -1,0 +1,15 @@
+/*
+ * Dashboard: the „Neue Session“ composer card right under the app bar (as
+ * RepoWatch's search field) and the „Zuletzt“ list.
+ */
+.dashboard-section + .dashboard-section {
+  margin-top: 6px;
+}
+.composer {
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  background: var(--raised);
+}
+.composer .empty-state {
+  padding: 18px 16px;
+}

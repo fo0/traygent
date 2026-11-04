@@ -1,0 +1,132 @@
+flowchart TD
+    subgraph Panel["Svelte Panel (src/)"]
+        AppSvelte["App.svelte orchestrator"]
+        PanelTs["panel.svelte.ts snapshot, refresh, launch, undo"]
+        ComposerTs["composerState.svelte.ts Neue Session form, folder or repo"]
+        DraftTs["settingsDraft.svelte.ts staged Agenten, Umgebung, clone root"]
+        GithubActionsTs["githubActions.svelte.ts account actions, listing refresh"]
+        ModalsTs["modals.svelte.ts dialog and focus return"]
+        UpdaterTs["updater.svelte.ts and updates.ts"]
+        AutostartTs["autostart.svelte.ts staged autostart"]
+        Components["Composer, RecentList, AppFooter, SettingsDialog, Modal"]
+        GithubComponents["FolderField, RepoSuggestions, GithubSettings, GithubConnect, InlineConfirm"]
+        Helpers["agents.ts, recents.ts, validation.ts pure rules"]
+        TargetTs["target.ts folder, repo or search; repo matching"]
+        ThemeTs["theme.ts theme preference"]
+        Bridge["bridge.ts native or demo, traygent:snapshot listener"]
+        IpcTs["ipc.ts typed command map, only invoke"]
+        DemoTs["demo.ts, demoData.ts, demoGithub.ts labelled browser demo"]
+        TypesTs["types.ts IPC contract"]
+    end
+
+    subgraph Shell["Tauri Desktop Shell (src-tauri/, feature desktop)"]
+        MainRs("main.rs desktop bin")
+        DesktopRs("desktop.rs snapshot, refresh_detection, work helper, tray")
+        DesktopAgents("desktop_agents.rs agent commands, start_detection")
+        DesktopGithub("desktop_github.rs GitHub commands, start_listing")
+        DesktopStartup["desktop_startup.rs Run value adapter"]
+        DesktopUpdates["desktop_updates.rs update commands"]
+        TrayPopup["tray_popup.rs and windows.rs Win32"]
+        Plugins["plugins: single-instance, dialog, opener, updater"]
+    end
+
+    subgraph Core["Rust Core (traygent_core)"]
+        ServiceRs["service.rs Service: settings, recents, detection, snapshot"]
+        LaunchPrepRs["service/launch_prep.rs resolve, repo folder, clone or reuse"]
+        ServiceGithubRs["service/github.rs account and listing commits"]
+        RepoRs["repo.rs classification, clone folder and URL"]
+        GithubRs["github.rs and github/* api, http, gh, discover, process, vault, secret"]
+        StoreRs["store.rs versioned state.json"]
+        SettingsRs["settings.rs defaults and validation"]
+        RecentsRs["recents.rs recent sessions"]
+        CatalogRs["catalog.rs agent catalog"]
+        DetectRs["detect.rs, host.rs, runner.rs CLI and Docker probes"]
+        LaunchRs["launch.rs, agents.rs, docker.rs, quote.rs argv builder"]
+        SpawnRs["spawn.rs detached process"]
+        ModelsRs["models.rs and models/github.rs IPC model"]
+        StartupRs["startup.rs login-startup rules"]
+        PopupRs["popup.rs popup geometry and dismissal"]
+        UpdatesRs["updates.rs and installer.rs, feature updates"]
+    end
+
+    subgraph External["Windows host and outside"]
+        StateFile[("APPDATA io.github.fo0.traygent state.json")]
+        LocalStorage[("localStorage theme")]
+        Terminal(["wt.exe or a console window"])
+        PowerShell(["powershell.exe 5.1 script of literals"])
+        AgentCli(["agent CLI by absolute path"])
+        Docker(["docker.exe run, named volumes, node:22-trixie"])
+        Registry(["Windows HKCU Run key"])
+        Releases(["GitHub Releases API and assets"])
+        GithubApi(["api.github.com /user, /user/repos with the user's token"])
+        Git(["git.exe clone from github.com, user's Git credentials"])
+        GhCli(["gh.exe sign-ins, token read on consent"])
+        Vault[("OS credential vault keyring, traygent / github-id")]
+    end
+
+    AppSvelte --> PanelTs
+    AppSvelte --> ModalsTs
+    AppSvelte --> UpdaterTs
+    AppSvelte --> Components
+    Components --> ComposerTs
+    Components --> DraftTs
+    Components --> AutostartTs
+    Components --> Helpers
+    Components --> GithubComponents
+    GithubComponents --> TargetTs
+    GithubComponents --> GithubActionsTs
+    ComposerTs --> TargetTs
+    PanelTs --> GithubActionsTs
+    GithubActionsTs --> Bridge
+    Components --> ThemeTs
+    ThemeTs --> LocalStorage
+    PanelTs --> Bridge
+    Bridge --> IpcTs
+    Bridge --> DemoTs
+    UpdaterTs --> IpcTs
+    AutostartTs --> IpcTs
+    IpcTs --> TypesTs
+    IpcTs -- "Tauri IPC, camelCase JSON" --> DesktopRs
+    IpcTs -- "Tauri IPC, camelCase JSON" --> DesktopAgents
+    IpcTs -- "Tauri IPC, camelCase JSON" --> DesktopGithub
+    DesktopGithub -- "traygent:snapshot event" --> Bridge
+    DesktopAgents -- "traygent:snapshot event" --> Bridge
+    MainRs --> DesktopRs
+    DesktopRs --> DesktopAgents
+    DesktopRs --> DesktopGithub
+    DesktopRs --> DesktopStartup
+    DesktopRs --> DesktopUpdates
+    DesktopRs --> TrayPopup
+    DesktopRs --> Plugins
+    DesktopAgents -- "work, off the UI thread" --> ServiceRs
+    DesktopAgents -- "detection thread" --> DetectRs
+    DesktopAgents --> SpawnRs
+    DesktopGithub -- "short lock, commit results" --> ServiceRs
+    DesktopGithub -- "worker and listing thread, no lock" --> GithubRs
+    ServiceRs --> StoreRs
+    ServiceRs --> SettingsRs
+    ServiceRs --> RecentsRs
+    ServiceRs --> CatalogRs
+    ServiceRs --> LaunchPrepRs
+    ServiceRs --> ServiceGithubRs
+    LaunchPrepRs --> RepoRs
+    LaunchPrepRs --> LaunchRs
+    ServiceGithubRs --> GithubRs
+    RecentsRs --> RepoRs
+    LaunchRs --> RepoRs
+    ServiceRs --> ModelsRs
+    StoreRs --> StateFile
+    LaunchRs --> CatalogRs
+    SpawnRs --> Terminal
+    Terminal --> PowerShell
+    PowerShell -- "clone first when the folder is missing" --> Git
+    PowerShell --> AgentCli
+    PowerShell --> Docker
+    TrayPopup --> PopupRs
+    DesktopStartup --> StartupRs
+    DesktopStartup --> Registry
+    DesktopUpdates --> UpdatesRs
+    UpdatesRs --> Releases
+    GithubRs -- "bearer token, no redirects" --> GithubApi
+    GithubRs --> GhCli
+    GithubRs --> Vault

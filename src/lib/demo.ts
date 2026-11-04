@@ -1,0 +1,204 @@
+import { agentLabel, agentStatus, envStatus } from './agents';
+import type { Bridge, ObserveSnapshots } from './bridgeTypes';
+import { DEMO_PICKED_FOLDER, demoSnapshot } from './demoData';
+import {
+  DEMO_ACCOUNT,
+  DEMO_LOGIN,
+  demoLocalAccounts,
+  demoRepos,
+} from './demoGithub';
+import {
+  recordStart,
+  restoreRecent,
+  upsertRecent,
+  withoutRecent,
+} from './recents';
+import { cloneFolder, repoProblem } from './target';
+import type { GithubAccount, GithubSource, Snapshot } from './types';
+import {
+  folderProblem,
+  launchPortsProblem,
+  optionsProblem,
+  settingsProblems,
+} from './validation';
+import { normalizeEnvs } from './environments';
+import { normalizePorts } from './ports';
+
+export type { Bridge } from './bridgeTypes';
+export { demoSnapshot } from './demoData';
+
+/** The demo bridge and the snapshots its simulated detection pushes. */
+export interface DemoBridge extends Bridge {
+  observe: ObserveSnapshots;
+}
+
+/** What the demo accepts as a personal access token. */
+const DEMO_TOKEN = /^(?:gh[pousr]_|github_pat_)\w{4,}$/;
+
+/**
+ * A local simulation of the native commands, with a short latency: starts
+ * record recent sessions, a detection finishes after `detection` ms and is
+ * pushed like the native `traygent:snapshot` event. Every change increases
+ * `revision`, as natively. No terminal, dialog or Explorer window ever opens;
+ * every error is German, as natively.
+ */
+export function createDemoBridge(latency = 150, detection = 600): DemoBridge {
+  let data = demoSnapshot();
+  const listeners = new Set<(snapshot: Snapshot) => void>();
+  let detectionTimer: ReturnType<typeof setTimeout> | undefined;
+  let listingTimer: ReturnType<typeof setTimeout> | undefined;
+  const delay = () =>
+    new Promise<void>((resolve) => setTimeout(resolve, latency));
+  const copy = () => structuredClone(data);
+  /** Applies one state change under the next revision. */
+  const change = (patch: Partial<Snapshot>) => {
+    data = { ...data, ...patch, revision: data.revision + 1 };
+  };
+  const emit = () => {
+    for (const listener of listeners) listener(copy());
+  };
+  /** The account's listing, just read: no error, not loading. */
+  const listed = (account: GithubAccount) => {
+    change({
+      github: {
+        account,
+        repos: demoRepos(),
+        loading: false,
+        listedAt: new Date().toISOString(),
+        defaultCloneRoot: data.github.defaultCloneRoot,
+      },
+    });
+  };
+  /** Connects the demo account and lists its repositories at once. */
+  const connect = (source: GithubSource) => {
+    clearTimeout(listingTimer);
+    listed({ ...DEMO_ACCOUNT, source });
+    return copy();
+  };
+
+  return {
+    async snapshot() {
+      await delay();
+      return copy();
+    },
+    async refreshDetection() {
+      await delay();
+      change({ detecting: true });
+      clearTimeout(detectionTimer);
+      detectionTimer = setTimeout(() => {
+        change({ detecting: false, checkedAt: new Date().toISOString() });
+        emit();
+      }, detection);
+      return copy();
+    },
+    async saveSettings(settings) {
+      await delay();
+      const problems = settingsProblems(settings);
+      const root = problems['github.cloneRoot'];
+      // Natively the clone root's message names its field.
+      const problem = Object.values(problems)[0];
+      if (problem)
+        throw new Error(problem === root ? `Klon-Ordner: ${root}` : problem);
+      const saved = structuredClone(settings);
+      saved.docker.ports = normalizePorts(saved.docker.ports);
+      saved.environments = normalizeEnvs(saved.environments);
+      change({ settings: saved });
+      return copy();
+    },
+    async launchSession(request) {
+      await delay();
+      const label = agentLabel(data, request.agent);
+      const env = envStatus(data, request.env);
+      if (request.env === 'wsl' || env?.state !== 'ready')
+        throw new Error('Diese Umgebung ist nicht bereit.');
+      if (
+        request.env === 'local' &&
+        agentStatus(data, request.agent, 'local')?.state !== 'ready'
+      )
+        throw new Error(`${label} ist lokal nicht installiert.`);
+      const { repo } = request;
+      const given = request.folder.trim();
+      const problem =
+        (repo ? repoProblem(repo) : '') ||
+        (repo && !given ? '' : folderProblem(request.folder)) ||
+        optionsProblem(request) ||
+        launchPortsProblem(request);
+      if (problem) throw new Error(problem);
+      // Every demo folder exists: a repository start reuses the folder it
+      // brings (a recent's restart), else starts in its clone folder, as
+      // natively; nothing clones.
+      const root =
+        data.settings.github.cloneRoot.trim() || data.github.defaultCloneRoot;
+      const folder = repo && !given ? cloneFolder(root, repo) : request.folder;
+      // Normalized like natively: the recent stores what the start published.
+      const ports = normalizePorts(request.ports);
+      const recent = recordStart(data.recents, { ...request, folder, ports });
+      change({ recents: upsertRecent(data.recents, recent) });
+      return { recent: structuredClone(recent), snapshot: copy() };
+    },
+    async removeRecent(id) {
+      await delay();
+      change({ recents: withoutRecent(data.recents, id) });
+      return copy();
+    },
+    async restoreRecent(recent) {
+      await delay();
+      const restored = restoreRecent(data.recents, structuredClone(recent));
+      if (!restored)
+        throw new Error('Eintrag kann nicht wiederhergestellt werden.');
+      change({ recents: restored });
+      return copy();
+    },
+    async pickFolder() {
+      await delay();
+      return DEMO_PICKED_FOLDER;
+    },
+    async installAgent() {
+      await delay();
+    },
+    async openFolder() {
+      await delay();
+    },
+    async githubConnectToken(token) {
+      await delay();
+      const value = token.trim();
+      if (!value) throw new Error('Token fehlt.');
+      if (!DEMO_TOKEN.test(value))
+        throw new Error('GitHub hat das Token abgelehnt.');
+      return connect('token');
+    },
+    async githubLocalAccounts() {
+      await delay();
+      return demoLocalAccounts(data.github.account?.login);
+    },
+    async githubImportLocal(login) {
+      await delay();
+      if (login !== DEMO_LOGIN)
+        throw new Error(`Die Anmeldung ${login} lässt sich nicht übernehmen.`);
+      return connect('gh');
+    },
+    async githubDisconnect() {
+      await delay();
+      clearTimeout(listingTimer);
+      const { defaultCloneRoot } = data.github;
+      change({ github: { repos: [], loading: false, defaultCloneRoot } });
+      return copy();
+    },
+    async githubRefreshRepos() {
+      await delay();
+      if (!data.github.account) throw new Error('Kein GitHub-Konto verbunden.');
+      change({ github: { ...data.github, loading: true } });
+      clearTimeout(listingTimer);
+      listingTimer = setTimeout(() => {
+        if (!data.github.account) return;
+        listed(data.github.account);
+        emit();
+      }, detection);
+      return copy();
+    },
+    async observe(callback) {
+      listeners.add(callback);
+      return () => listeners.delete(callback);
+    },
+  };
+}

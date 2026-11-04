@@ -1,0 +1,54 @@
+/*
+ * Windows High Contrast for the agent-domain controls (19-controls.css): the
+ * checked segment, probe dots and the checked switch are fills that forced
+ * colours would erase, so they are redrawn with system colours. Loaded last,
+ * so these win over the base rules of the same specificity.
+ */
+@media (forced-colors: active) {
+  .segment:has(input:checked) {
+    forced-color-adjust: none;
+    background: Highlight;
+    color: HighlightText;
+  }
+  /* A product mark on the selection drops its own colour. */
+  .segment:has(input:checked) .mark {
+    color: inherit;
+  }
+  .status-dot,
+  .status-dot[data-state] {
+    forced-color-adjust: none;
+    background: CanvasText;
+  }
+  .status-dot[data-state='missing'] {
+    background: Canvas;
+    box-shadow: inset 0 0 0 1.5px CanvasText;
+  }
+  .chip,
+  .chip[data-warn='true'] {
+    border-color: CanvasText;
+  }
+  .switch-input:checked + .switch {
+    forced-color-adjust: none;
+    background: Highlight;
+    border-color: Highlight;
+  }
+  .switch-input:checked + .switch:after {
+    background: HighlightText;
+  }
+  /* „Zuletzt“ (26-recent-rows.css, loaded later, hence the row prefix): the
+     round start is an accent fill and the agent tile a tint; draw rings. */
+  .recent-row .recent-start {
+    border-color: ButtonText;
+  }
+  .recent-row .recent-start[aria-disabled='true'] {
+    border-color: GrayText;
+    color: GrayText;
+  }
+  .recent-row .agent-badge,
+  .recent-row .model-badge {
+    border: 1px solid CanvasText;
+  }
+  .recent-list .recent-row:has(.recent-start:focus-visible) {
+    outline-color: Highlight;
+  }
+}

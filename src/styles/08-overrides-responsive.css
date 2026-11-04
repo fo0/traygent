@@ -1,0 +1,96 @@
+.empty-state p {
+  font-size: var(--font-size-meta);
+}
+
+@media (max-width: 520px) {
+  .desktop {
+    padding: 0;
+    background: var(--surface);
+    justify-content: flex-start;
+  }
+  .tray {
+    width: 100%;
+    height: 100dvh;
+    max-height: none;
+    min-height: 0;
+    border: 0;
+    border-radius: 0;
+    box-shadow: none;
+  }
+  .modal-backdrop {
+    padding: 9px;
+    background: var(--backdrop);
+  }
+  .modal {
+    max-height: calc(100dvh - 20px);
+    border-radius: 11px;
+  }
+  .modal-heading {
+    padding: 17px 16px 14px;
+  }
+  .modal-body {
+    padding: 16px;
+  }
+  .modal-actions {
+    padding: 12px 16px;
+  }
+  .content {
+    padding-top: 14px;
+  }
+}
+/* The 360px minimum window: the brand heading keeps only its icon (the name
+   stays for assistive tech), so the actions keep their room. */
+@media (max-width: 400px) {
+  .brand-name {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip-path: inset(50%);
+    white-space: nowrap;
+  }
+  .app-bar {
+    padding-left: 14px;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *:before,
+  *:after {
+    animation: none !important;
+    transition: none !important;
+  }
+}
+
+.connection-copy {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  min-width: 0;
+  white-space: nowrap;
+}
+.connection-copy > span:last-child {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+@media (max-width: 370px) {
+  .app-bar {
+    padding-right: 8px;
+    gap: 6px;
+  }
+  .connection-copy {
+    gap: 4px;
+  }
+  .content {
+    padding-left: 11px;
+    padding-right: 11px;
+  }
+  .modal-actions {
+    gap: 6px;
+  }
+  .primary-button,
+  .secondary-button {
+    padding: 7px 9px;
+  }
+}

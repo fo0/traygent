@@ -1,0 +1,39 @@
+# Verification
+
+## Local checks
+
+```sh
+pnpm verify
+pnpm exec playwright install chromium
+pnpm test:e2e
+cargo fmt --manifest-path src-tauri/Cargo.toml --check
+cargo test --locked --manifest-path src-tauri/Cargo.toml --features updates
+cargo clippy --locked --manifest-path src-tauri/Cargo.toml --features updates --all-targets -- -D warnings
+```
+
+`pnpm verify` runs formatting, ESLint, the icon byte check, Svelte/TypeScript diagnostics, frontend unit tests, release-helper tests and the production frontend build. Browser tests use the labelled browser demo and a labelled native IPC mock. Rust tests exercise the IPC model, update policy, installer verification, startup rules, popup geometry, the folder-field classification and the GitHub account and listing flow (gh, HTTP and the OS vault faked).
+
+The Windows CI job additionally compiles the actual desktop shell and tests the Win32 popup and the autostart registry adapter in an isolated test subkey (never the real login Run key). See [Windows autostart behavior and acceptance](WINDOWS_AUTOSTART.md). Normal checks skip installer packaging; Release or an explicit manual installer request performs the NSIS build. CI results apply to the exact tested commit, not to later changes. See [release process](RELEASES.md).
+
+## Test boundaries
+
+Mocks do not establish native tray/DPI acceptance, real agent CLIs, Docker or terminal windows. Test those on an owner-controlled Windows system. Windows popup behavior has separate [native validation boundaries](WINDOWS_POPUP_VALIDATION.md). Windows EXEs have no Authenticode certificate. Standard unsigned builds install updates in the app ([release process](RELEASES.md)); the `update-install` browser spec exercises the offer, progress, failed verification and retry, but does not prove an actual Windows upgrade.
+
+## Native Windows smoke checklist
+
+CI compiles the desktop shell and runs Win32 and registry tests, but it cannot prove the following. Check them on an authorized Windows test desktop with the branch build; record the build and Windows version.
+
+1. **Capabilities.** `src-tauri/capabilities/default.json` grants only event listen/unlisten, header dragging and the inert maximize toggle; no capability error appears in the panel.
+2. **Header drag.** Dragging the app bar (`data-tauri-drag-region`) on its free space or over the brand moves the panel; the refresh and settings buttons stay clickable and do not drag. Reopening the panel from the tray places it beside the icon again.
+3. **No maximize.** Double-clicking the header does not maximize or resize the window (`maximizable: false`).
+4. **In-app update (unsigned build).** With an older build installed and a newer stable release published, the banner **Update <v> verfügbar** appears at startup (or after **Nach Updates suchen**); **Ansehen** shows **Version <v> verfügbar** with at most 5 changelog bullets. **Installieren** shows a progress bar (IPC `Channel`), then the app exits, the installer runs for the current user from `%TEMP%\Traygent-update-<v>\` and Traygent restarts on the new version with its panel open (also after an autostart launch). No browser opens.
+5. **Rejected download.** A release whose asset is missing, lacks a `sha256` digest or does not match size and SHA-256 installs nothing and shows an error.
+6. **Light, dark and High Contrast themes.** With **Einstellungen → App → Darstellung** on **System**, switching Windows between light and dark app mode switches the open panel at once; **Hell** and **Dunkel** override Windows and survive a restart, and the hidden window never shows the other theme first. Then turn on a Windows contrast theme: switches, the selected settings tab, focus rings and the chosen **Darstellung** option stay visible.
+7. **Autostart after uninstall.** Enable **Mit Windows starten**, uninstall Traygent, then inspect `HKCU\Software\Microsoft\Windows\CurrentVersion\Run`. **Known gap:** the `io.github.fo0.traygent` value is left behind because the installer has no uninstall hook (item 7 in the [backlog](../BACKLOG.md)); see [Windows startup](WINDOWS_AUTOSTART.md).
+
+8. **Clone in a Windows Terminal tab.** Type `owner/name` of a repository not yet under the **Klon-Ordner** (default `%USERPROFILE%\Traygent`) and press **Starten**: the wt tab shows `git clone` progress, then the agent starts in `<Klon-Ordner>\<owner>\<name>`. Repeat with a profile path containing spaces, with the console terminal and with Docker (clone on the host, folder bind-mounted). A second start reuses the folder without cloning. A failing clone (unknown repository, network off) ends with „[traygent] Das Repository konnte nicht geklont werden. …“ before the agent starts; without Git the start is refused with „Git ist nicht installiert.“ ([backlog](../BACKLOG.md) #33).
+9. **Git Credential Manager prompt.** Cloning a private repository without stored Git credentials opens the Git Credential Manager sign-in from that terminal; after signing in the clone completes. Traygent's GitHub token is not used: no token appears in the tab, `git remote -v` or the process command line.
+10. **gh import.** With gh signed in to github.com, **Einstellungen → GitHub → Lokale Anmeldung prüfen** lists the sign-ins without reading a token; **Übernehmen** connects as that login and lists its repositories. Check a gh ≥ 2.40 (`auth token --user`), one with `auth status --json hosts` and one legacy version (only its active account is listed; a gh without `auth token --user` refuses the import with a German line), plus gh signed out and gh missing ([backlog](../BACKLOG.md) #35).
+11. **Credential Manager round trip.** After connecting (token or gh import), Windows Credential Manager (generic credentials) holds Traygent's entry for service `traygent`, user `github-<id>` — record the exact target name keyring writes; after a Traygent restart the account lists its repositories again without a new sign-in; **Trennen** removes the entry while gh stays signed in. An expired or revoked token keeps the account and shows „GitHub-Token ungültig oder abgelaufen.“.
+
+Tray placement, DPI and focus-loss behavior are covered by the [Windows popup acceptance](WINDOWS_POPUP_VALIDATION.md#interactive-windows-acceptance).

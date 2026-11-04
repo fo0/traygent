@@ -1,0 +1,145 @@
+/*
+ * Design tokens („Ein Blick“, violet accent). Components read only these
+ * variables, never a theme-specific value: every colour literal of the panel
+ * lives in this file (and system colours in 14-forced-colors.css), which
+ * src/lib/tokens.test.ts enforces together with the contrast pairs below.
+ *
+ * Themes: the dark set is the default on :root. The light set applies when
+ * the OS prefers light, unless the user chose „Dunkel“; „Hell“ applies it
+ * whatever the OS prefers. src/lib/theme.ts sets `data-theme` on <html> for an
+ * explicit choice and removes it for „System“. The two light blocks must stay
+ * identical (the token test compares them).
+ */
+:root {
+  color-scheme: dark;
+
+  /* Surfaces, from the window backdrop up to cards and menus. */
+  --page: #0a0b0d;
+  /* Sunken fields such as text inputs. */
+  --bg: #0b0b0d;
+  /* The track of a segmented control, below its raised selection. */
+  --track: #0b0b0d;
+  /* The panel itself, and dialogs. */
+  --surface: #111114;
+  /* Cards and menus. */
+  --raised: #18181c;
+  --hover: #222228;
+  --border: #26262c;
+  --border-strong: #34343c;
+
+  /* Text, at least 4.5:1 (WCAG AA) on --surface, --raised and --hover. */
+  --text: #f1f1f4;
+  --text-2: #b9b9c4;
+  /* Metadata, the smallest contrast: 4.8:1 on --hover. */
+  --text-3: #8d8d99;
+
+  /* Accent and the text or glyph drawn on it. */
+  --accent: #b9a5ff;
+  --accent-hover: #cbbcff;
+  --accent-soft: rgba(185, 165, 255, 0.12);
+  --on-accent: #15111f;
+
+  /* Run and connection status. */
+  --run: #6cb6ff;
+  --ok: #4ade80;
+  --fail: #f87171;
+  --wait: #fbbf24;
+  --none: #2c2c33;
+
+  /* Product marks with a colour of their own, at least 3:1 on every surface. */
+  --brand-claude: #d97757;
+
+  --scrollbar: #3a3a42;
+  --backdrop: rgba(5, 5, 7, 0.72);
+  --shadow: 0 24px 60px rgba(0, 0, 0, 0.6), 0 0 0 1px rgba(255, 255, 255, 0.05);
+  --menu-shadow: 0 14px 34px rgba(0, 0, 0, 0.6);
+
+  /*
+   * Derived from the tokens above, so they follow the theme without a light
+   * value of their own: tinted fills and borders for status messages and
+   * accented cards. Text on a tint uses the matching status colour.
+   */
+  --accent-line: color-mix(in srgb, var(--accent) 45%, var(--border));
+  --ok-soft: color-mix(in srgb, var(--ok) 10%, transparent);
+  --ok-line: color-mix(in srgb, var(--ok) 40%, var(--border));
+  --run-soft: color-mix(in srgb, var(--run) 10%, transparent);
+  --run-line: color-mix(in srgb, var(--run) 40%, var(--border));
+  --wait-soft: color-mix(in srgb, var(--wait) 10%, transparent);
+  --wait-line: color-mix(in srgb, var(--wait) 45%, var(--border));
+  --fail-soft: color-mix(in srgb, var(--fail) 10%, transparent);
+  --fail-line: color-mix(in srgb, var(--fail) 45%, var(--border));
+
+  /* Type scale: body text, and the smallest size metadata may use. */
+  --font-size-base: 14px;
+  --font-size-meta: 12px;
+
+  /* One height for every settings control: fields, selects, segmented
+     controls, status lines and buttons; list-style rows of checkboxes or
+     radios (port presets, „Umgebungen“, gh sign-ins) take the row height. */
+  --control-height: 32px;
+  --row-height: 28px;
+}
+
+/* Light: the OS prefers light and the user did not choose „Dunkel“. */
+@media (prefers-color-scheme: light) {
+  :root:not([data-theme='dark']) {
+    color-scheme: light;
+    --page: #dcdce2;
+    --bg: #ffffff;
+    --track: #ececf1;
+    --surface: #f6f6f8;
+    --raised: #ffffff;
+    --hover: #efeff3;
+    --border: #e1e1e7;
+    --border-strong: #c9c9d2;
+    --text: #111114;
+    --text-2: #474752;
+    --text-3: #5f5f6b;
+    --accent: #5b3fc4;
+    --accent-hover: #4a2fae;
+    --accent-soft: rgba(91, 63, 196, 0.1);
+    --on-accent: #ffffff;
+    --run: #0b63ce;
+    --ok: #187733;
+    --fail: #b81e29;
+    --wait: #8a5d00;
+    --none: #e2e2e8;
+    --brand-claude: #c15f3c;
+    --scrollbar: #c4c4cc;
+    --backdrop: rgba(17, 17, 20, 0.36);
+    --shadow:
+      0 24px 60px rgba(20, 20, 40, 0.16), 0 0 0 1px rgba(20, 20, 40, 0.06);
+    --menu-shadow: 0 14px 34px rgba(20, 20, 40, 0.18);
+  }
+}
+
+/* Light: chosen in the settings („Hell“), whatever the OS prefers. */
+:root[data-theme='light'] {
+  color-scheme: light;
+  --page: #dcdce2;
+  --bg: #ffffff;
+  --track: #ececf1;
+  --surface: #f6f6f8;
+  --raised: #ffffff;
+  --hover: #efeff3;
+  --border: #e1e1e7;
+  --border-strong: #c9c9d2;
+  --text: #111114;
+  --text-2: #474752;
+  --text-3: #5f5f6b;
+  --accent: #5b3fc4;
+  --accent-hover: #4a2fae;
+  --accent-soft: rgba(91, 63, 196, 0.1);
+  --on-accent: #ffffff;
+  --run: #0b63ce;
+  --ok: #187733;
+  --fail: #b81e29;
+  --wait: #8a5d00;
+  --none: #e2e2e8;
+  --brand-claude: #c15f3c;
+  --scrollbar: #c4c4cc;
+  --backdrop: rgba(17, 17, 20, 0.36);
+  --shadow:
+    0 24px 60px rgba(20, 20, 40, 0.16), 0 0 0 1px rgba(20, 20, 40, 0.06);
+  --menu-shadow: 0 14px 34px rgba(20, 20, 40, 0.18);
+}

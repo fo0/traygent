@@ -1,0 +1,21 @@
+{
+  // Code that runs in Node: tool configs, scripts, Vitest unit tests and
+  // Playwright specs. DOM stays in `lib` because unit tests import panel
+  // modules and specs pass callbacks that run inside the page.
+  "extends": "./tsconfig.json",
+  "compilerOptions": {
+    "lib": ["ES2022", "DOM", "DOM.Iterable"],
+    "types": ["node", "svelte", "vite/client"],
+    "allowJs": true,
+    "checkJs": true
+  },
+  "include": [
+    "vite.config.ts",
+    "playwright.config.ts",
+    "eslint.config.js",
+    "svelte.config.js",
+    "src/**/*.test.ts",
+    "tests/**/*.ts",
+    "scripts/**/*.mjs"
+  ]
+}

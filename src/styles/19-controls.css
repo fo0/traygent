@@ -1,0 +1,333 @@
+/*
+ * Shared controls of the agent domain: text buttons, the detection spinner,
+ * segmented radios with probe dots, option chips, text fields, menu items and
+ * the checked switch. Tokens from 00-tokens.css only.
+ */
+
+/* A borderless accent action, e.g. „Rückgängig“ in a notice. */
+.text-button {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  margin: -4px 0;
+  padding: 4px 6px;
+  border-radius: 6px;
+  background: transparent;
+  color: var(--accent);
+  font-size: var(--font-size-meta);
+  font-weight: 600;
+  white-space: nowrap;
+}
+.text-button:hover:not(:disabled) {
+  background: var(--accent-soft);
+}
+
+/* A detection runs: the refresh glyph turns. */
+@keyframes traygent-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+.spinning svg {
+  animation: traygent-spin 0.9s linear infinite;
+}
+
+/* Segmented control: native radios inside labels, the input stays focusable. */
+.segmented {
+  display: flex;
+  gap: 2px;
+  min-width: 0;
+  padding: 2px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--track);
+}
+.segment {
+  position: relative;
+  flex: 1 1 0;
+  min-width: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  min-height: 28px;
+  padding: 4px 8px;
+  border-radius: 6px;
+  color: var(--text-2);
+  font-size: var(--font-size-meta);
+  font-weight: 550;
+  white-space: nowrap;
+  cursor: pointer;
+  user-select: none;
+}
+.segment input {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  margin: 0;
+  opacity: 0;
+  cursor: inherit;
+}
+.segment-label {
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+/* The row a form leads with (the composer's agents): from the default 480 px
+   window on a clearly larger row (36 px segments, 14.5 px names, 18 px
+   marks), so the agent choice stands out from the rows below it; narrower
+   windows keep the regular sizes. At every width each segment sizes to its
+   label first, so a name is cut only when the row cannot hold all three. */
+.segmented.prominent .segment {
+  flex: 1 1 auto;
+}
+@media (min-width: 480px) {
+  .segmented.prominent .segment {
+    gap: 6px;
+    min-height: 36px;
+    padding: 6px 8px;
+    font-size: 14.5px;
+  }
+}
+@media (max-width: 479px) {
+  .segmented.prominent .segment svg {
+    width: 14px;
+    height: 14px;
+  }
+}
+.segment:hover:not(:has(input:disabled)) {
+  background: var(--hover);
+  color: var(--text);
+}
+.segment:has(input:checked) {
+  background: var(--raised);
+  color: var(--text);
+  box-shadow: inset 0 0 0 1px var(--border-strong);
+}
+.segment:has(input:focus-visible) {
+  outline: 2px solid var(--accent);
+  outline-offset: 1px;
+}
+.segment:has(input:disabled) {
+  opacity: 0.42;
+  cursor: default;
+}
+.segment[data-warn='true'] {
+  color: var(--wait);
+}
+.segment[data-warn='true']:has(input:checked) {
+  background:
+    linear-gradient(var(--wait-soft), var(--wait-soft)), var(--raised);
+  box-shadow: inset 0 0 0 1px var(--wait-line);
+  color: var(--wait);
+}
+
+/* Probe dots: ready filled, missing hollow, stopped amber. */
+.status-dot {
+  flex-shrink: 0;
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: var(--none);
+}
+.status-dot[data-state='ready'] {
+  background: var(--ok);
+}
+.status-dot[data-state='missing'] {
+  background: transparent;
+  box-shadow: inset 0 0 0 1.5px var(--text-3);
+}
+.status-dot[data-state='stopped'] {
+  background: var(--wait);
+}
+
+/* Option chips: compact selects, a combobox and the permission toggle. Tight
+   enough that every agent's chips, Docker's „Ports“ included, keep one row
+   beside „Starten“ in the default 480 px window. */
+.chip {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  min-height: 28px;
+  padding: 0 6px;
+  border: 1px solid var(--border-strong);
+  border-radius: 999px;
+  background: var(--raised);
+  color: var(--text-2);
+  font-size: var(--font-size-meta);
+  white-space: nowrap;
+}
+.chip:is(label, button):hover {
+  background: var(--hover);
+  color: var(--text);
+}
+.chip:has(:focus-visible) {
+  outline: 2px solid var(--accent);
+  outline-offset: 1px;
+}
+.chip-button:focus-visible {
+  outline-offset: 1px;
+}
+/* An icon-only chip (the permission toggle): a circle the chips' height. */
+.chip-icon {
+  justify-content: center;
+  min-width: 28px;
+  padding: 0;
+}
+.chip-select,
+.chip-input {
+  appearance: none;
+  min-width: 2ch;
+  max-width: 128px;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: var(--text);
+  font: inherit;
+  field-sizing: content;
+  text-overflow: ellipsis;
+}
+.chip-select {
+  padding-right: 12px;
+  cursor: pointer;
+}
+.chip-select:focus-visible,
+.chip-input:focus-visible {
+  outline: none;
+}
+.chip-select option {
+  background: var(--raised);
+  color: var(--text);
+}
+.chip-input {
+  min-width: 6ch;
+}
+.chip-caret {
+  position: absolute;
+  right: 6px;
+  pointer-events: none;
+  color: var(--text-3);
+}
+/* A warning or an error keeps its colour under the pointer. */
+.chip[data-warn='true'],
+.chip[data-warn='true']:hover {
+  border-color: var(--wait-line);
+  background:
+    linear-gradient(var(--wait-soft), var(--wait-soft)), var(--raised);
+  color: var(--wait);
+}
+.chip[data-invalid='true'],
+.chip[data-invalid='true']:hover {
+  border-color: var(--fail-line);
+  color: var(--fail);
+}
+.chip-static {
+  min-height: 20px;
+  padding: 0 6px;
+  border-color: var(--border);
+  background: transparent;
+}
+
+/* Text fields of the settings and the composer. */
+.text-field {
+  width: 100%;
+  min-height: var(--control-height);
+  padding: 5px 9px;
+  border: 1px solid var(--border-strong);
+  border-radius: 6px;
+  background: var(--bg);
+  color: var(--text);
+  font-size: 13px;
+}
+/* Off, e.g. „Denken“ without a model: kept in place, dimmed like a segment. */
+.text-field:disabled {
+  opacity: 0.42;
+  cursor: default;
+}
+.text-field:focus-visible {
+  outline-offset: 1px;
+}
+.text-field[aria-invalid='true'] {
+  border-color: var(--fail);
+}
+select.text-field {
+  cursor: pointer;
+}
+.mono {
+  font-family: 'Cascadia Mono', Consolas, ui-monospace, monospace;
+  font-size: var(--font-size-meta);
+}
+.field-error {
+  margin: 4px 0 0;
+  color: var(--fail);
+  font-size: var(--font-size-meta);
+  line-height: 1.4;
+}
+
+/* Menu items: folder list and row actions. */
+.menu-item {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  width: 100%;
+  min-height: 32px;
+  padding: 6px 9px;
+  border-radius: 7px;
+  background: transparent;
+  color: var(--text);
+  font-size: 13px;
+  text-align: left;
+  white-space: nowrap;
+}
+.menu-item:hover,
+.menu-item:focus-visible {
+  outline: none;
+  background: var(--hover);
+}
+.menu-item.danger {
+  color: var(--fail);
+}
+.menu-text {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+.menu-text > span {
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.menu-meta {
+  color: var(--text-3);
+  font-size: var(--font-size-meta);
+}
+
+/* The switch (06-form-fields.css) once its checkbox is checked. */
+.switch-row {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-top: 14px;
+  font-size: 13px;
+  cursor: pointer;
+}
+.switch-input {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  margin: 0;
+  opacity: 0;
+}
+.switch-input:checked + .switch {
+  background: var(--accent);
+  border-color: var(--accent);
+}
+.switch-input:checked + .switch:after {
+  left: 15px;
+  background: var(--on-accent);
+}
+.switch-input:focus-visible + .switch {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}

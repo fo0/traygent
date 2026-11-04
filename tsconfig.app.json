@@ -1,0 +1,14 @@
+{
+  // Panel code that runs in the WebView: DOM globals only, no Node types.
+  "extends": "./tsconfig.json",
+  "compilerOptions": {
+    "lib": ["ES2022", "DOM", "DOM.Iterable"],
+    "types": ["svelte", "vite/client"],
+    // svelte-check turns a component without `<script lang="ts">` (e.g.
+    // TokenPermissions.svelte) into a JS module; without allowJs its import
+    // resolves to an untyped module.
+    "allowJs": true
+  },
+  "include": ["src/**/*.ts", "src/**/*.svelte"],
+  "exclude": ["src/**/*.test.ts"]
+}

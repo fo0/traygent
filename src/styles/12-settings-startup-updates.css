@@ -1,0 +1,209 @@
+/* Top-aligned so the tab strip keeps its position when panels of different
+   heights are shown; the max-height leaves room for the top offset. */
+.modal.settings-modal {
+  --settings-modal-top: min(6dvh, 48px);
+  align-self: flex-start;
+  margin-top: var(--settings-modal-top);
+  max-height: calc(100% - var(--settings-modal-top));
+}
+/* The tabs sit centred between the heading's divider and their own. */
+.settings-tabs {
+  display: flex;
+  gap: 2px;
+  padding: 8px 18px;
+  flex-shrink: 0;
+  border-bottom: 1px solid var(--border);
+}
+.startup-panel h3 {
+  margin: 0 0 18px;
+}
+.startup-option {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  padding: 10px 12px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--raised);
+  cursor: pointer;
+}
+.startup-option input {
+  margin: 3px 0 0;
+  flex-shrink: 0;
+  accent-color: var(--accent);
+}
+.startup-option strong {
+  display: block;
+  font-size: 13px;
+  margin-bottom: 6px;
+}
+.startup-option span span {
+  display: block;
+  font-size: 12px;
+  line-height: 1.6;
+  color: var(--text-2);
+}
+.startup-status {
+  font-size: 12px;
+  line-height: 1.6;
+  margin: 14px 0;
+}
+.startup-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+/* Each tab sizes to its label first, then the strip shares the rest, so the
+   longest label never spills over its neighbour. */
+.settings-tabs button {
+  flex: 1 1 auto;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  min-height: var(--control-height);
+  padding: 6px 5px;
+  background: transparent;
+  border: 1px solid transparent;
+  border-radius: 6px;
+  color: var(--text-2);
+  font-size: var(--font-size-meta);
+}
+.settings-tabs button[aria-selected='true'] {
+  background: var(--accent-soft);
+  border-color: var(--accent-line);
+  color: var(--text);
+}
+/* `flex: none`: a full five-tab strip shrinks its tabs, never the dot. */
+.tab-update-dot {
+  flex: none;
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--accent);
+}
+.tab-update-dot[data-tone='danger'] {
+  background: var(--fail);
+}
+/* Updates tab: one version row, then at most one compact release block. */
+.update-panel {
+  color: var(--text);
+  font-size: var(--font-size-meta);
+  line-height: 1.5;
+}
+.update-row {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px 12px;
+}
+.update-version {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  margin-right: auto;
+}
+.update-version strong {
+  font-size: 13px;
+}
+.update-version span,
+.update-title span {
+  color: var(--text-3);
+}
+.update-line {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin: 10px 0 0;
+  color: var(--text-2);
+}
+.update-ok {
+  color: var(--ok);
+}
+.update-release {
+  margin-top: 12px;
+  padding: 12px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--raised);
+}
+.update-title {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 4px 8px;
+  margin: 0;
+}
+.update-title strong {
+  font-size: 13px;
+}
+.update-notes {
+  margin: 8px 0 0;
+  padding-left: 18px;
+  color: var(--text-2);
+  overflow-wrap: anywhere;
+}
+.update-notes li + li {
+  margin-top: 2px;
+}
+.update-progress {
+  margin-top: 10px;
+}
+.update-progress label {
+  display: block;
+  margin-bottom: 5px;
+  color: var(--text-2);
+}
+.update-progress progress {
+  width: 100%;
+  height: 8px;
+  accent-color: var(--accent);
+}
+.update-release .alert {
+  margin-top: 10px;
+}
+.update-release .primary-button {
+  width: 100%;
+  margin-top: 10px;
+}
+.update-panel > .alert {
+  margin-top: 10px;
+}
+
+/* App tab: „Darstellung“ (System / Hell / Dunkel) above the startup option,
+   spaced like the sections of the other tabs. */
+.theme-setting {
+  margin-bottom: 18px;
+}
+.theme-setting h3 {
+  margin: 0 0 10px;
+}
+.theme-options {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 8px;
+}
+.theme-option {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-height: var(--control-height);
+  padding: 4px 10px;
+  border: 1px solid var(--border-strong);
+  border-radius: 8px;
+  background: var(--raised);
+  font-size: var(--font-size-meta);
+  cursor: pointer;
+}
+.theme-option:hover {
+  background: var(--hover);
+}
+.theme-option:has(input:checked) {
+  border-color: var(--accent-line);
+  background: var(--accent-soft);
+}
+.theme-option input {
+  margin: 0;
+  flex-shrink: 0;
+  accent-color: var(--accent);
+}

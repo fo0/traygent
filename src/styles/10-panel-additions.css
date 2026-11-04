@@ -1,0 +1,9 @@
+.notice-banner {
+  align-items: center;
+}
+.notice-banner > svg {
+  margin-top: 0;
+}
+.notice-banner > .icon-button {
+  align-self: center;
+}

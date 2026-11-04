@@ -1,0 +1,26 @@
+<!doctype html>
+<html lang="de">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <!-- Panel surface per scheme; src/lib/theme.ts points both at an explicit
+         choice. -->
+    <meta
+      name="theme-color"
+      content="#f6f6f8"
+      media="(prefers-color-scheme: light)"
+      data-scheme="light"
+    />
+    <meta
+      name="theme-color"
+      content="#111114"
+      media="(prefers-color-scheme: dark)"
+      data-scheme="dark"
+    />
+    <title>Traygent · Coding agents at hand</title>
+  </head>
+  <body>
+    <div id="app"></div>
+    <script type="module" src="/src/main.ts"></script>
+  </body>
+</html>

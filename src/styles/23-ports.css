@@ -1,0 +1,146 @@
+/*
+ * Ports of a Docker session: the picker (presets, custom chips, add field),
+ * the composer's popover and the „Zuletzt“ chip. Tokens from 00-tokens.css.
+ */
+.ports-chip {
+  display: contents;
+}
+/* The popover hangs under the whole chip row, so it never runs off the side. */
+.composer-actions {
+  position: relative;
+}
+.port-popover {
+  top: calc(100% + 4px);
+  left: 0;
+  width: min(380px, 100%);
+  min-width: 0;
+  max-width: none;
+  /* PortsChip sets max-height to the room left in the content area. */
+  overflow: auto;
+  overscroll-behavior: contain;
+  padding: 8px;
+  scrollbar-width: thin;
+  scrollbar-color: var(--scrollbar) transparent;
+}
+.port-popover.up {
+  top: auto;
+  bottom: calc(100% + 4px);
+}
+
+.port-picker {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  min-width: 0;
+}
+.port-presets {
+  display: grid;
+  /* Two columns where the labels fit, else one: a label never gets cut. */
+  grid-template-columns: repeat(auto-fill, minmax(164px, 1fr));
+  gap: 0 6px;
+}
+.port-preset {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-height: 26px;
+  min-width: 0;
+  padding: 0 4px;
+  border-radius: 6px;
+  font-size: var(--font-size-meta);
+  white-space: nowrap;
+  cursor: pointer;
+}
+.port-preset:hover {
+  background: var(--hover);
+}
+.port-preset input {
+  flex-shrink: 0;
+  margin: 0;
+  accent-color: var(--accent);
+}
+.port-number {
+  color: var(--text);
+  font-variant-numeric: tabular-nums;
+  font-weight: 600;
+}
+.port-name {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  color: var(--text-3);
+}
+.port-custom {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.port-chip {
+  gap: 2px;
+  max-width: 100%;
+  padding-right: 2px;
+  color: var(--text);
+}
+.port-chip > .mono {
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.port-remove {
+  display: inline-grid;
+  flex-shrink: 0;
+  place-items: center;
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  background: transparent;
+  color: var(--text-3);
+}
+.port-remove:hover,
+.port-remove:focus-visible {
+  background: var(--hover);
+  color: var(--text);
+}
+.port-add {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+.port-add .text-field {
+  flex: 1;
+  min-width: 0;
+  min-height: 28px;
+  padding: 3px 8px;
+}
+.port-add .icon-button.small {
+  min-width: 28px;
+  min-height: 28px;
+}
+.port-picker .field-error {
+  margin: 0;
+}
+/* Settings → Umgebung: the preset rows take the list row height, the add
+   field the control height; the label stays level with the first row. */
+.modal-body .port-preset {
+  min-height: var(--row-height);
+}
+.modal-body .port-add .text-field {
+  min-height: var(--control-height);
+}
+.modal-body .port-add .icon-button.small {
+  min-width: var(--control-height);
+  min-height: var(--control-height);
+}
+.port-defaults-label {
+  display: flex;
+  align-items: center;
+  align-self: start;
+  min-height: var(--row-height);
+}
+@media (max-width: 420px) {
+  .port-defaults-label {
+    min-height: 0;
+  }
+}

@@ -1,0 +1,26 @@
+/*
+ * Panel stylesheet entry. Order matters: later files override earlier ones
+ * (the sheet grew by appending patches), so keep the numeric prefixes in order.
+ * Tokens come first: every later file reads them.
+ */
+@import './00-tokens.css';
+@import './00-base.css';
+@import './01-shell.css';
+@import './02-dashboard.css';
+@import './03-footer-empty-alerts.css';
+@import './05-modal-settings.css';
+@import './06-form-fields.css';
+@import './08-overrides-responsive.css';
+@import './10-panel-additions.css';
+@import './12-settings-startup-updates.css';
+@import './25-icons.css';
+@import './14-forced-colors.css';
+@import './17-settings-onboarding.css';
+@import './18-overview.css';
+@import './19-controls.css';
+@import './20-composer-recents.css';
+@import './21-settings-agents.css';
+@import './22-forced-colors-domain.css';
+@import './23-ports.css';
+@import './24-github.css';
+@import './26-recent-rows.css';

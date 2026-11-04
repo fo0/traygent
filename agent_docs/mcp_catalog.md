@@ -1,0 +1,127 @@
+# MCP Catalog
+
+This file documents:
+
+1. **This project's intended MCPs** — declared by the user, not detected from the host.
+2. The mechanics that are **not** general knowledge: which servers survive into an unattended run, and how to stop trigger tools from prompting.
+
+> **Cross-machine rule:** the optimizer never auto-detects which MCPs are installed locally. The catalog reflects intent + reference, not host probe. If a listed MCP isn't installed on the current machine, the agent silently falls back to non-MCP equivalents (Read / Bash / WebFetch / etc.) and notes once: `MCP <name> not available locally — falling back to standard tools.`
+
+## Project MCPs (intended for this project)
+
+> Edit this list when adding/removing MCP integrations from the project. The optimizer preserves user edits on re-run.
+
+| MCP          | Purpose in this project               | Notes |
+| ------------ | ------------------------------------- | ----- |
+| _(none yet)_ | _Add entries as MCPs are integrated._ |       |
+
+## Servers the agent will meet anyway
+
+One entry, because it is the only one whose behavior is not general knowledge:
+
+| MCP                  | Why it is written down                                                                                                                                                                                                                                                                                                                                                                  |
+| -------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `claude-code-remote` | Claude Code web/remote session management — scheduled Routines/triggers, `send_later` self check-ins, PR-activity subscriptions. Pre-approved in `.claude/settings.json` → `permissions.allow` (per-spelling globs; the PR-activity pair may register under `github` — covered) — which reaches the local CLI, **not** a cloud/web session. See _Prompt-free triggers everywhere_ below |
+
+Every other server (filesystem, github, database, browser-automation, error-tracking, work-tracking, cloud-provider …) needs no catalog here: what it does is evident from its name and tool list at the moment it is connected, and a list of them in this file would only go stale. Two rules cover them all — **fall back silently** when a server is absent (below), and **never call a cost-incurring one** unbidden.
+
+## Prompt-free triggers everywhere (one-time)
+
+This repo's `.claude/settings.json` pre-approves
+every Claude Code Remote trigger tool — but a **project** allowlist grants capability, so Claude Code applies it only
+after this repo's **workspace-trust dialog** has been accepted. That single fact splits the two surfaces:
+
+| Surface                                                             | What actually happens                                                                                                                                                                                                                                                      | The one-time fix                                                                                                     |
+| ------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------- |
+| **Local CLI**                                                       | The trust dialog appears on the first interactive run in the repo; accept it and the repo block is live                                                                                                                                                                    | Accept the dialog — or put the rules in user settings below and cover every repo at once                             |
+| **Claude Code web / cloud** (routines, Claude Tag, mobile included) | No trust dialog exists and every session starts from a fresh container, so the block is dropped at startup — `Ignoring N permissions.allow entries from .claude/settings.json: this workspace has not been trusted` — and `delete_trigger` & friends prompt on every merge | User settings, installed by the environment's **setup script** (below). Nothing inside the repo can fix this surface |
+
+**Self-heal, local only** (moved from `CLAUDE.md`): when a trigger tool prompts in the local CLI, append the missing `mcp__<that server>__*` glob to `.claude/settings.json` → `permissions.allow` and commit it — additive, never a `deny` or `ask` entry. Web/cloud appends nothing and names the user-scope fix below.
+
+Same rules either way, in `~/.claude/settings.json` — user scope carries no trust gate and applies to every repo:
+
+```json
+{
+  "permissions": {
+    "allow": [
+      "mcp__claude-code-remote__*",
+      "mcp__Claude_Code_Remote__*",
+      "mcp__claude_code_remote__*",
+      "mcp__github__subscribe_pr_activity",
+      "mcp__github__unsubscribe_pr_activity"
+    ]
+  }
+}
+```
+
+**Cloud/web — paste this into the environment's _Setup script_** (claude.ai → Claude Code → cloud environment settings).
+It runs as root before Claude Code launches, and what it writes survives in the environment snapshot, so later sessions
+start with the file already in place. Merge-safe: it adds only what is missing.
+
+```bash
+python3 - <<'PY'
+import json, os, pathlib
+d = pathlib.Path(os.environ.get("CLAUDE_CONFIG_DIR") or (pathlib.Path.home() / ".claude"))
+d.mkdir(parents=True, exist_ok=True)
+f = d / "settings.json"
+cfg = json.loads(f.read_text()) if f.exists() else {}
+allow = cfg.setdefault("permissions", {}).setdefault("allow", [])
+for rule in ["mcp__claude-code-remote__*", "mcp__Claude_Code_Remote__*", "mcp__claude_code_remote__*",
+             "mcp__github__subscribe_pr_activity", "mcp__github__unsubscribe_pr_activity"]:
+    if rule not in allow:
+        allow.append(rule)
+f.write_text(json.dumps(cfg, indent=2))
+PY
+```
+
+Editing the setup script re-runs it and rebuilds the snapshot; the cache also expires after roughly seven days. Verify in
+the next session with `cat ~/.claude/settings.json`. **Why not a `SessionStart` hook in the repo:** hooks do run in an
+untrusted workspace, but settings are read _before_ hooks fire — the rules would apply to the session _after_ the one that
+wrote them, and in the cloud there is no session after: each gets a new container. The web surface pre-approves the
+GitHub MCP server on its own, which is why the prompts that survive there are the Claude Code Remote ones.
+
+Merge additively into an existing file; never remove user entries. To re-gate a single tool (e.g. `add_repo`), add it
+to `permissions.ask` — `ask` is evaluated before `allow`, so it prompts despite the glob. **The agent never writes
+this file on its own** — it lives outside the repo, so applying it is the user's call.
+
+Two more keys earn their place in that same user-level file:
+
+| Key                                             | Effect on unattended work                                                                                                                                                                                                                                                                                                                                                                            |
+| ----------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `"askUserQuestionTimeout": "5m"`                | An unanswered `AskUserQuestion` auto-continues after 5 minutes with whatever was preselected, instead of holding the session open. The default `"never"` waits forever — that is what turns one ambiguous moment into a dead overnight run. Values: `"60s"`, `"5m"`, `"10m"`, `"never"`. **Read from user settings only** — a repo cannot set it for you, which is why the optimizer never writes it |
+| `"permissions": {"defaultMode": "acceptEdits"}` | Optional. File edits and common filesystem commands stop prompting; every other rule above still applies. Project settings _can_ carry this, but how much a machine may do unsupervised is the owner's call, not the repo's — so the optimizer leaves it to you. `bypassPermissions` skips nearly all prompts and belongs only in a container or VM you are willing to lose                          |
+
+## MCPs in cloud and routine runs
+
+A cloud session — every routine run included — starts from a fresh clone of the repository. Nothing added locally with `claude mcp add` travels with it, because that configuration lives on the machine, not in the repo. Two paths make a server reachable in an unattended run:
+
+1. **A committed `.mcp.json` at the repo root** (project scope). It is part of the clone, so it applies everywhere the repo goes:
+
+   ```json
+   {
+     "mcpServers": {
+       "example": { "type": "http", "url": "https://mcp.example.com/mcp" }
+     }
+   }
+   ```
+
+   stdio servers use `"command"` + `"args"` instead of `"type"`/`"url"`. `${VAR}` and `${VAR:-default}` expand in `command`, `args` and `env` — **use them for every credential**; a token committed in `.mcp.json` is a leaked token. Project servers need approval before they connect: `.claude/settings.json` → `enableAllProjectMcpServers: true` grants it, and like every project-level allow rule it applies only after the workspace-trust dialog is accepted, so a repo cannot fully approve its own servers on a first local run.
+
+2. **claude.ai connectors.** A routine includes the account's connectors, and its own form is where you narrow them to what the run needs. Connector traffic goes through Anthropic's servers, so it is unaffected by the environment's allowed-domains list.
+
+Neither path is a hard requirement — Selection Heuristic rule 3 still holds. A run whose MCP is missing falls back and says so once.
+
+## Selection Heuristic for the Agent
+
+1. **Project MCPs first.** If the project intends an MCP for a task, use it.
+2. **Otherwise try the fitting connected server**, whatever it is; if it is absent, fall back to standard tools and say so once.
+3. **Never make MCP usage a hard requirement.** All workflows must work without MCPs (autonomy + cross-machine rule).
+4. **Never call cost-incurring MCPs** (cloud, paid APIs) unless explicitly requested by the user.
+
+## Adding a New Project MCP
+
+1. Add a row to the **Project MCPs** table above with purpose + notes.
+2. If the MCP needs setup, put the install/auth steps in that row's Notes — `CLAUDE.md → External Integrations` stays a pointer to this file.
+3. If a workflow becomes MCP-dependent, add a fallback path that works without it.
+
+<!-- Generated by claude-code-optimizer v1.70.0 -->

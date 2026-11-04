@@ -1,0 +1,393 @@
+{
+  "demo": false,
+  "settings": {
+    "defaultAgent": "claude",
+    "defaultEnv": "local",
+    "environments": ["local", "docker", "wsl"],
+    "terminal": "windowsTerminal",
+    "sharedWindow": false,
+    "agents": {
+      "claude": {
+        "model": "default",
+        "effort": "default",
+        "permission": "auto",
+        "extraArgs": ""
+      },
+      "opencode": {
+        "model": "default",
+        "effort": "default",
+        "permission": "auto",
+        "extraArgs": ""
+      },
+      "codex": {
+        "model": "default",
+        "effort": "default",
+        "permission": "auto",
+        "extraArgs": ""
+      }
+    },
+    "docker": {
+      "images": {
+        "claude": "node:22-trixie",
+        "opencode": "node:22-trixie",
+        "codex": "node:22-trixie"
+      },
+      "ghToken": false,
+      "ports": []
+    },
+    "github": {
+      "cloneRoot": ""
+    }
+  },
+  "catalog": [
+    {
+      "id": "claude",
+      "label": "Claude Code",
+      "models": [
+        {
+          "id": "default",
+          "label": "Standard",
+          "hint": "Ohne --model: Standard des Kontos"
+        },
+        {
+          "id": "fable",
+          "label": "Fable 5.1",
+          "hint": "Für die schwersten, längsten Aufgaben"
+        },
+        {
+          "id": "opus",
+          "label": "Opus 5.5"
+        },
+        {
+          "id": "sonnet",
+          "label": "Sonnet 5.5"
+        },
+        {
+          "id": "haiku",
+          "label": "Haiku 5.5",
+          "hint": "Schnell und günstig"
+        },
+        {
+          "id": "opusplan",
+          "label": "Opus Plan",
+          "hint": "Opus beim Planen, sonst Sonnet"
+        }
+      ],
+      "freeModel": true,
+      "efforts": [
+        {
+          "id": "default",
+          "label": "Standard",
+          "hint": "Ohne --effort: Standard des Modells"
+        },
+        {
+          "id": "low",
+          "label": "Niedrig"
+        },
+        {
+          "id": "medium",
+          "label": "Mittel"
+        },
+        {
+          "id": "high",
+          "label": "Hoch"
+        },
+        {
+          "id": "xhigh",
+          "label": "Sehr hoch"
+        },
+        {
+          "id": "max",
+          "label": "Maximal"
+        }
+      ],
+      "permissions": [
+        {
+          "id": "ask",
+          "label": "Nachfragen",
+          "hint": "Fragt vor Änderungen und Befehlen",
+          "danger": false
+        },
+        {
+          "id": "auto",
+          "label": "Auto",
+          "hint": "Auto-Modus: sichere Schritte ohne Rückfrage",
+          "danger": false
+        },
+        {
+          "id": "bypass",
+          "label": "Bypass",
+          "hint": "Überspringt alle Rückfragen",
+          "danger": true
+        }
+      ],
+      "sessions": ["new", "continue", "resume"],
+      "environments": ["local", "docker"],
+      "install": {
+        "command": "irm https://claude.ai/install.ps1 | iex",
+        "docsUrl": "https://code.claude.com/docs/en/setup",
+        "update": "claude update",
+        "requires": "Git for Windows empfohlen"
+      }
+    },
+    {
+      "id": "opencode",
+      "label": "OpenCode",
+      "models": [
+        {
+          "id": "default",
+          "label": "Standard",
+          "hint": "Aus der OpenCode-Konfiguration; eigenes Modell als provider/model (opencode models)"
+        }
+      ],
+      "freeModel": true,
+      "efforts": [
+        {
+          "id": "default",
+          "label": "Standard",
+          "hint": "Nur mit gewähltem Modell (Modell-Variante)"
+        },
+        {
+          "id": "low",
+          "label": "Niedrig"
+        },
+        {
+          "id": "medium",
+          "label": "Mittel"
+        },
+        {
+          "id": "high",
+          "label": "Hoch"
+        },
+        {
+          "id": "xhigh",
+          "label": "Sehr hoch"
+        },
+        {
+          "id": "max",
+          "label": "Maximal"
+        }
+      ],
+      "permissions": [
+        {
+          "id": "ask",
+          "label": "Nachfragen",
+          "hint": "Regeln aus der OpenCode-Konfiguration",
+          "danger": false
+        },
+        {
+          "id": "auto",
+          "label": "Auto",
+          "hint": "Genehmigt alles, was nicht ausdrücklich verboten ist",
+          "danger": false
+        },
+        {
+          "id": "bypass",
+          "label": "YOLO",
+          "hint": "Erlaubt jede Aktion ohne Rückfrage",
+          "danger": true
+        }
+      ],
+      "sessions": ["new", "continue"],
+      "environments": ["local", "docker"],
+      "install": {
+        "command": "npm install -g @opencode/cli@latest",
+        "docsUrl": "https://opencode.ai/v2/docs/",
+        "update": "opencode upgrade",
+        "requires": "Node.js + npm"
+      }
+    },
+    {
+      "id": "codex",
+      "label": "Codex",
+      "models": [
+        {
+          "id": "default",
+          "label": "Standard",
+          "hint": "Ohne -m: Standard aus Konto und Konfiguration"
+        },
+        {
+          "id": "gpt-6.1-sol",
+          "label": "gpt-6.1-sol"
+        },
+        {
+          "id": "gpt-6-astra",
+          "label": "gpt-6-astra"
+        },
+        {
+          "id": "gpt-6-sol",
+          "label": "gpt-6-sol"
+        },
+        {
+          "id": "gpt-6-luna",
+          "label": "gpt-6-luna"
+        },
+        {
+          "id": "gpt-5.6-sol",
+          "label": "gpt-5.6-sol"
+        },
+        {
+          "id": "gpt-6.1-terra",
+          "label": "gpt-6.1-terra"
+        },
+        {
+          "id": "gpt-5.6-terra",
+          "label": "gpt-5.6-terra"
+        },
+        {
+          "id": "gpt-5.6-luna",
+          "label": "gpt-5.6-luna"
+        },
+        {
+          "id": "gpt-5.5",
+          "label": "gpt-5.5"
+        }
+      ],
+      "freeModel": true,
+      "efforts": [
+        {
+          "id": "default",
+          "label": "Standard",
+          "hint": "Ohne model_reasoning_effort: Standard des Modells"
+        },
+        {
+          "id": "low",
+          "label": "Niedrig"
+        },
+        {
+          "id": "medium",
+          "label": "Mittel"
+        },
+        {
+          "id": "high",
+          "label": "Hoch"
+        },
+        {
+          "id": "xhigh",
+          "label": "Sehr hoch"
+        },
+        {
+          "id": "max",
+          "label": "Maximal"
+        }
+      ],
+      "permissions": [
+        {
+          "id": "ask",
+          "label": "Nachfragen",
+          "hint": "Lokal nur lesen, Änderungen nach Rückfrage; in Docker fragt Codex nur bei Bedarf",
+          "danger": false
+        },
+        {
+          "id": "auto",
+          "label": "Auto",
+          "hint": "Automatische Prüfung, schreibt im Arbeitsordner",
+          "danger": false
+        },
+        {
+          "id": "bypass",
+          "label": "YOLO",
+          "hint": "Ohne Rückfragen und ohne Sandbox",
+          "danger": true
+        }
+      ],
+      "sessions": ["new", "continue", "resume"],
+      "environments": ["local", "docker"],
+      "install": {
+        "command": "irm https://chatgpt.com/codex/install.ps1 | iex",
+        "docsUrl": "https://github.com/openai/codex",
+        "update": "codex update",
+        "requires": "Windows 10 1809+ mit winget"
+      }
+    }
+  ],
+  "portPresets": [
+    {
+      "port": 3000,
+      "label": "Next.js · Node"
+    },
+    {
+      "port": 5173,
+      "label": "Vite"
+    },
+    {
+      "port": 4200,
+      "label": "Angular"
+    },
+    {
+      "port": 8000,
+      "label": "Django · FastAPI"
+    },
+    {
+      "port": 8080,
+      "label": "Spring · HTTP"
+    },
+    {
+      "port": 5000,
+      "label": "Flask · ASP.NET"
+    },
+    {
+      "port": 4321,
+      "label": "Astro"
+    },
+    {
+      "port": 6006,
+      "label": "Storybook"
+    }
+  ],
+  "agents": [
+    {
+      "agent": "claude",
+      "env": "local",
+      "state": "unknown"
+    },
+    {
+      "agent": "claude",
+      "env": "docker",
+      "state": "unknown"
+    },
+    {
+      "agent": "opencode",
+      "env": "local",
+      "state": "unknown"
+    },
+    {
+      "agent": "opencode",
+      "env": "docker",
+      "state": "unknown"
+    },
+    {
+      "agent": "codex",
+      "env": "local",
+      "state": "unknown"
+    },
+    {
+      "agent": "codex",
+      "env": "docker",
+      "state": "unknown"
+    }
+  ],
+  "environments": [
+    {
+      "env": "local",
+      "state": "ready"
+    },
+    {
+      "env": "docker",
+      "state": "unknown"
+    },
+    {
+      "env": "wsl",
+      "state": "unavailable",
+      "detail": "Bald verfügbar"
+    }
+  ],
+  "recents": [],
+  "github": {
+    "repos": [],
+    "loading": false,
+    "defaultCloneRoot": ""
+  },
+  "detecting": false,
+  "revision": 0
+}

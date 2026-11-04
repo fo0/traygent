@@ -1,0 +1,34 @@
+/*
+ * Windows High Contrast (forced colors). Backgrounds, box-shadows and most
+ * author colours are replaced by system colours here, so state that the
+ * panel shows with tints, glows or fills is redrawn with system colours.
+ */
+@media (forced-colors: active) {
+  /* Switch: the knob is a background fill and would disappear entirely. */
+  .switch,
+  .switch:after {
+    forced-color-adjust: none;
+  }
+  .switch {
+    background: Canvas;
+    border-color: CanvasText;
+  }
+  .switch:after {
+    background: CanvasText;
+  }
+
+  /* Selected settings tab. */
+  .settings-tabs button[aria-selected='true'] {
+    forced-color-adjust: none;
+    background: Highlight;
+    border-color: Highlight;
+    color: HighlightText;
+  }
+  /* The chosen „Darstellung“ tile: its radio is hidden, so it is filled. */
+  .theme-option:has(input:checked) {
+    forced-color-adjust: none;
+    background: Highlight;
+    border-color: Highlight;
+    color: HighlightText;
+  }
+}

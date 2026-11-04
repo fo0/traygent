@@ -1,0 +1,80 @@
+/*
+ * Product marks and icon-led controls: agent marks in badges, segments and
+ * labels, icons in the settings tabs and the theme choice.
+ */
+.mark-claude {
+  color: var(--brand-claude);
+}
+
+/* Settings tabs: an icon beside each label, dimmed until the tab is active;
+   an inactive tab highlights on hover like the other controls. */
+.settings-tabs button svg {
+  opacity: 0.75;
+}
+.settings-tabs button[aria-selected='true'] svg {
+  opacity: 1;
+}
+.settings-tabs button:hover:not([aria-selected='true']) {
+  background: var(--hover);
+  color: var(--text);
+}
+
+/* A form label or heading led by an icon. */
+.label-icon,
+.heading-icon {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+.label-icon svg {
+  color: var(--text-2);
+}
+.label-icon .mark-claude {
+  color: var(--brand-claude);
+}
+
+/* Darstellung: icon tiles; the radio stays for keyboard and screen readers. */
+.theme-option {
+  position: relative;
+  justify-content: center;
+  color: var(--text-2);
+}
+.theme-option:has(input:checked) {
+  color: var(--text);
+}
+.theme-option input {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  opacity: 0;
+  cursor: inherit;
+}
+.theme-option:has(input:focus-visible) {
+  outline: 2px solid var(--accent);
+  outline-offset: 1px;
+}
+
+/* App tab: Autostart closes the tab, below „Darstellung“. */
+.startup-panel h3 {
+  margin-bottom: 10px;
+}
+.startup-panel .field-help {
+  margin: 0;
+}
+
+/* In a settings form, segments size to their label, so a mark never cuts it. */
+.field-grid .segment {
+  flex: 1 1 auto;
+}
+
+/* Narrow windows: the tab labels alone, so the strip never scrolls sideways. */
+.settings-tabs button {
+  min-width: 0;
+}
+/* Five icon tabs need the default 480 px window; narrower, labels only. */
+@media (max-width: 479px) {
+  .settings-tabs button svg {
+    display: none;
+  }
+}

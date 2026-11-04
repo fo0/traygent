@@ -1,0 +1,120 @@
+name: CI
+on:
+  pull_request:
+  # Release runs this first for the commit it publishes.
+  workflow_call:
+permissions:
+  contents: read
+concurrency:
+  # A new push to a pull request supersedes its running CI; release runs never cancel.
+  group: ci-${{ github.event_name == 'pull_request' && github.ref || github.run_id }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+jobs:
+  changes:
+    # Pull requests run the Rust and Windows jobs only when they touch what those jobs
+    # check. Release runs always check everything.
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      pull-requests: read # List the pull request's changed files.
+    outputs:
+      rust: ${{ steps.scope.outputs.rust }}
+      desktop: ${{ steps.scope.outputs.desktop }}
+    steps:
+      - id: scope
+        env:
+          GH_TOKEN: ${{ github.token }}
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+        run: |
+          if [ -z "$PR_NUMBER" ]; then
+            printf 'rust=true\ndesktop=true\n' >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          files=$(gh api --paginate "repos/$GITHUB_REPOSITORY/pulls/$PR_NUMBER/files" --jq '.[] | .filename, (.previous_filename // empty)')
+          touches() { grep -qE "$1" <<< "$files" && echo true || echo false; }
+          # release:test reads scripts/ and release.yml.
+          echo "rust=$(touches '^(src-tauri/|fixtures/|\.github/workflows/ci\.yml$)')" >> "$GITHUB_OUTPUT"
+          echo "desktop=$(touches '^(src-tauri/|fixtures/|scripts/|\.github/workflows/|package\.json$|pnpm-lock\.yaml$|pnpm-workspace\.yaml$|\.node-version$)')" >> "$GITHUB_OUTPUT"
+  panel:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: pnpm/action-setup@ea17c68df8912ef543352723c149a84f56e3d413 # v6.1.0
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version-file: .node-version
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm verify
+      # Headless runs use Chromium's headless shell; the full browser is never started.
+      - run: pnpm exec playwright install --with-deps --only-shell chromium
+      - id: e2e
+        run: pnpm test:e2e
+      - name: Upload Playwright report
+        if: failure() && steps.e2e.outcome == 'failure'
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: playwright-report
+          path: |
+            playwright-report/
+            test-results/
+          retention-days: 7
+          if-no-files-found: ignore
+  rust-core:
+    needs: changes
+    if: needs.changes.outputs.rust == 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Install Rust stable
+        run: rustup toolchain install stable --profile minimal --component clippy,rustfmt --no-self-update && rustup default stable
+      - name: Cache Rust dependencies
+        uses: Swatinem/rust-cache@d1527c8f67ef9af357290475d4af4b0fab8f12e0 # v2.9.3
+        with:
+          workspaces: src-tauri -> target
+          shared-key: linux-core
+          cache-bin: false
+          save-if: ${{ github.ref == 'refs/heads/main' }}
+      - run: cargo fmt --manifest-path src-tauri/Cargo.toml --check
+      - run: cargo clippy --locked --manifest-path src-tauri/Cargo.toml --features updates --all-targets -- -D warnings
+      - run: cargo test --locked --manifest-path src-tauri/Cargo.toml --features updates
+  windows-desktop:
+    needs: changes
+    if: needs.changes.outputs.desktop == 'true'
+    runs-on: windows-latest
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: pnpm/action-setup@ea17c68df8912ef543352723c149a84f56e3d413 # v6.1.0
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version-file: .node-version
+          cache: pnpm
+      - name: Install Rust stable
+        run: rustup toolchain install stable --profile minimal --component clippy --no-self-update && rustup default stable
+      - name: Cache Rust dependencies
+        uses: Swatinem/rust-cache@d1527c8f67ef9af357290475d4af4b0fab8f12e0 # v2.9.3
+        with:
+          workspaces: src-tauri -> target
+          shared-key: windows-check
+          cache-bin: false
+          save-if: ${{ github.ref == 'refs/heads/main' }}
+      - run: pnpm install --frozen-lockfile
+      # Lint and icon bytes are platform-independent and run in `panel`. The release
+      # tests execute release.yml's PowerShell blocks, which publish from Windows.
+      - run: pnpm release:test
+      # The desktop crate embeds dist/ at compile time.
+      - run: pnpm build
+      - run: cargo clippy --locked --manifest-path src-tauri/Cargo.toml --features desktop --all-targets -- -D warnings
+      - name: Test Windows popup and isolated autostart registry adapter
+        run: cargo test --locked --manifest-path src-tauri/Cargo.toml --features desktop --bin traygent
+      - name: Test the core on Windows
+        run: cargo test --locked --manifest-path src-tauri/Cargo.toml --features updates
