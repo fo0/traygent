@@ -80,7 +80,7 @@ The folder field also takes a repository ([ADR-0005](adr/0005-start-from-a-githu
 ## Docker sessions
 
 - Every agent runs in `node:22-trixie` (changeable per agent under **Umgebung**) with `docker run --rm -it --init`; the folder is bind-mounted, all agent state lives in **named volumes** ([ADR-0004](adr/0004-docker-volumes-shared-with-the-batch-starter.md)).
-- **Claude Code** uses the same volumes and layout as the `claude/cli-starter.bat` Batch starter of [agent-tools](https://github.com/fo0/agent-tools) (`claude-code-tools`, `claude-code-config`, `/workspace`, the same per-folder project name), so an existing container login carries over in both directions.
+- **Claude Code** uses the same volumes and layout as the `claude/cli-starter.bat` Batch starter of agent-tools (`claude-code-tools`, `claude-code-config`, `/workspace`, the same per-folder project name), so an existing container login carries over in both directions.
 - **OpenCode** and **Codex** get Traygent-owned volumes and mount the folder at `/workspace/<project-name>`, so their per-folder session lists stay apart.
 - The **first start** pulls the image and installs the CLI into its volume; the agent's Docker status says so beforehand. Codex logs in by device code, or by `OPENAI_API_KEY` when your environment sets it (forwarded by name only).
 - Git inside the container gets `safe.directory=*`, `core.autocrlf=input` and your `%USERPROFILE%\.gitconfig` read-only. With **GitHub-Token weitergeben** the session fetches `gh auth token` on the host and forwards it as `GH_TOKEN` by name — it never appears in a command line or the state file.

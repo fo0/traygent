@@ -34,15 +34,15 @@ Every start lands in **Zuletzt** (recent), so the next one is a single click.
 
 ## Features
 
-|     |                                    |                                                                                                                               |
-| --- | ---------------------------------- | ----------------------------------------------------------------------------------------------------------------------------- |
-| ⚡  | **One-click starts**               | Agent, folder, environment, Enter. Model, effort and permission default to your settings; the session mode starts at **Neu**. |
-| 🕘  | **Recent sessions**                | Up to 20 folder · agent · environment combinations as compact rows; a click restarts one with exactly the same settings.      |
-| 🐳  | **Local or Docker**                | Run the agent on the host or in a container with named volumes for its state and optional port publishing.                    |
-| 🐙  | **Start from a GitHub repository** | Paste a URL, type `owner/name` or search your repositories; Traygent clones it on first use and reuses the folder afterwards. |
-| 🔍  | **Detects what is installed**      | Agent CLIs, their versions and Docker are detected; a missing CLI offers its install command instead of a dead start.         |
-| 🔄  | **Updates in the app**             | Check, read the changelog and install without leaving the app.                                                                |
-| 🌗  | **Small and native**               | Rust + Tauri, light and dark theme, starts with Windows if you want it to.                                                    |
+| Feature                               | What you get                                                                                                                  |
+| ------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------- |
+| ⚡ **One-click starts**               | Agent, folder, environment, Enter. Model, effort and permission default to your settings; the session mode starts at **Neu**. |
+| 🕘 **Recent sessions**                | Up to 20 folder · agent · environment combinations as compact rows; a click restarts one with exactly the same settings.      |
+| 🐳 **Local or Docker**                | Run the agent on the host or in a container with named volumes for its state and optional port publishing.                    |
+| 🐙 **Start from a GitHub repository** | Paste a URL, type `owner/name` or search your repositories; Traygent clones it on first use and reuses the folder afterwards. |
+| 🔍 **Detects what is installed**      | Agent CLIs, their versions and Docker are detected; a missing CLI offers its install command instead of a dead start.         |
+| 🔄 **Updates in the app**             | Check, read the changelog and install without leaving the app.                                                                |
+| 🌗 **Small and native**               | Rust + Tauri, light and dark theme, starts with Windows if you want it to.                                                    |
 
 Every control is described in the [user guide](docs/USAGE.md).
 
@@ -91,7 +91,7 @@ Open http://127.0.0.1:1420. The preview is labelled **Demo**.
 - **German UI.** Labels are German; the [user guide](docs/USAGE.md) explains them.
 - **GitHub.com, one account.** GitHub Enterprise hosts are not recognised; repositories outside the account's list are found only when typed as `owner/name` or pasted as a URL. A repository created since the last list read appears after **Aktualisieren**; a token rotated in `gh` must be imported again.
 - **PATH after a fresh install.** Detection finds a CLI installed after Traygent started, but terminals Traygent opens inherit its PATH; tools an agent calls itself (for example Git) may need a new login or a Traygent restart.
-- **Not yet:** corporate CA import into containers and GPU passthrough — the `claude/cli-starter.bat` of [agent-tools](https://github.com/fo0/agent-tools) still covers those. Planned work: [BACKLOG.md](BACKLOG.md).
+- **Not yet:** corporate CA import into containers and GPU passthrough — the `claude/cli-starter.bat` of agent-tools still covers those. Planned work: [BACKLOG.md](BACKLOG.md).
 - Some launch details still await confirmation on a real Windows host; they are tracked in [BACKLOG.md](BACKLOG.md).
 
 ## Development
@@ -121,4 +121,4 @@ pnpm build:installer   # unsigned NSIS installer (Windows) → src-tauri/target/
 
 ## License
 
-[MIT](LICENSE). Dependencies retain their own licenses. Icons and UI glyphs are drawn from repository-native geometry ([asset sources](docs/ASSETS.md)). The app shell derives from [RepoWatch](https://github.com/fo0/repo-watch); Traygent replaces the Batch starters of [agent-tools](https://github.com/fo0/agent-tools) for everyday starts.
+[MIT](LICENSE). Dependencies retain their own licenses. Icons and UI glyphs are drawn from repository-native geometry ([asset sources](docs/ASSETS.md)). The app shell derives from [RepoWatch](https://github.com/fo0/repo-watch); Traygent replaces the Batch starters of agent-tools for everyday starts.
