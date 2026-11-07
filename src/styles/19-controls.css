@@ -95,6 +95,45 @@
     height: 14px;
   }
 }
+/* Collapsing row (the composer's agents): the checked segment grows and
+   shows its name, the others keep mark and probe dot at full contrast (they
+   are installed choices, not disabled ones), so the choice reads at a
+   glance. The name slides in; reduced motion switches at once. */
+.segmented.collapse .segment {
+  flex: 0 0 auto;
+  padding-inline: 12px;
+  transition:
+    flex-grow 0.2s ease,
+    background 0.15s,
+    color 0.15s;
+}
+.segmented.collapse .segment:has(input:checked) {
+  flex: 1 1 auto;
+}
+.segmented.collapse .segment:not(:has(input:checked)) .segment-label {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+}
+.segmented.collapse .segment:has(input:checked) .segment-label {
+  animation: segment-label-in 0.2s ease;
+}
+@keyframes segment-label-in {
+  from {
+    opacity: 0;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .segmented.collapse .segment {
+    transition: none;
+  }
+  .segmented.collapse .segment:has(input:checked) .segment-label {
+    animation: none;
+  }
+}
 .segment:hover:not(:has(input:disabled)) {
   background: var(--hover);
   color: var(--text);
@@ -141,7 +180,7 @@
   background: var(--wait);
 }
 
-/* Option chips: compact selects, a combobox and the permission toggle. Tight
+/* Option chips: compact dropdowns (27-dropdowns.css) and the permission toggle. Tight
    enough that every agent's chips, Docker's „Ports“ included, keep one row
    beside „Starten“ in the default 480 px window. */
 .chip {
@@ -150,7 +189,7 @@
   align-items: center;
   gap: 3px;
   min-height: 28px;
-  padding: 0 6px;
+  padding: 0 5px;
   border: 1px solid var(--border-strong);
   border-radius: 999px;
   background: var(--raised);
@@ -175,10 +214,9 @@
   min-width: 28px;
   padding: 0;
 }
-.chip-select,
 .chip-input {
   appearance: none;
-  min-width: 2ch;
+  min-width: 6ch;
   max-width: 128px;
   padding: 0;
   border: 0;
@@ -188,26 +226,8 @@
   field-sizing: content;
   text-overflow: ellipsis;
 }
-.chip-select {
-  padding-right: 12px;
-  cursor: pointer;
-}
-.chip-select:focus-visible,
 .chip-input:focus-visible {
   outline: none;
-}
-.chip-select option {
-  background: var(--raised);
-  color: var(--text);
-}
-.chip-input {
-  min-width: 6ch;
-}
-.chip-caret {
-  position: absolute;
-  right: 6px;
-  pointer-events: none;
-  color: var(--text-3);
 }
 /* A warning or an error keeps its colour under the pointer. */
 .chip[data-warn='true'],
@@ -250,9 +270,6 @@
 }
 .text-field[aria-invalid='true'] {
   border-color: var(--fail);
-}
-select.text-field {
-  cursor: pointer;
 }
 .mono {
   font-family: 'Cascadia Mono', Consolas, ui-monospace, monospace;

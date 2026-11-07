@@ -1,5 +1,7 @@
 <script lang="ts">
+  import Dropdown from './Dropdown.svelte';
   import Icon from './Icon.svelte';
+  import ModelCombo from './ModelCombo.svelte';
   import PortsChip from './PortsChip.svelte';
   import {
     PERMISSION_ICONS,
@@ -9,6 +11,7 @@
     effortChoices,
     permissionChoice,
   } from './agents';
+  import { toItems } from './choices';
   import type { Composer } from './composerState.svelte';
   import { effortLevel } from './optionMarks';
   import type {
@@ -32,95 +35,58 @@
     presets: readonly PortPreset[];
     /** Why the typed model is refused; marks the chip. */
     invalidModel?: string;
-    /** Enter on a select starts like everywhere else in the composer. */
+    /** Enter on a closed dropdown starts like everywhere else in the composer. */
     onEnter: () => void;
   } = $props();
   const options = $derived(composer.options);
   const permission = $derived(permissionChoice(entry, options.permission));
-  const models = $derived(entry.models.filter((m) => m.id !== 'default'));
   /** Hidden while the model cannot carry a thinking level (nothing is sent). */
   const efforts = $derived(effortChoices(entry, options.model));
-  const knownEffort = $derived(
-    efforts.some((choice) => choice.id === options.effort),
-  );
   const sessions = $derived(composer.sessions);
-  const listId = $derived(`composer-models-${entry.id}`);
   const modelTitle = $derived(
     invalidModel || choiceTitle('Modell', entry.models, options.model),
   );
-  const enter = (event: KeyboardEvent) => {
-    if (event.key !== 'Enter') return;
-    event.preventDefault();
-    onEnter();
-  };
   const sessionTitle = (mode: SessionMode, env: EnvId) =>
     `Session: ${SESSION_HINTS[mode]}${env === 'docker' && mode !== 'new' ? ' (im Container)' : ''}`;
 </script>
 
 <div class="option-chips" role="group" aria-label="Optionen">
   {#if entry.freeModel}
-    <label
-      class="chip chip-field"
-      data-invalid={invalidModel ? 'true' : undefined}
+    <ModelCombo
+      id={`composer-model-${entry.id}`}
+      models={entry.models}
+      value={options.model}
+      onChange={(model) => (composer.options.model = model)}
       title={modelTitle}
-      ><Icon name="cpu" size={13} /><input
-        class="chip-input"
-        type="text"
-        list={listId}
-        aria-label="Modell"
-        aria-invalid={invalidModel ? 'true' : undefined}
-        placeholder="Modell"
-        spellcheck="false"
-        autocomplete="off"
-        value={options.model === 'default' ? '' : options.model}
-        oninput={(event) =>
-          (composer.options.model =
-            event.currentTarget.value.trim() || 'default')}
-      /></label
-    >
-    <datalist id={listId}>
-      {#each models as model (model.id)}<option
-          value={model.id}
-          label={model.label}
-        ></option>{/each}
-    </datalist>
+      invalid={invalidModel}
+      {onEnter}
+    />
   {:else}
-    <label class="chip" title={modelTitle}
-      ><Icon name="cpu" size={13} /><select
-        class="chip-select"
-        aria-label="Modell"
-        value={options.model}
-        onkeydown={enter}
-        onchange={(event) =>
-          (composer.options.model = event.currentTarget.value)}
-      >
-        {#each entry.models as model (model.id)}<option value={model.id}
-            >{model.label}</option
-          >{/each}
-      </select><Icon name="down" size={11} class="chip-caret" /></label
+    <Dropdown
+      id={`composer-model-${entry.id}`}
+      label="Modell"
+      items={toItems(entry.models, options.model)}
+      value={options.model}
+      onChange={(model) => (composer.options.model = model)}
+      title={modelTitle}
+      {onEnter}
+      >{#snippet lead()}<Icon name="cpu" size={13} />{/snippet}</Dropdown
     >
   {/if}
   {#if efforts.length}
-    <label class="chip" title={choiceTitle('Denken', efforts, options.effort)}
-      ><Icon
-        name="signal"
-        size={14}
-        level={effortLevel(options.effort)}
-      /><select
-        class="chip-select"
-        aria-label="Denken"
-        value={options.effort}
-        onkeydown={enter}
-        onchange={(event) =>
-          (composer.options.effort = event.currentTarget.value)}
-      >
-        {#if !knownEffort}<option value={options.effort}
-            >{options.effort}</option
-          >{/if}
-        {#each efforts as effort (effort.id)}<option value={effort.id}
-            >{effort.label}</option
-          >{/each}
-      </select><Icon name="down" size={11} class="chip-caret" /></label
+    <Dropdown
+      id="composer-effort"
+      label="Denken"
+      items={toItems(efforts, options.effort)}
+      value={options.effort}
+      onChange={(effort) => (composer.options.effort = effort)}
+      title={choiceTitle('Denken', efforts, options.effort)}
+      {onEnter}
+      >{#snippet lead()}<Icon
+          name="signal"
+          size={14}
+          level={effortLevel(options.effort)}
+        />{/snippet}</Dropdown
     >
   {/if}
   <!-- Icon only: the label lives in the accessible name and the tooltip. -->
@@ -134,19 +100,19 @@
     ><Icon name={PERMISSION_ICONS[permission.id]} size={14} /></button
   >
   {#if sessions.length > 1}
-    <label class="chip" title={sessionTitle(composer.session, composer.env)}
-      ><Icon name="history" size={13} /><select
-        class="chip-select"
-        aria-label="Session"
-        value={composer.session}
-        onkeydown={enter}
-        onchange={(event) =>
-          (composer.session = event.currentTarget.value as SessionMode)}
-      >
-        {#each sessions as mode (mode)}<option value={mode}
-            >{SESSION_LABELS[mode]}</option
-          >{/each}
-      </select><Icon name="down" size={11} class="chip-caret" /></label
+    <Dropdown
+      id="composer-session"
+      label="Session"
+      items={sessions.map((mode) => ({
+        id: mode,
+        label: SESSION_LABELS[mode],
+        title: SESSION_HINTS[mode],
+      }))}
+      value={composer.session}
+      onChange={(mode) => (composer.session = mode as SessionMode)}
+      title={sessionTitle(composer.session, composer.env)}
+      {onEnter}
+      >{#snippet lead()}<Icon name="history" size={13} />{/snippet}</Dropdown
     >
   {/if}
   {#if composer.env === 'docker'}

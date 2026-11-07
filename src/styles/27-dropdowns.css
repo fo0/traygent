@@ -1,0 +1,140 @@
+/*
+ * Dropdowns (Dropdown.svelte, ModelCombo.svelte, ChoiceList.svelte): one
+ * popup list for every choice — the composer chips „Modell“, „Denken“ and
+ * „Session“ and the same fields in the settings and „Bearbeiten …“ — in the
+ * style of the app's menus instead of the WebView's native select popup.
+ * Tokens from 00-tokens.css only.
+ */
+.dropdown {
+  position: relative;
+  display: inline-flex;
+  min-width: 0;
+}
+.dropdown.field {
+  display: flex;
+  width: 100%;
+}
+
+/* Chip: mark, the chosen label, caret. */
+.dropdown-chip {
+  cursor: pointer;
+}
+/* The caret sits in the chip's end padding, so a dropdown chip is no wider
+   than the native select it replaced. */
+.chip .dropdown-caret {
+  margin-right: -2px;
+}
+.dropdown-text {
+  min-width: 0;
+  max-width: 128px;
+  overflow: hidden;
+  color: var(--text);
+  text-overflow: ellipsis;
+}
+.dropdown-caret {
+  flex-shrink: 0;
+  color: var(--text-3);
+  transition: transform 0.15s;
+}
+[aria-expanded='true'] > .dropdown-caret,
+.dropdown:has([aria-expanded='true']) .dropdown-toggle .dropdown-caret {
+  transform: rotate(180deg);
+}
+.dropdown-toggle {
+  display: inline-flex;
+  margin-left: -1px;
+  align-items: center;
+  align-self: stretch;
+  cursor: pointer;
+}
+
+/* Form field: a full-width button or text field with the caret at the end. */
+.dropdown-field {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  text-align: left;
+  cursor: pointer;
+}
+.dropdown-field .dropdown-text {
+  max-width: none;
+}
+.dropdown-field-box {
+  position: relative;
+  display: flex;
+  align-items: center;
+  width: 100%;
+}
+.dropdown-field-box .text-field {
+  padding-right: 28px;
+}
+.dropdown-field-box .dropdown-toggle {
+  position: absolute;
+  top: 0;
+  right: 6px;
+  bottom: 0;
+  padding: 0 3px;
+}
+
+/* The list: under its control, at least as wide, scrolling when long. */
+.choice-list {
+  top: calc(100% + 4px);
+  left: 0;
+  min-width: max(100%, 180px);
+  max-height: 264px;
+  margin: 0;
+  overflow-y: auto;
+  list-style: none;
+  scrollbar-width: thin;
+  scrollbar-color: var(--scrollbar) transparent;
+}
+.choice {
+  gap: 10px;
+  min-height: 30px;
+  padding: 5px 8px 5px 10px;
+  cursor: pointer;
+}
+/* The pointer or the arrow keys mark the active option; focus stays on the
+   control, so the hover colour is the only cue. */
+.choice[aria-selected='true'] {
+  background: var(--hover);
+}
+.choice-label {
+  flex: 1 1 auto;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.choice-meta {
+  flex-shrink: 0;
+  color: var(--text-3);
+  font-size: var(--font-size-meta);
+}
+.choice-check {
+  flex-shrink: 0;
+  visibility: hidden;
+  color: var(--accent);
+}
+.choice[data-current='true'] .choice-label {
+  font-weight: 600;
+}
+.choice[data-current='true'] .choice-check {
+  visibility: visible;
+}
+
+@media (forced-colors: active) {
+  .choice[aria-selected='true'] {
+    forced-color-adjust: none;
+    background: Highlight;
+    color: HighlightText;
+  }
+  .choice[aria-selected='true'] :is(.choice-meta, .choice-check) {
+    color: inherit;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .dropdown-caret {
+    transition: none;
+  }
+}

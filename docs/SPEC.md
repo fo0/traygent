@@ -33,9 +33,14 @@ Brand top left: icon + „Traygent“. Window ~480×760, frameless, tray popup l
    search field — no visible section heading; the section is named for assistive tech only and
    the checked agent is the page's focus landing:
    - Agent segmented control (Claude · OpenCode · Codex), each with a small status dot for the
-     selected environment (ready / missing).
-   - Folder: one field („Ordner oder Repo“) for a folder **or** a GitHub repository + browse
-     button (native folder dialog) + quick list of recent folders; see _Repositories_ below.
+     selected environment (ready / missing). Only the chosen agent shows its name and takes the
+     row's room; the others shrink to mark and dot at full contrast (never greyed out — they
+     are choices, not disabled ones), the name lives in their tooltip and accessible name
+     (owner request, #5).
+   - Folder: one field („Ordner oder Repo“) for a folder **or** a GitHub repository + quick list
+     of recent folders + a GitHub button (menu of the account's 8 newest-pushed repositories;
+     „GitHub verbinden …“ without an account) + browse button (native folder dialog); see
+     _Repositories_ below.
      Empty when the panel opens (owner request, #20) — a placeholder shows both forms
      (`C:\Projekte\app oder owner/repo`), never a pre-filled folder.
    - Env segmented control with icons: Lokal (monitor) · Docker (container/whale) · WSL (disabled,
@@ -43,11 +48,15 @@ Brand top left: icon + „Traygent“. Window ~480×760, frameless, tray popup l
      one the row is hidden and that one is used. A hidden environment (the saved default, a
      recent taken over with „In Composer übernehmen“) falls back to the first shown one that
      starts sessions.
-   - Compact option chips for the selected agent: Modell (select), Denken (thinking/effort
-     select led by signal bars of the chosen level, hidden if the agent has none), Freigabe (a
+   - Compact option chips for the selected agent: Modell (dropdown, or for agents with free
+     model strings an editable combobox whose list opens unfiltered and filters only while
+     typing), Denken (thinking/effort dropdown led by signal bars of the chosen level, hidden
+     if the agent has none), Freigabe (a
      symbol only — shield, shield with check, bolt — cycling ask → auto → bypass; the label is
      its tooltip and accessible name, bypass shows a warning colour), Session (Neu /
-     Fortsetzen / Auswahl). Every agent's chips, Docker's „Ports“ included, keep one row beside
+     Fortsetzen / Auswahl). Every dropdown — these chips and the same fields in Settings →
+     Agenten and „Bearbeiten …“ — opens the one app-styled list (check mark on the chosen
+     value), never the WebView's native select popup. Every agent's chips, Docker's „Ports“ included, keep one row beside
      „Starten“ in the default 480 px window.
    - Primary button „Starten“ bottom right; Enter starts. Missing CLI → button becomes
      „Installieren …“ (opens Settings → Agenten for that agent) — never a dead start.

@@ -1,3 +1,4 @@
+import { choose } from './support/dropdown';
 import { expect, test, type Page } from './support/test';
 import { nativeSnapshot } from './support/snapshot';
 import { installTauriMock, readCalls, readCommands } from './support/tauriMock';
@@ -127,7 +128,7 @@ test('OpenCode thinks only with a model: no effort is shown, sent or recorded wi
   const model = form.getByRole('combobox', { name: 'Modell' });
   await expect(effort).toHaveCount(0);
   await model.fill('opencode/big-pickle');
-  await effort.selectOption('high');
+  await choose(effort, 'Hoch');
   await model.fill('');
   await expect(effort).toHaveCount(0);
   await start(page).click();
@@ -165,9 +166,7 @@ test('the catalog hints of model and effort live in the tooltips only', async ({
     'title',
     'Modell: Standard – Ohne --model: Standard des Kontos',
   );
-  const effort = form.locator('label.chip', {
-    has: page.getByRole('combobox', { name: 'Denken' }),
-  });
+  const effort = form.getByRole('combobox', { name: 'Denken' });
   await expect(effort).toHaveAttribute(
     'title',
     'Denken: Standard – Ohne --effort: Standard des Modells',
