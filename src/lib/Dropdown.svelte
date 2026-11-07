@@ -40,6 +40,8 @@
   const listId = $derived(`${id}-list`);
   let open = $state(false);
   let active = $state(0);
+  /** Clamped: the items may change while the list is open (a refresh). */
+  const current = $derived(Math.min(active, items.length - 1));
   const selected = $derived(items.findIndex((item) => item.id === value));
   /** An unknown stored value is shown as it is. */
   const text = $derived(items[selected]?.label ?? value);
@@ -92,16 +94,16 @@
       open = false;
     } else if (key === 'Enter' || key === ' ') {
       event.preventDefault();
-      pick(active);
+      pick(current);
     } else if (key === 'Tab') open = false;
     else if (key === 'ArrowUp' && event.altKey) {
       event.preventDefault();
-      pick(active);
+      pick(current);
     } else {
       const next =
-        menuIndex(key, active, items.length) ??
+        menuIndex(key, current, items.length) ??
         (key.length === 1 && !event.ctrlKey && !event.metaKey
-          ? seek(key, active)
+          ? seek(key, current)
           : null);
       if (next === null) return;
       event.preventDefault();
@@ -122,7 +124,9 @@
     aria-haspopup="listbox"
     aria-expanded={open}
     aria-controls={open ? listId : undefined}
-    aria-activedescendant={open ? `${listId}-${active}` : undefined}
+    aria-activedescendant={open && current >= 0
+      ? `${listId}-${current}`
+      : undefined}
     data-value={value}
     {title}
     {disabled}
@@ -145,7 +149,7 @@
       {label}
       {items}
       current={value}
-      {active}
+      active={current}
       onPick={pick}
       onHover={(index) => (active = index)}
     />

@@ -53,6 +53,7 @@
   let active = $state(0);
   const items = $derived(query === null ? all : matchChoices(all, query));
   const expanded = $derived(open && items.length > 0);
+  /** -1 while typing: no option is picked until ↓/↑ moves onto one. */
   const current = $derived(Math.min(active, items.length - 1));
   let input = $state<HTMLInputElement>();
 
@@ -76,11 +77,17 @@
       event.preventDefault();
       if (!expanded) show();
       else if (event.altKey && step < 0) open = false;
+      else if (current < 0) active = step > 0 ? 0 : items.length - 1;
       else active = (current + step + items.length) % items.length;
     } else if (event.key === 'Enter') {
+      // Typed text stays as typed (any model string is allowed): Enter picks
+      // only an option the arrow keys moved onto, else it starts.
       event.preventDefault();
-      if (expanded) pick(current);
-      else onEnter?.();
+      if (expanded && current >= 0) pick(current);
+      else {
+        open = false;
+        onEnter?.();
+      }
     } else if (event.key === 'Escape' && expanded) {
       event.preventDefault();
       event.stopPropagation();
@@ -114,7 +121,9 @@
       aria-autocomplete="list"
       aria-expanded={expanded}
       aria-controls={expanded ? listId : undefined}
-      aria-activedescendant={expanded ? `${listId}-${current}` : undefined}
+      aria-activedescendant={expanded && current >= 0
+        ? `${listId}-${current}`
+        : undefined}
       aria-invalid={invalid ? 'true' : undefined}
       aria-describedby={describedBy}
       placeholder={variant === 'chip' ? 'Modell' : 'Standard'}
@@ -126,7 +135,7 @@
         const typed = event.currentTarget.value;
         onChange(typed.trim() || 'default');
         query = typed.trim();
-        active = 0;
+        active = -1;
         open = true;
       }}
       onclick={() => {

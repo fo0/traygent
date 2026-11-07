@@ -32,11 +32,38 @@ test('the model list opens unfiltered; only typing filters it', async ({
   await field.press('Escape');
   await field.fill('opus');
   await expect(models(page)).toHaveCount(2);
+  // Typing activates nothing; ↓ moves onto the match, Enter picks it.
   await field.fill('son');
   await expect(modelIds(page)).toHaveText(['sonnet']);
+  await expect(field).not.toHaveAttribute('aria-activedescendant');
+  await field.press('ArrowDown');
   await field.press('Enter');
   await expect(field).toHaveValue('sonnet');
   await expect(models(page)).toHaveCount(0);
+});
+
+test('a typed model that only partly matches stays as typed; Enter starts', async ({
+  page,
+}) => {
+  await page.goto('/');
+  await composer(page)
+    .getByRole('combobox', { name: 'Ordner oder Repo' })
+    .fill('C:\\Users\\demo\\Projekte\\traygent');
+  const field = model(page);
+  await field.fill('opu');
+  await expect(models(page)).toHaveCount(2);
+  await field.press('Enter');
+  await expect(
+    page
+      .getByRole('status')
+      .filter({ hasText: 'Claude Code gestartet (Demo).' }),
+  ).toBeVisible();
+  await expect(
+    page
+      .locator('.recent-row')
+      .first()
+      .getByRole('img', { name: 'Modell: opu' }),
+  ).toBeVisible();
 });
 
 test('the caret toggles the full model list and keeps the field focused', async ({
@@ -106,6 +133,24 @@ test('the GitHub button lists recent repositories; a pick fills the field', asyn
   await expect(
     composer(page).getByRole('combobox', { name: 'Ordner oder Repo' }),
   ).toHaveValue('demo-user/traygent');
+});
+
+test('Escape on an open dropdown in Settings closes only the list', async ({
+  page,
+}) => {
+  await page.goto('/');
+  await page
+    .getByRole('button', { name: 'Einstellungen', exact: true })
+    .click();
+  const dialog = page.getByRole('dialog', { name: 'Einstellungen' });
+  for (const name of ['Denken', 'Modell']) {
+    const control = dialog.getByRole('combobox', { name });
+    await control.click();
+    await expect(control).toHaveAttribute('aria-expanded', 'true');
+    await control.press('Escape');
+    await expect(control).toHaveAttribute('aria-expanded', 'false');
+    await expect(dialog).toBeVisible();
+  }
 });
 
 test('without an account the GitHub button leads to Settings → GitHub', async ({
