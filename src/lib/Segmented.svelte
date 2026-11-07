@@ -28,6 +28,7 @@
     onChange,
     landing = false,
     prominent = false,
+    collapse = false,
   }: {
     /** The radio group's name; unique per page. */
     name: string;
@@ -43,12 +44,18 @@
      * 18 px marks), for the row a form leads with (the composer's agents).
      */
     prominent?: boolean;
+    /**
+     * Only the checked segment shows its name and takes the room; the others
+     * shrink to their mark and dot. Names stay in the accessible names and
+     * the tooltips.
+     */
+    collapse?: boolean;
   } = $props();
   const hintId = (item: Segment<T>) => `${name}-${item.id}-hint`;
 </script>
 
 <div
-  class={['segmented', prominent && 'prominent']}
+  class={['segmented', prominent && 'prominent', collapse && 'collapse']}
   role="radiogroup"
   aria-label={label}
 >

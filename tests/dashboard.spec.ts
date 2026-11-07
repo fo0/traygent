@@ -1,5 +1,6 @@
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
+import { choose } from './support/dropdown';
 import { expect, test, type Page } from './support/test';
 import { nativeSnapshot } from './support/snapshot';
 import { installTauriMock, readCalls } from './support/tauriMock';
@@ -78,11 +79,9 @@ test('the chips change the next start only; Bypass shows the warning colour', as
   await expect(permission).toHaveAttribute('data-warn', 'true');
   await permission.click();
   await expect(permission).toHaveAccessibleName('Freigabe: Nachfragen');
-  await form.getByRole('combobox', { name: 'Denken' }).selectOption('high');
+  await choose(form.getByRole('combobox', { name: 'Denken' }), 'Hoch');
   await form.getByRole('combobox', { name: 'Modell' }).fill('opus');
-  await form
-    .getByRole('combobox', { name: 'Session' })
-    .selectOption('continue');
+  await choose(form.getByRole('combobox', { name: 'Session' }), 'Fortsetzen');
   await start(page).click();
   const first = rows(page).first();
   await expect(first.locator('.recent-name')).toHaveText('traygent');
@@ -97,7 +96,8 @@ test('the chips change the next start only; Bypass shows the warning colour', as
   ).toBeVisible();
   // After the start the form begins from the defaults again.
   await expect(permission).toHaveAccessibleName('Freigabe: Auto');
-  await expect(form.getByRole('combobox', { name: 'Session' })).toHaveValue(
+  await expect(form.getByRole('combobox', { name: 'Session' })).toHaveAttribute(
+    'data-value',
     'new',
   );
 });

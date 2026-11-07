@@ -1,3 +1,4 @@
+import { choose } from './support/dropdown';
 import { expect, test, type Page } from './support/test';
 import { nativeSnapshot } from './support/snapshot';
 import { installTauriMock, readCalls } from './support/tauriMock';
@@ -26,7 +27,7 @@ test('Agenten: staged defaults apply with „Speichern“ and reach the composer
   await expect(saveButton(page)).toHaveAttribute('aria-disabled', 'true');
   const permission = dialog.getByRole('radiogroup', { name: 'Freigabe' });
   await permission.getByRole('radio', { name: 'Bypass' }).check();
-  await dialog.getByRole('combobox', { name: 'Denken' }).selectOption('max');
+  await choose(dialog.getByRole('combobox', { name: 'Denken' }), 'Maximal');
   await expect(saveButton(page)).not.toHaveAttribute('aria-disabled');
   await saveButton(page).click();
   await expect(dialog).toHaveCount(0);
@@ -37,7 +38,7 @@ test('Agenten: staged defaults apply with „Speichern“ and reach the composer
   await expect(chip).toHaveAccessibleName('Freigabe: Bypass');
   await expect(
     page.locator('form.composer').getByRole('combobox', { name: 'Denken' }),
-  ).toHaveValue('max');
+  ).toHaveAttribute('data-value', 'max');
 
   const reopened = await openSettings(page);
   await expect(

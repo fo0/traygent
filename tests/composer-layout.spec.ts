@@ -43,14 +43,20 @@ for (const font of LAYOUT_FONTS) {
   test(`no agent name is cut in ${font}`, async ({ page }) => {
     await page.goto('/');
     await pinFont(page, font);
+    // Only the checked agent shows its name (the row collapses the others).
     for (const width of UNCUT[font]) {
       await page.setViewportSize({ width, height: 760 });
-      const cut = await agents(page).evaluate((group) =>
-        [...group.querySelectorAll('.segment-label')]
-          .filter((label) => label.scrollWidth > label.clientWidth)
-          .map((label) => label.textContent),
-      );
-      expect(cut, `${width}px`).toEqual([]);
+      for (const agent of ['Claude Code', 'OpenCode', 'Codex']) {
+        await agents(page).getByRole('radio', { name: agent }).check();
+        const label = agents(page).locator(
+          '.segment:has(input:checked) .segment-label',
+        );
+        await expect(label).toHaveText(agent);
+        const cut = await label.evaluate(
+          (node) => node.scrollWidth > node.clientWidth,
+        );
+        expect(cut, `${agent} at ${width}px`).toBe(false);
+      }
     }
   });
 
@@ -92,6 +98,37 @@ for (const font of LAYOUT_FONTS) {
       }
   });
 }
+
+test('only the chosen agent shows its name; the others keep mark and dot', async ({
+  page,
+}) => {
+  await page.setViewportSize({ width: 480, height: 760 });
+  // Widths are read at once: no grow transition in between.
+  await page.emulateMedia({ reducedMotion: 'reduce' });
+  await page.goto('/');
+  const group = agents(page);
+  const width = (agent: string) =>
+    group
+      .locator('.segment', { has: page.getByRole('radio', { name: agent }) })
+      .evaluate((node) => node.getBoundingClientRect().width);
+  for (const chosen of ['Claude Code', 'Codex']) {
+    await group.getByRole('radio', { name: chosen }).check();
+    const others = ['Claude Code', 'OpenCode', 'Codex'].filter(
+      (agent) => agent !== chosen,
+    );
+    // Visible names: only the chosen one; every radio keeps its name.
+    const shown = await group.evaluate((node) =>
+      [...node.querySelectorAll('.segment-label')]
+        .filter((label) => label.getBoundingClientRect().width > 1)
+        .map((label) => label.textContent),
+    );
+    expect(shown).toEqual([chosen]);
+    for (const agent of others) {
+      await expect(group.getByRole('radio', { name: agent })).toHaveCount(1);
+      expect(await width(agent)).toBeLessThan((await width(chosen)) / 2);
+    }
+  }
+});
 
 test('the permission chip is a symbol; its label is the name and the tooltip', async ({
   page,

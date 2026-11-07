@@ -35,9 +35,13 @@
     onFocus: () => void;
   } = $props();
   const LIST = 'folder-suggestions';
-  let open = $state(false);
+  /** Repositories the GitHub menu lists: the newest pushes. */
+  const RECENT_REPOS = 8;
+  /** The open menu: recent folders or recent repositories. */
+  let open = $state<'folders' | 'repos' | null>(null);
   let initial = $state<MenuFocus>('first');
   let trigger = $state<HTMLButtonElement>();
+  let repoTrigger = $state<HTMLButtonElement>();
   let input = $state<HTMLInputElement>();
   /** Suggestions wanted: typing opens them, Escape, a pick and blur close them. */
   let suggest = $state(false);
@@ -55,14 +59,34 @@
   const expanded = $derived(suggest && count > 0);
   const current = $derived(Math.min(active, count - 1));
 
-  function openWith(focus: MenuFocus) {
+  const recentRepos = $derived(repos.slice(0, RECENT_REPOS));
+
+  function openWith(menu: 'folders' | 'repos', focus: MenuFocus) {
+    // The listing may be stale: refreshed like on the field's focus.
+    if (menu === 'repos' && connected) onFocus();
     initial = focus;
-    open = true;
+    open = menu;
   }
-  function choose(folder: string) {
-    value = folder;
-    open = false;
+  /** A menu button: click toggles, ↓/↑ open at the first/last item. */
+  function menuButton(menu: 'folders' | 'repos') {
+    return {
+      onclick: () => (open === menu ? (open = null) : openWith(menu, 'first')),
+      onkeydown: (event: KeyboardEvent) => {
+        const focus = openingFocus(event.key);
+        if (!focus) return;
+        event.preventDefault();
+        openWith(menu, focus);
+      },
+    };
+  }
+  function choose(text: string) {
+    value = text;
+    open = null;
     input?.focus();
+  }
+  function connectFromMenu() {
+    open = null;
+    onConnect();
   }
   function pick(index: number) {
     suggest = false;
@@ -133,15 +157,18 @@
       aria-label="Zuletzt verwendete Ordner"
       title="Zuletzt verwendete Ordner"
       aria-haspopup="menu"
-      aria-expanded={open}
-      onclick={() => (open ? (open = false) : openWith('first'))}
-      onkeydown={(event) => {
-        const focus = openingFocus(event.key);
-        if (!focus) return;
-        event.preventDefault();
-        openWith(focus);
-      }}><Icon name="down" size={14} /></button
+      aria-expanded={open === 'folders'}
+      {...menuButton('folders')}><Icon name="down" size={14} /></button
     >{/if}<button
+    bind:this={repoTrigger}
+    type="button"
+    class="icon-button small"
+    aria-label="GitHub-Repositories"
+    title="GitHub-Repositories"
+    aria-haspopup="menu"
+    aria-expanded={open === 'repos'}
+    {...menuButton('repos')}><Icon name="github" size={15} /></button
+  ><button
     type="button"
     class="icon-button small"
     aria-label="Ordner durchsuchen"
@@ -158,12 +185,12 @@
       onHover={(index) => (active = index)}
     />
   {/if}
-  {#if open}
+  {#if open === 'folders'}
     <div
       class="menu folder-menu"
       role="menu"
       aria-label="Zuletzt verwendete Ordner"
-      use:menu={{ trigger, initial, onClose: () => (open = false) }}
+      use:menu={{ trigger, initial, onClose: () => (open = null) }}
     >
       {#each recents as folder (folder)}
         <button
@@ -179,6 +206,53 @@
           ></button
         >
       {/each}
+    </div>
+  {/if}
+  {#if open === 'repos'}
+    <div
+      class="menu folder-menu"
+      role="menu"
+      aria-label="GitHub-Repositories"
+      use:menu={{
+        trigger: repoTrigger,
+        initial,
+        onClose: () => (open = null),
+      }}
+    >
+      {#if !connected}
+        <button
+          type="button"
+          role="menuitem"
+          class="menu-item"
+          onclick={connectFromMenu}
+          ><Icon name="github" size={14} />GitHub verbinden …</button
+        >
+      {:else if recentRepos.length}
+        {#each recentRepos as repo (repoLabel(repo))}
+          <button
+            type="button"
+            role="menuitem"
+            class="menu-item"
+            aria-label={`${repoLabel(repo)}${repo.private ? ' · privat' : ''}`}
+            title={repo.description || undefined}
+            onclick={() => choose(repoLabel(repo))}
+            ><Icon name={repo.private ? 'lock' : 'repo'} size={14} /><span
+              class="repo-label"
+              ><span class="repo-owner">{repo.owner}/</span>{repo.name}</span
+            ></button
+          >
+        {/each}
+      {:else}
+        <!-- No listing (yet): the way to the account instead of a dead row. -->
+        <button
+          type="button"
+          role="menuitem"
+          class="menu-item"
+          title="Keine Repositories geladen"
+          onclick={connectFromMenu}
+          ><Icon name="github" size={14} />GitHub-Einstellungen …</button
+        >
+      {/if}
     </div>
   {/if}
 </div>

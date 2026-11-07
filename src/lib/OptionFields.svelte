@@ -1,7 +1,10 @@
 <script lang="ts">
   import type { Snippet } from 'svelte';
+  import Dropdown from './Dropdown.svelte';
+  import ModelCombo from './ModelCombo.svelte';
   import Segmented, { type Segment } from './Segmented.svelte';
   import { choiceTitle, effortNeedsModel } from './agents';
+  import { toItems } from './choices';
   import type { AgentCatalogEntry, LaunchOptions, PermissionId } from './types';
 
   // One agent's options as form fields: Einstellungen → Agenten → Standards
@@ -27,9 +30,6 @@
     children?: Snippet;
   } = $props();
   const id = $derived(entry.id);
-  const knownEffort = $derived(
-    entry.efforts.some((choice) => choice.id === options.effort),
-  );
   /** Kept as stored, but off: without a model no thinking level is sent. */
   const effortOff = $derived(effortNeedsModel(entry, options.model));
   const effortTitle = $derived(
@@ -51,39 +51,26 @@
   <label for={`${prefix}-model`}>Modell</label>
   <div class="field-cell">
     {#if entry.freeModel}
-      <input
+      <ModelCombo
         id={`${prefix}-model`}
-        class="text-field"
-        type="text"
-        list={`${prefix}-models-${id}`}
-        placeholder="Standard"
-        spellcheck="false"
-        autocomplete="off"
-        title={choiceTitle('Modell', entry.models, options.model)}
-        aria-invalid={modelProblem ? 'true' : undefined}
-        aria-describedby={modelProblem ? `${prefix}-model-error` : undefined}
-        value={options.model === 'default' ? '' : options.model}
-        oninput={(event) =>
-          onChange({ model: event.currentTarget.value.trim() || 'default' })}
-      />
-      <datalist id={`${prefix}-models-${id}`}>
-        {#each entry.models.filter((m) => m.id !== 'default') as model (model.id)}<option
-            value={model.id}
-            label={model.label}
-          ></option>{/each}
-      </datalist>
-    {:else}
-      <select
-        id={`${prefix}-model`}
-        class="text-field"
-        title={choiceTitle('Modell', entry.models, options.model)}
+        models={entry.models}
         value={options.model}
-        onchange={(event) => onChange({ model: event.currentTarget.value })}
-      >
-        {#each entry.models as model (model.id)}<option value={model.id}
-            >{model.label}</option
-          >{/each}
-      </select>
+        onChange={(model) => onChange({ model })}
+        title={choiceTitle('Modell', entry.models, options.model)}
+        invalid={modelProblem}
+        describedBy={modelProblem ? `${prefix}-model-error` : undefined}
+        variant="field"
+      />
+    {:else}
+      <Dropdown
+        id={`${prefix}-model`}
+        label="Modell"
+        items={toItems(entry.models, options.model)}
+        value={options.model}
+        onChange={(model) => onChange({ model })}
+        title={choiceTitle('Modell', entry.models, options.model)}
+        variant="field"
+      />
     {/if}
     {#if modelProblem}<p id={`${prefix}-model-error`} class="field-error">
         {modelProblem}
@@ -93,21 +80,16 @@
     <label for={`${prefix}-effort`}>Denken</label>
     <!-- A disabled control shows no tooltip everywhere: its cell carries it too. -->
     <div class="field-cell" title={effortTitle}>
-      <select
+      <Dropdown
         id={`${prefix}-effort`}
-        class="text-field"
+        label="Denken"
+        items={toItems(entry.efforts, options.effort)}
+        value={options.effort}
+        onChange={(effort) => onChange({ effort })}
         title={effortTitle}
         disabled={effortOff}
-        value={options.effort}
-        onchange={(event) => onChange({ effort: event.currentTarget.value })}
-      >
-        {#if !knownEffort}<option value={options.effort}
-            >{options.effort}</option
-          >{/if}
-        {#each entry.efforts as effort (effort.id)}<option value={effort.id}
-            >{effort.label}</option
-          >{/each}
-      </select>
+        variant="field"
+      />
     </div>
   {/if}
   <span class="field-label" aria-hidden="true">Freigabe</span>

@@ -149,6 +149,7 @@
     onChange={(id) => composer.selectAgent(id)}
     landing
     prominent
+    collapse
   />
   <FolderField
     bind:value={composer.folder}
