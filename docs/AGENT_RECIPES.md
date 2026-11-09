@@ -74,7 +74,7 @@ Versions seen: Claude Code npm `2.1.317`; OpenCode `@opencode/cli` `2.2.5` (`lat
 - **Detect:** `%USERPROFILE%\.local\bin\claude.exe` (native, docs uninstall path), `%APPDATA%\npm\claude.cmd` (npm),
   `%LOCALAPPDATA%\Microsoft\WinGet\Links\claude.exe` (WinGet, UNVERIFIED). `claude --version` → `2.1.317 (Claude Code)`.
 - **Model** `--model <alias|id>`; `freeModel: true` (full ids allowed). Catalog (docs model-config, verified):
-  `default` (no flag; Opus 5.5 on Pro/Max/Team/API) · `fable` (Fable 5.1, hardest/longest tasks) · `opus` (Opus 5.5) ·
+  `default` (no flag; Opus 5.5 on Pro/Max/Team/API) · `fable` (Fable 5.2, hardest/longest tasks) · `opus` (Opus 5.5) ·
   `sonnet` (Sonnet 5.5) · `haiku` (Haiku 5.5) · `opusplan` (Opus in plan mode, Sonnet otherwise). The starter's
   `[1m]` aliases are no-ops on current models (1M is native from Opus 4.7 / Sonnet 5) — do not offer them.
 - **Effort** `--effort <low|medium|high|xhigh|max>` (docs; also `ultracode` ≥ 2.1.203 — omit in v1). `default` = no

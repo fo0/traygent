@@ -76,7 +76,7 @@ fn claude() -> AgentCatalogEntry {
             ),
             choice(
                 "fable",
-                "Fable 5.1",
+                "Fable 5.2",
                 Some("Für die schwersten, längsten Aufgaben"),
             ),
             choice("opus", "Opus 5.5", None),
