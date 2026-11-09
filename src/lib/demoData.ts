@@ -10,11 +10,10 @@ import type {
   Choice,
   PermissionChoice,
   PortPreset,
-  RecentSession,
   Snapshot,
 } from './types';
-import { recentId } from './recents';
-import { DEMO_CLONE_ROOT, DEMO_LOGIN, demoGithub } from './demoGithub';
+import { demoGithub } from './demoGithub';
+import { DEMO_HOME, demoRecents } from './demoRecents';
 
 /** `default` (with the catalog's hint) plus the five levels. */
 const efforts = (hint: string): Choice[] => [
@@ -176,8 +175,6 @@ export function demoSettings(): AppSettings {
   };
 }
 
-const DEMO_HOME = 'C:\\Users\\demo';
-
 const DEMO_AGENTS: AgentStatus[] = [
   {
     agent: 'claude',
@@ -209,81 +206,6 @@ const DEMO_AGENTS: AgentStatus[] = [
   },
 ];
 
-const MINUTE = 60_000;
-
-/** Recent sessions relative to `now`, newest first. */
-function demoRecents(now: number): RecentSession[] {
-  const entries: [
-    folder: string,
-    agent: RecentSession['agent'],
-    env: RecentSession['env'],
-    options: Partial<RecentSession['options']>,
-    ago: number,
-    starts: number,
-    ports?: string[],
-    repo?: string,
-  ][] = [
-    [`${DEMO_HOME}\\Projekte\\traygent`, 'claude', 'local', {}, 5, 14],
-    [
-      `${DEMO_CLONE_ROOT}\\${DEMO_LOGIN}\\repo-watch`,
-      'codex',
-      'local',
-      { model: 'gpt-6.1-sol', effort: 'high' },
-      47,
-      6,
-      [],
-      'repo-watch',
-    ],
-    [
-      'D:\\Arbeit\\kunden-portal',
-      'claude',
-      'docker',
-      { model: 'opus', permission: 'bypass' },
-      3 * 60,
-      9,
-      ['127.0.0.1:3000:3000', '127.0.0.1:5173:5173'],
-    ],
-    [
-      `${DEMO_HOME}\\Projekte\\agent-tools`,
-      'opencode',
-      'docker',
-      { model: 'opencode/big-pickle' },
-      26 * 60,
-      3,
-    ],
-    [
-      'D:\\Arbeit\\infra\\terraform-module',
-      'codex',
-      'docker',
-      { permission: 'auto' },
-      3 * 24 * 60,
-      2,
-    ],
-    [
-      `${DEMO_HOME}\\Notizen`,
-      'claude',
-      'local',
-      { effort: 'low', permission: 'ask' },
-      9 * 24 * 60,
-      1,
-    ],
-  ];
-  const defaults = demoSettings().agents;
-  return entries.map(
-    ([folder, agent, env, options, ago, starts, ports, repo]) => ({
-      id: recentId(folder, agent, env),
-      agent,
-      env,
-      folder,
-      ...(repo && { repo: { owner: DEMO_LOGIN, name: repo } }),
-      options: { ...defaults[agent], ...options },
-      ports: ports ?? [],
-      lastStartedAt: new Date(now - ago * MINUTE).toISOString(),
-      starts,
-    }),
-  );
-}
-
 /**
  * The browser preview's snapshot: simulated, labelled `demo`, never read from
  * the machine. It starts as if the startup detection had just finished.
@@ -300,7 +222,7 @@ export function demoSnapshot(now: number = Date.now()): Snapshot {
       { env: 'docker', state: 'ready', version: '27.5.1' },
       { env: 'wsl', state: 'unavailable', detail: 'Bald verfügbar' },
     ],
-    recents: demoRecents(now),
+    recents: demoRecents(now, demoSettings().agents),
     github: demoGithub(now),
     detecting: false,
     revision: 1,
