@@ -97,6 +97,12 @@ pub(crate) fn run_process(
         }
         command.env("GH_CONFIG_DIR", directory);
     }
+    // gh looks there before %AppData%; a relative value is invalid (XDG spec), so drop it.
+    if let Some(directory) = std::env::var_os("XDG_CONFIG_HOME") {
+        if Path::new(&directory).is_absolute() {
+            command.env("XDG_CONFIG_HOME", directory);
+        }
+    }
     command
         .env("GH_PROMPT_DISABLED", "1")
         .env("GH_NO_UPDATE_NOTIFIER", "1")
@@ -209,6 +215,18 @@ mod tests {
         assert_eq!(out.stdout, b"fixture-output");
         assert_eq!(out.stderr, b"private-diagnostic");
         assert!(!sh("exit 3", Duration::from_secs(5)).unwrap().success);
+    }
+
+    #[test]
+    fn an_absolute_xdg_config_home_reaches_gh_and_a_relative_one_does_not() {
+        let five = Duration::from_secs(5);
+        let script = "printf %s \"$XDG_CONFIG_HOME\"";
+        std::env::set_var("XDG_CONFIG_HOME", "/synthetic/config");
+        assert_eq!(sh(script, five).unwrap().stdout, b"/synthetic/config");
+        std::env::set_var("XDG_CONFIG_HOME", "relative/config");
+        assert!(sh(script, five).unwrap().stdout.is_empty());
+        std::env::remove_var("XDG_CONFIG_HOME");
+        assert!(sh(script, five).unwrap().stdout.is_empty());
     }
 
     #[test]
