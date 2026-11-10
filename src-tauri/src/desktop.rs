@@ -90,6 +90,7 @@ pub fn run() {
             // A loaded account lists its repositories at startup.
             crate::desktop_github::start_listing(app.handle(), &mut service);
             drop(service);
+            crate::desktop_agent_updates::start_schedule(app.handle());
             let show = MenuItem::with_id(
                 app,
                 "toggle",
@@ -133,6 +134,7 @@ pub fn run() {
             crate::desktop_agents::pick_folder,
             crate::desktop_agents::install_agent,
             crate::desktop_agents::open_folder,
+            crate::desktop_agent_updates::update_agents,
             crate::desktop_github::github_connect_token,
             crate::desktop_github::github_local_accounts,
             crate::desktop_github::github_import_local,

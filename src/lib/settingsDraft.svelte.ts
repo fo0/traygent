@@ -6,9 +6,10 @@ const same = (a: unknown, b: unknown) =>
   JSON.stringify(a) === JSON.stringify(b);
 
 /**
- * The staged settings of the „Agenten“, „Umgebung“ and „GitHub“ tabs. The fields edit
- * `value`; „Speichern“ sends it whole (`save_settings`) and commits the
- * answer as the new baseline, „Abbrechen“ drops it with the dialog.
+ * The staged settings of the „Agenten“, „Umgebung“, „GitHub“ and „Updates“
+ * tabs. The fields edit `value`; „Speichern“ sends it whole (`save_settings`)
+ * and commits the answer as the new baseline, „Abbrechen“ drops it with the
+ * dialog.
  */
 export class SettingsDraft {
   /** The baseline: the settings as last saved. */

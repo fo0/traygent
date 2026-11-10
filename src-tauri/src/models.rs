@@ -4,7 +4,9 @@
 //! union, every optional TS field is an `Option` that is skipped when `None`.
 use serde::{Deserialize, Serialize};
 
+mod agent_updates;
 mod github;
+pub use agent_updates::*;
 pub use github::*;
 
 /// The coding agents Traygent starts.
@@ -340,6 +342,8 @@ pub struct AppSettings {
     pub agents: PerAgent<LaunchOptions>,
     pub docker: DockerSettings,
     pub github: GithubSettings,
+    /// Update the local agent CLIs in the background while no session uses them.
+    pub agent_updates: bool,
 }
 
 /// Mirrors `Snapshot` in `src/lib/types.ts`; replaced wholesale on every change.
@@ -360,6 +364,13 @@ pub struct Snapshot {
     pub recents: Vec<RecentSession>,
     /// The GitHub account and its repository listing.
     pub github: GithubState,
+    /// The last update run per agent in catalog order; only agents that had one since the
+    /// app started.
+    #[serde(default)]
+    pub agent_updates: Vec<AgentUpdateStatus>,
+    /// True while an agent update run is in progress.
+    #[serde(default)]
+    pub agent_updates_running: bool,
     /// True while a detection runs; a `traygent:snapshot` event follows.
     pub detecting: bool,
     /// Increases with every native state change and every finished detection; the panel

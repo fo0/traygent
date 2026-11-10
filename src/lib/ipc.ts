@@ -59,6 +59,15 @@ export interface Commands {
    * finished listing follows as the `traygent:snapshot` event.
    */
   github_refresh_repos: { args: undefined; result: Snapshot };
+  /**
+   * Starts an update run over the ready local agent CLIs now, whatever the
+   * setting; resolves at once with `agentUpdatesRunning: true` and no agent
+   * `running` yet. The agents follow one after the other (`running`, then
+   * the result), each change a `traygent:snapshot` event. Rejects with a
+   * German message while a run is in progress, while the agents are still
+   * being detected, or without a ready local CLI.
+   */
+  update_agents: { args: undefined; result: Snapshot };
   autostart_status: { args: undefined; result: StartupStatus };
   set_autostart: { args: { enabled: boolean }; result: StartupStatus };
   open_startup_settings: { args: undefined; result: void };
@@ -93,6 +102,7 @@ const REGISTERED: Record<Command, true> = {
   github_import_local: true,
   github_disconnect: true,
   github_refresh_repos: true,
+  update_agents: true,
   autostart_status: true,
   set_autostart: true,
   open_startup_settings: true,

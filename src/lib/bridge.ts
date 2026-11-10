@@ -25,6 +25,7 @@ const nativeBridge: Bridge = {
   githubImportLocal: (login) => call('github_import_local', { login }),
   githubDisconnect: () => call('github_disconnect'),
   githubRefreshRepos: () => call('github_refresh_repos'),
+  updateAgents: () => call('update_agents'),
 };
 
 /** Snapshots the native shell pushes (`traygent:snapshot`). */

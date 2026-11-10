@@ -172,6 +172,7 @@ export function demoSettings(): AppSettings {
       ports: [],
     },
     github: { cloneRoot: '' },
+    agentUpdates: false,
   };
 }
 
@@ -225,6 +226,8 @@ export function demoSnapshot(now: number = Date.now()): Snapshot {
     recents: demoRecents(now, demoSettings().agents),
     github: demoGithub(now),
     detecting: false,
+    agentUpdates: [],
+    agentUpdatesRunning: false,
     revision: 1,
     checkedAt: new Date(now).toISOString(),
   };

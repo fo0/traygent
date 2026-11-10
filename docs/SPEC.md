@@ -116,6 +116,9 @@ Brand top left: icon + „Traygent“. Window ~480×760, frameless, tray popup l
   the default) is staged like every setting.
 - **App**: theme (System/Hell/Dunkel), Mit Windows starten.
 - **Updates**: in-app updates — „Nach Updates suchen“, changelog, „Installieren“ — as in RepoWatch.
+  Below it „Agenten“: the staged checkbox „Automatisch aktualisieren“ (`settings.agentUpdates`,
+  default off), „Jetzt aktualisieren“ and one line per agent with its last result; see
+  _Agent updates_ below.
 
 Later (BACKLOG, not now): see [BACKLOG.md](../BACKLOG.md).
 
@@ -144,6 +147,7 @@ Commands (Rust `#[tauri::command]`, German `Err` strings; panel calls only via `
 | `pick_folder`                      | `{ initial?: string }`                                                                           | `string \| null` (native folder dialog)                       |
 | `install_agent`                    | `{ agent }`                                                                                      | `void` (opens a terminal running the catalog install command) |
 | `open_folder`                      | `{ path }`                                                                                       | `void` (Explorer)                                             |
+| `update_agents`                    | –                                                                                                | `Snapshot` (starts an agent-CLI update run, events follow)    |
 | `github_connect_token`             | `{ token }`                                                                                      | `Snapshot` (verifies `/user`, vaults the token, lists repos)  |
 | `github_local_accounts`            | –                                                                                                | `LocalAccounts` (gh sign-ins; reads no token)                 |
 | `github_import_local`              | `{ login }`                                                                                      | `Snapshot` (explicit consent: reads that gh token, as above)  |
@@ -192,6 +196,34 @@ Commands (Rust `#[tauri::command]`, German `Err` strings; panel calls only via `
   when known, minimal child env without token variables, stdout/stderr capped at 64 KiB, 20 s
   timeout, `/user` must match the chosen login). Without the `vault` feature every vault call
   fails closed („Windows-Tresor nicht verfügbar.“).
+
+## Agent updates ([ADR-0008](adr/0008-background-updates-of-the-agent-clis.md))
+
+- With `settings.agentUpdates` on, Rust runs each locally installed CLI's own update command
+  (`claude update`, `opencode upgrade`, `codex update`) on its resolved path — hidden, closed
+  stdin, 10-minute timeout: about a minute after the app started, then every 4 hours.
+  `update_agents` („Jetzt aktualisieren“) starts a run at once, whatever the setting; a second
+  run while one is going is refused („Agenten werden bereits aktualisiert.“), as is one while a
+  detection runs or before the first finished („Die Agenten werden noch gesucht. …“; the
+  schedule retries a minute later) and one without a ready local CLI („Kein lokaler Agent
+  installiert.“). A run takes the agents one after the other and ends the 4-hour wait anew (the
+  schedule counts a try without a ready local CLI as a run); an
+  update command that runs into its timeout is ended with its whole process tree.
+- An agent is skipped (`inUse`) while a process of its CLI runs: its executable, or a `node` /
+  `bun` process whose command line names its package — sessions started outside Traygent count;
+  the Claude desktop app (`Claude.exe` in its own install folders) does not, and a `node` / `bun`
+  process with an unreadable command line counts for every agent.
+  The process list comes from `Get-CimInstance Win32_Process` through Windows PowerShell; a list
+  that cannot be read, times out or is incomplete skips every agent (fail closed).
+- `Snapshot.agentUpdates` holds one `AgentUpdateStatus` per agent that had a run since the app
+  started, in catalog order: `running`, `updated` (`from` → `version`), `current`, `inUse`,
+  `failed`, each with its time `at`; `Snapshot.agentUpdatesRunning` is true while a run is in
+  progress. `update_agents` returns before the first agent turns `running`. Every change emits
+  `traygent:snapshot`; a detection follows every run (one already running reruns), so versions
+  and paths refresh. Nothing is persisted.
+- A local `launch_session` of an agent in `running` is refused („<Agent> wird gerade
+  aktualisiert.“); Docker starts are not affected, and the CLI in a container keeps its own
+  update path.
 
 ## Ports (Docker sessions)
 

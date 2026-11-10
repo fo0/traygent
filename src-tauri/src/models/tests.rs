@@ -216,6 +216,14 @@ fn repository_fields_are_optional_and_camel_case() {
     );
     let shared: AppSettings = serde_json::from_value(json!({ "sharedWindow": true })).unwrap();
     assert!(shared.shared_window);
+    // Settings from before the agent updates (#16) load with them off.
+    assert!(!settings.agent_updates && !shared.agent_updates);
+    assert_eq!(
+        serde_json::to_value(&settings).unwrap()["agentUpdates"],
+        false
+    );
+    let updating: AppSettings = serde_json::from_value(json!({ "agentUpdates": true })).unwrap();
+    assert!(updating.agent_updates);
     assert_eq!(
         serde_json::to_value(&settings).unwrap()["github"],
         json!({ "cloneRoot": "" })
@@ -283,4 +291,52 @@ fn github_types_mirror_the_ts_contract() {
         serde_json::to_value(&accounts).unwrap(),
         json!({ "accounts": [{ "login": "max", "importable": false, "connected": true }] })
     );
+}
+
+#[test]
+fn agent_update_statuses_are_camel_case_and_skip_unknown_versions() {
+    let states = [
+        (AgentUpdateState::Running, "running"),
+        (AgentUpdateState::Updated, "updated"),
+        (AgentUpdateState::Current, "current"),
+        (AgentUpdateState::InUse, "inUse"),
+        (AgentUpdateState::Failed, "failed"),
+    ];
+    for (state, text) in states {
+        assert_eq!(serde_json::to_value(state).unwrap(), json!(text));
+        let back: AgentUpdateState = serde_json::from_value(json!(text)).unwrap();
+        assert_eq!(back, state);
+    }
+    let skipped = AgentUpdateStatus {
+        agent: AgentId::Codex,
+        state: AgentUpdateState::InUse,
+        version: None,
+        from: None,
+        at: "2026-11-10T08:00:00Z".into(),
+    };
+    assert_eq!(
+        serde_json::to_value(&skipped).unwrap(),
+        json!({ "agent": "codex", "state": "inUse", "at": "2026-11-10T08:00:00Z" })
+    );
+    let updated = AgentUpdateStatus {
+        state: AgentUpdateState::Updated,
+        version: Some("0.167.0".into()),
+        from: Some("0.166.0".into()),
+        ..skipped
+    };
+    let value = serde_json::to_value(&updated).unwrap();
+    assert_eq!(
+        (&value["version"], &value["from"]),
+        (&json!("0.167.0"), &json!("0.166.0"))
+    );
+    assert_eq!(
+        serde_json::from_value::<AgentUpdateStatus>(value).unwrap(),
+        updated
+    );
+    // A snapshot always carries the list; one from before it reads as empty.
+    let mut native = serde_json::to_value(Snapshot::native()).unwrap();
+    assert_eq!(native["agentUpdates"], json!([]));
+    native.as_object_mut().unwrap().remove("agentUpdates");
+    let old: Snapshot = serde_json::from_value(native).unwrap();
+    assert!(old.agent_updates.is_empty());
 }

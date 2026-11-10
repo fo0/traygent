@@ -24,6 +24,7 @@ flowchart TD
         DesktopRs("desktop.rs snapshot, refresh_detection, work helper, tray")
         DesktopAgents("desktop_agents.rs agent commands, start_detection")
         DesktopGithub("desktop_github.rs GitHub commands, start_listing")
+        DesktopAgentUpdates("desktop_agent_updates.rs update_agents, schedule thread")
         DesktopStartup["desktop_startup.rs Run value adapter"]
         DesktopUpdates["desktop_updates.rs update commands"]
         TrayPopup["tray_popup.rs and windows.rs Win32"]
@@ -34,6 +35,7 @@ flowchart TD
         ServiceRs["service.rs Service: settings, recents, detection, snapshot"]
         LaunchPrepRs["service/launch_prep.rs resolve, repo folder, clone or reuse"]
         ServiceGithubRs["service/github.rs account and listing commits"]
+        AgentUpdatesRs["agent_updates.rs in-use check, update commands, schedule rule"]
         RepoRs["repo.rs classification, clone folder and URL"]
         GithubRs["github.rs and github/* api, http, gh, discover, process, vault, secret"]
         StoreRs["store.rs versioned state.json"]
@@ -94,6 +96,10 @@ flowchart TD
     MainRs --> DesktopRs
     DesktopRs --> DesktopAgents
     DesktopRs --> DesktopGithub
+    DesktopRs --> DesktopAgentUpdates
+    IpcTs -- "Tauri IPC, camelCase JSON" --> DesktopAgentUpdates
+    DesktopAgentUpdates -- "short lock, commit statuses" --> ServiceRs
+    DesktopAgentUpdates -- "run thread, no lock" --> AgentUpdatesRs
     DesktopRs --> DesktopStartup
     DesktopRs --> DesktopUpdates
     DesktopRs --> TrayPopup

@@ -51,6 +51,8 @@ Stable project knowledge. **Read at session start.**
 - **Colours live in `src/styles/00-tokens.css` only** (dark set plus two identical light blocks); `tokens.test.ts` rejects literals elsewhere and checks WCAG AA pairs. Playwright runs dark by default (`playwright.config.ts`). (2026-11-03)
 - **App icons come from geometry** in `scripts/generate-icons.mjs` (writes `src-tauri/icons/*`, `source.svg` included); `pnpm icons:check` fails on drift. The tray icon embeds `icons/32x32.png`. (2026-11-03)
 
+- **Agent CLI updates fail closed** — the in-use check (`agent_updates.rs → LIST_SCRIPT`) needs its end marker and only known lines; a new line kind in the script must be added to `line_agent`, or every agent reads as in use. `store.rs → parse_settings` reads settings field by field: a new setting needs its line there or a saved value is dropped on load. (2026-11-10)
+
 ## External Dependencies
 
 - **GitHub Releases API** (`api.github.com/repos/fo0/traygent/releases/latest`, unauthenticated) for the update check; downloads only from GitHub hosts. (2026-11-03)

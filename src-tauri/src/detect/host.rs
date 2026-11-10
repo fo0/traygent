@@ -137,6 +137,13 @@ impl Host {
         )
         .unwrap_or_else(|| "powershell.exe".into())
     }
+
+    /// `taskkill.exe` by absolute path; the default Windows folder when `SystemRoot` is not
+    /// absolute, never the bare name (it would resolve against the cwd and PATH).
+    pub fn taskkill(&self) -> String {
+        self.under(&self.system_root, &["System32", "taskkill.exe"])
+            .unwrap_or_else(|| r"C:\Windows\System32\taskkill.exe".into())
+    }
 }
 
 /// An absolute directory without `%`: `C:\…` or UNC on Windows, `/…` elsewhere.

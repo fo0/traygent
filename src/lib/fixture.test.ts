@@ -56,6 +56,8 @@ describe('golden snapshot fixture', () => {
           'recents',
           'github',
           'detecting',
+          'agentUpdates',
+          'agentUpdatesRunning',
           'revision',
         ],
         optional: ['notice', 'checkedAt'],
@@ -68,6 +70,9 @@ describe('golden snapshot fixture', () => {
     expect(fixture.revision as number).toBeGreaterThanOrEqual(0);
     if ('notice' in fixture) expect(fixture.notice).toBeTypeOf('string');
     expect(Array.isArray(fixture.recents)).toBe(true);
+    // No agent update ran before the app started.
+    expect(fixture.agentUpdates).toEqual([]);
+    expect(fixture.agentUpdatesRunning).toBe(false);
   });
 
   it('carries valid settings', () => {
@@ -84,10 +89,13 @@ describe('golden snapshot fixture', () => {
           'agents',
           'docker',
           'github',
+          'agentUpdates',
         ],
       },
       'settings',
     );
+    // Agent CLIs update automatically only after the user opted in.
+    expect(settings.agentUpdates).toBe(false);
     expectShape(settings.github, { required: ['cloneRoot'] }, 'github');
     expect(settings.github.cloneRoot).toBeTypeOf('string');
     expect(AGENTS).toContain(settings.defaultAgent);

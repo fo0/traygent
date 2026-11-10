@@ -242,6 +242,14 @@ export class Panel {
     return next;
   }
 
+  /**
+   * Starts an agent CLI update run; the results follow as pushed snapshots.
+   * Rejects with the German message (e.g. a run is in progress).
+   */
+  async updateAgents() {
+    this.accept(await this.#bridge.updateAgents());
+  }
+
   /** The folder dialog; null when cancelled or failed (with a notice). */
   async pickFolder(initial: string | null): Promise<string | null> {
     try {

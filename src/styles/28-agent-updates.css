@@ -1,0 +1,83 @@
+/*
+ * Settings → „Updates“ → „Agenten“: the staged auto-update checkbox with the
+ * immediate action level with it, then one single-line row per agent run.
+ * Tokens from 00-tokens.css only.
+ */
+.agent-updates {
+  margin-top: 18px;
+  font-size: var(--font-size-meta);
+}
+.agent-updates h3 {
+  margin: 0 0 10px;
+}
+/* The button stays level with the checkbox; a narrow panel wraps the help
+   line instead of giving the button a row of its own. */
+.agent-updates-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+.agent-updates-option {
+  flex: 1 1 auto;
+  min-width: 0;
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  line-height: 1.5;
+  cursor: pointer;
+}
+.agent-updates-row .secondary-button {
+  flex: none;
+}
+.agent-updates-option input {
+  margin: 2px 0 0;
+  flex-shrink: 0;
+  accent-color: var(--accent);
+}
+.agent-updates-option strong {
+  display: block;
+  font-size: 13px;
+  font-weight: 500;
+}
+.agent-updates-option span span {
+  display: block;
+  color: var(--text-3);
+}
+.agent-update-list {
+  display: grid;
+  gap: 2px;
+  margin: 10px 0 0;
+  padding: 0;
+  list-style: none;
+}
+.agent-update-list li {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-height: var(--row-height);
+  padding: 0 10px;
+  border-radius: 6px;
+  background: var(--raised);
+  white-space: nowrap;
+}
+.agent-update-name {
+  flex: none;
+  font-weight: 500;
+}
+.agent-update-state {
+  flex: 1 1 auto;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  color: var(--text-2);
+}
+.agent-update-state[data-tone='fail'] {
+  color: var(--fail);
+}
+.agent-update-list time {
+  flex: none;
+  color: var(--text-3);
+}
+.agent-updates > .alert {
+  margin-top: 10px;
+}

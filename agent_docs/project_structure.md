@@ -7,7 +7,7 @@ src/        Svelte panel, lib/ = components, controllers (panel, composer, setti
             (folder field classification), IPC map, demo (demoGithub.ts = synthetic account); styles/ = ordered CSS
 src-tauri/  Rust core crate (traygent_core: catalog, settings, recents, store, detect/, launch/, spawn, ports, repo,
             github/ (api, http, gh, discover, process, vault, secret), service/ (launch_prep, github), models/github)
-            + desktop bin (desktop*.rs incl. desktop_github.rs, tray_popup/), Tauri config, capabilities, icons
+            + desktop bin (desktop*.rs incl. desktop_github.rs, desktop_agent_updates.rs, tray_popup/), Tauri config, capabilities, icons
 fixtures/   snapshot.default.json — golden native snapshot (written by a Rust test, checked by Vitest);
             targets.json, port-vectors.json — test vectors shared by the panel and Rust
 tests/      Playwright specs (browser demo + labelled IPC mock), support/

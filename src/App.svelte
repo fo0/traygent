@@ -134,6 +134,7 @@
     github={panel.github}
     onSaveSettings={(settings) => panel.saveSettings(settings)}
     onInstallAgent={(agent) => panel.installAgent(agent)}
+    onUpdateAgents={() => panel.updateAgents()}
     onInstalled={() => panel.announceInstall()}
     onClose={modals.close}
   />

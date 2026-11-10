@@ -37,7 +37,8 @@
     },
     "github": {
       "cloneRoot": ""
-    }
+    },
+    "agentUpdates": false
   },
   "catalog": [
     {
@@ -388,6 +389,8 @@
     "loading": false,
     "defaultCloneRoot": ""
   },
+  "agentUpdates": [],
+  "agentUpdatesRunning": false,
   "detecting": false,
   "revision": 0
 }
