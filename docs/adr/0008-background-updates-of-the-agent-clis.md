@@ -13,7 +13,7 @@ The owner wants the connected agent CLIs (Claude Code, OpenCode, Codex) kept up 
 
 We will run each locally installed CLI's own update command (`claude update`, `opencode upgrade`, `codex update`) on its resolved path, hidden, with a 10-minute timeout, when `settings.agentUpdates` is on (default off): about a minute after the app started and then every 4 hours, plus on an explicit „Jetzt aktualisieren“. Traygent neither downloads nor compares versions itself.
 
-A CLI counts as in use while a process of it runs — its own executable, or a `node` / `bun` process whose command line names its package — read once per agent from `Get-CimInstance Win32_Process` through Windows PowerShell. The check fails closed: a process list that cannot be read, times out or arrives incomplete skips every agent. A local start of an agent that is being updated is refused with a message. The result per agent (`running`, `updated`, `current`, `inUse`, `failed`) lives in memory and reaches the panel as `Snapshot.agentUpdates`.
+A CLI counts as in use while a process of it runs — its own executable, or a `node` / `bun` process whose command line names its package — read right before each agent's turn from `Get-CimInstance Win32_Process` through Windows PowerShell. The check fails closed: a process list that cannot be read, times out or arrives incomplete skips every agent. A local start of an agent that is being updated is refused with a message. The result per agent (`running`, `updated`, `current`, `inUse`, `failed`) lives in memory and reaches the panel as `Snapshot.agentUpdates`.
 
 ## Consequences
 

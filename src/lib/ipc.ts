@@ -59,6 +59,12 @@ export interface Commands {
    * finished listing follows as the `traygent:snapshot` event.
    */
   github_refresh_repos: { args: undefined; result: Snapshot };
+  /**
+   * Starts an update run over every agent CLI now, whatever the setting;
+   * resolves at once with `running` statuses, the results follow as
+   * `traygent:snapshot` events. Rejects while a run is in progress.
+   */
+  update_agents: { args: undefined; result: Snapshot };
   autostart_status: { args: undefined; result: StartupStatus };
   set_autostart: { args: { enabled: boolean }; result: StartupStatus };
   open_startup_settings: { args: undefined; result: void };
@@ -93,6 +99,7 @@ const REGISTERED: Record<Command, true> = {
   github_import_local: true,
   github_disconnect: true,
   github_refresh_repos: true,
+  update_agents: true,
   autostart_status: true,
   set_autostart: true,
   open_startup_settings: true,

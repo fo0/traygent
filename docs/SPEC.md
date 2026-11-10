@@ -203,10 +203,13 @@ Commands (Rust `#[tauri::command]`, German `Err` strings; panel calls only via `
   (`claude update`, `opencode upgrade`, `codex update`) on its resolved path — hidden, closed
   stdin, 10-minute timeout: about a minute after the app started, then every 4 hours.
   `update_agents` („Jetzt aktualisieren“) starts a run at once, whatever the setting; a second
-  run while one is going is refused („Agenten werden bereits aktualisiert.“). A run waits for a
-  finished detection and takes the agents one after the other.
+  run while one is going is refused („Agenten werden bereits aktualisiert.“), as is one while a
+  detection runs or before the first finished („Die Agenten werden noch gesucht. …“; the
+  schedule retries a minute later). A run takes the agents one after the other and ends the
+  4-hour wait anew.
 - An agent is skipped (`inUse`) while a process of its CLI runs: its executable, or a `node` /
-  `bun` process whose command line names its package — sessions started outside Traygent count.
+  `bun` process whose command line names its package — sessions started outside Traygent count;
+  the Claude desktop app (`Claude.exe` in its own install folders) does not.
   The process list comes from `Get-CimInstance Win32_Process` through Windows PowerShell; a list
   that cannot be read, times out or is incomplete skips every agent (fail closed).
 - `Snapshot.agentUpdates` holds one `AgentUpdateStatus` per agent that had a run since the app

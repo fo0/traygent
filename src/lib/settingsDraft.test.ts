@@ -49,6 +49,21 @@ describe('SettingsDraft', () => {
     expect(draft.dirty).toBe(false);
   });
 
+  it('stages the agent auto-update switch like every other field', () => {
+    const draft = new SettingsDraft(demoSettings());
+    expect(draft.value.agentUpdates).toBe(false);
+    draft.value.agentUpdates = true;
+    expect(draft.dirty).toBe(true);
+    expect(draft.saved.agentUpdates).toBe(false);
+    expect(draft.current().agentUpdates).toBe(true);
+    draft.value.agentUpdates = false;
+    expect(draft.dirty).toBe(false);
+    draft.value.agentUpdates = true;
+    draft.commit(draft.current());
+    expect(draft.dirty).toBe(false);
+    expect(draft.saved.agentUpdates).toBe(true);
+  });
+
   it('marks invalid fields per tab group', () => {
     const draft = new SettingsDraft(demoSettings());
     draft.value.agents.claude.extraArgs = '--x "y"';

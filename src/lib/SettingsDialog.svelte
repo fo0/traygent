@@ -1,6 +1,7 @@
 <script lang="ts">
   import { onDestroy, untrack } from 'svelte';
   import AgentSettings from './AgentSettings.svelte';
+  import AgentUpdates from './AgentUpdates.svelte';
   import EnvSettings from './EnvSettings.svelte';
   import GithubSettings from './GithubSettings.svelte';
   import Icon from './Icon.svelte';
@@ -30,6 +31,7 @@
     github,
     onSaveSettings,
     onInstallAgent,
+    onUpdateAgents,
     onInstalled,
     onClose,
   }: {
@@ -54,6 +56,8 @@
     onSaveSettings: (settings: AppSettings) => Promise<Snapshot>;
     /** An immediate action, not staged: opens the install terminal. */
     onInstallAgent: (agent: AgentId) => Promise<void>;
+    /** An immediate action, not staged: starts an agent CLI update run. */
+    onUpdateAgents: () => Promise<void>;
     /** The install flow closed the dialog: the panel says what comes next. */
     onInstalled?: () => void;
     returnFocus?: (() => HTMLElement | null | undefined) | undefined;
@@ -246,6 +250,7 @@
         onCheck={() => updater.check()}
         onInstall={updater.install}
       />
+      <AgentUpdates {snapshot} {draft} onUpdate={onUpdateAgents} />
     {/if}
   </div>
   {#if error}<div class="dialog-alert danger" role="alert">

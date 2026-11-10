@@ -182,6 +182,24 @@ export interface AppSettings {
   agents: Record<AgentId, LaunchOptions>;
   docker: DockerSettings;
   github: GithubSettings;
+  /** Update the local agent CLIs every 4 hours while no session uses them. */
+  agentUpdates: boolean;
+}
+
+/** Where one agent's CLI update run stands. */
+export type AgentUpdateState =
+  'running' | 'updated' | 'current' | 'inUse' | 'failed';
+
+/** The latest update run of one agent's local CLI. */
+export interface AgentUpdateStatus {
+  agent: AgentId;
+  state: AgentUpdateState;
+  /** CLI version after the run (`updated`, `current`), when known. */
+  version?: string;
+  /** Version before, only for `updated`. */
+  from?: string;
+  /** RFC 3339 time this state was reached. */
+  at: string;
 }
 
 /** How the connected account's token was obtained. */
@@ -255,6 +273,11 @@ export interface Snapshot {
   github: GithubState;
   /** True while a detection runs; a `traygent:snapshot` event follows. */
   detecting: boolean;
+  /**
+   * Catalog order; only agents with an update run since app start, `[]`
+   * before. `running` entries settle through `traygent:snapshot` events.
+   */
+  agentUpdates: AgentUpdateStatus[];
   /**
    * Increases with every native state change and every finished detection;
    * the panel drops a snapshot older than the one it shows. The demo counts

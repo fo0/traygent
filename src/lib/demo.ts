@@ -1,5 +1,7 @@
 import { agentLabel, agentStatus, effortProblem, envStatus } from './agents';
 import type { Bridge, ObserveSnapshots } from './bridgeTypes';
+import { AGENT_UPDATES_BUSY, updatesRunning } from './agentUpdates';
+import { finishedUpdates, runningUpdates } from './demoAgentUpdates';
 import { DEMO_PICKED_FOLDER, demoSnapshot } from './demoData';
 import {
   DEMO_ACCOUNT,
@@ -38,16 +40,17 @@ const DEMO_TOKEN = /^(?:gh[pousr]_|github_pat_)\w{4,}$/;
 
 /**
  * A local simulation of the native commands, with a short latency: starts
- * record recent sessions, a detection finishes after `detection` ms and is
- * pushed like the native `traygent:snapshot` event. Every change increases
- * `revision`, as natively. No terminal, dialog or Explorer window ever opens;
- * every error is German, as natively.
+ * record recent sessions, a detection (and an agent update run) finishes
+ * after `detection` ms and is pushed like the native `traygent:snapshot`
+ * event. Every change increases `revision`, as natively. No terminal, dialog
+ * or Explorer window ever opens; every error is German, as natively.
  */
 export function createDemoBridge(latency = 150, detection = 600): DemoBridge {
   let data = demoSnapshot();
   const listeners = new Set<(snapshot: Snapshot) => void>();
   let detectionTimer: ReturnType<typeof setTimeout> | undefined;
   let listingTimer: ReturnType<typeof setTimeout> | undefined;
+  let updateTimer: ReturnType<typeof setTimeout> | undefined;
   const delay = () =>
     new Promise<void>((resolve) => setTimeout(resolve, latency));
   const copy = () => structuredClone(data);
@@ -213,6 +216,18 @@ export function createDemoBridge(latency = 150, detection = 600): DemoBridge {
       listingTimer = setTimeout(() => {
         if (!data.github.account) return;
         listed(data.github.account);
+        emit();
+      }, detection);
+      return copy();
+    },
+    async updateAgents() {
+      await delay();
+      if (updatesRunning(data.agentUpdates))
+        throw new Error(AGENT_UPDATES_BUSY);
+      change({ agentUpdates: runningUpdates(data) });
+      clearTimeout(updateTimer);
+      updateTimer = setTimeout(() => {
+        change(finishedUpdates(data));
         emit();
       }, detection);
       return copy();

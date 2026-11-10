@@ -38,6 +38,7 @@ function bridgeWith(overrides: Partial<Bridge> = {}): Bridge {
     githubImportLocal: async () => snapshot(),
     githubDisconnect: async () => snapshot(),
     githubRefreshRepos: async () => snapshot(),
+    updateAgents: async () => snapshot(),
     ...overrides,
   };
 }
@@ -261,6 +262,18 @@ describe('Panel', () => {
     updateRecent.mockRejectedValueOnce(new Error('Ungültiges Modell.'));
     await expect(panel.updateRecent(recent, options, [])).rejects.toThrow(
       'Ungültiges Modell.',
+    );
+  });
+
+  it('starts an agent update run and rejects with the German message', async () => {
+    const started = snapshot({ revision: 9 });
+    const updateAgents = vi.fn(async () => started);
+    const panel = panelWith({ updateAgents });
+    await panel.updateAgents();
+    expect(panel.snapshot).toBe(started);
+    updateAgents.mockRejectedValueOnce('Agenten werden bereits aktualisiert.');
+    await expect(panel.updateAgents()).rejects.toBe(
+      'Agenten werden bereits aktualisiert.',
     );
   });
 

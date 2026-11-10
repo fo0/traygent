@@ -46,6 +46,12 @@ export interface Bridge {
    * the finished listing arrives through `observe`.
    */
   githubRefreshRepos(): Promise<Snapshot>;
+  /**
+   * Starts an agent CLI update run; resolves at once with `running`
+   * statuses, the results arrive through `observe`. Rejects with a German
+   * message while a run is in progress.
+   */
+  updateAgents(): Promise<Snapshot>;
 }
 
 /** Pushed snapshots, e.g. a finished detection; resolves to the unsubscribe. */
