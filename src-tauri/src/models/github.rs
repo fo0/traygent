@@ -1,4 +1,4 @@
-//! The GitHub part of the IPC data model (docs/adr/0005), mirrored from `src/lib/types.ts`.
+//! The GitHub part of the IPC data model (docs/adr/0005), mirrored from `src/lib/githubTypes.ts`.
 use serde::{Deserialize, Serialize};
 
 /// How the connected account's token was obtained.

@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { agentUpdateText, updatesRunning } from './agentUpdates';
+import { agentUpdateText } from './agentUpdates';
 import type { AgentUpdateStatus } from './types';
 
 const at = '2026-11-10T08:00:00Z';
@@ -24,12 +24,16 @@ describe('agentUpdateText', () => {
     });
   });
 
-  it('shows the new version of an update, the old one in the tooltip', () => {
+  it('shows the new version of an update, the old one in the tooltip and to assistive tech', () => {
     expect(
       agentUpdateText(
         status({ state: 'updated', from: '2.1.317', version: '2.1.318' }),
       ),
-    ).toEqual({ text: 'aktualisiert auf 2.1.318', title: '2.1.317 → 2.1.318' });
+    ).toEqual({
+      text: 'aktualisiert auf 2.1.318',
+      title: '2.1.317 → 2.1.318',
+      detail: 'vorher 2.1.317',
+    });
     expect(
       agentUpdateText(status({ state: 'updated', version: '2.1.318' })),
     ).toEqual({ text: 'aktualisiert auf 2.1.318' });
@@ -43,20 +47,5 @@ describe('agentUpdateText', () => {
       text: 'aktuell · 0.166.0',
     });
     expect(agentUpdateText(status({}))).toEqual({ text: 'aktuell' });
-  });
-});
-
-describe('updatesRunning', () => {
-  it('is true while any agent still runs', () => {
-    expect(updatesRunning([])).toBe(false);
-    expect(updatesRunning([status({}), status({ state: 'failed' })])).toBe(
-      false,
-    );
-    expect(
-      updatesRunning([
-        status({}),
-        status({ agent: 'codex', state: 'running' }),
-      ]),
-    ).toBe(true);
   });
 });

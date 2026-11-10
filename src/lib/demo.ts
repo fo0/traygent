@@ -1,7 +1,11 @@
 import { agentLabel, agentStatus, effortProblem, envStatus } from './agents';
 import type { Bridge, ObserveSnapshots } from './bridgeTypes';
-import { AGENT_UPDATES_BUSY, updatesRunning } from './agentUpdates';
-import { finishedUpdates, runningUpdates } from './demoAgentUpdates';
+import {
+  agentUpdatesProblem,
+  agentUpdateSteps,
+  launchUpdateProblem,
+  scheduleSteps,
+} from './demoAgentUpdates';
 import { DEMO_PICKED_FOLDER, demoSnapshot } from './demoData';
 import {
   DEMO_ACCOUNT,
@@ -40,9 +44,10 @@ const DEMO_TOKEN = /^(?:gh[pousr]_|github_pat_)\w{4,}$/;
 
 /**
  * A local simulation of the native commands, with a short latency: starts
- * record recent sessions, a detection (and an agent update run) finishes
- * after `detection` ms and is pushed like the native `traygent:snapshot`
- * event. Every change increases `revision`, as natively. No terminal, dialog
+ * record recent sessions, a detection finishes after `detection` ms and is
+ * pushed like the native `traygent:snapshot` event; an agent update run
+ * pushes each of its steps, one every `detection / 2` ms. Every change
+ * increases `revision`, as natively. No terminal, dialog
  * or Explorer window ever opens; every error is German, as natively.
  */
 export function createDemoBridge(latency = 150, detection = 600): DemoBridge {
@@ -50,7 +55,6 @@ export function createDemoBridge(latency = 150, detection = 600): DemoBridge {
   const listeners = new Set<(snapshot: Snapshot) => void>();
   let detectionTimer: ReturnType<typeof setTimeout> | undefined;
   let listingTimer: ReturnType<typeof setTimeout> | undefined;
-  let updateTimer: ReturnType<typeof setTimeout> | undefined;
   const delay = () =>
     new Promise<void>((resolve) => setTimeout(resolve, latency));
   const copy = () => structuredClone(data);
@@ -115,6 +119,8 @@ export function createDemoBridge(latency = 150, detection = 600): DemoBridge {
       const env = envStatus(data, request.env);
       if (request.env === 'wsl' || env?.state !== 'ready')
         throw new Error('Diese Umgebung ist nicht bereit.');
+      const updating = launchUpdateProblem(data, request);
+      if (updating) throw new Error(updating);
       if (
         request.env === 'local' &&
         agentStatus(data, request.agent, 'local')?.state !== 'ready'
@@ -222,14 +228,15 @@ export function createDemoBridge(latency = 150, detection = 600): DemoBridge {
     },
     async updateAgents() {
       await delay();
-      if (updatesRunning(data.agentUpdates))
-        throw new Error(AGENT_UPDATES_BUSY);
-      change({ agentUpdates: runningUpdates(data) });
-      clearTimeout(updateTimer);
-      updateTimer = setTimeout(() => {
-        change(finishedUpdates(data));
+      const problem = agentUpdatesProblem(data);
+      if (problem) throw new Error(problem);
+      const steps = agentUpdateSteps(data);
+      change({ agentUpdatesRunning: true });
+      const apply = (step: (typeof steps)[number]) => {
+        change(step(data));
         emit();
-      }, detection);
+      };
+      scheduleSteps(steps, apply, detection / 2);
       return copy();
     },
     async observe(callback) {

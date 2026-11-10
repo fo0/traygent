@@ -1,4 +1,4 @@
-//! The agent-update part of the IPC data model (#16), mirrored from `src/lib/types.ts`.
+//! The agent-update part of the IPC data model (#16), mirrored from `src/lib/agentUpdateTypes.ts`.
 use super::AgentId;
 use serde::{Deserialize, Serialize};
 

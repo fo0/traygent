@@ -2,8 +2,21 @@
  * The IPC data model, mirrored by src-tauri/src/models.rs (camelCase JSON).
  * This file is the contract: the Rust side mirrors it field by field, the
  * golden fixture `fixtures/snapshot.default.json` (written by a Rust test)
- * must satisfy `Snapshot`. Product rules: docs/SPEC.md.
+ * must satisfy `Snapshot`. Product rules: docs/SPEC.md. The agent-update and
+ * GitHub groups live in sibling modules and are re-exported here.
  */
+import type { AgentUpdateStatus } from './agentUpdateTypes';
+import type { GithubState } from './githubTypes';
+
+export type { AgentUpdateState, AgentUpdateStatus } from './agentUpdateTypes';
+export type {
+  GithubAccount,
+  GithubSource,
+  GithubState,
+  LocalAccount,
+  LocalAccounts,
+  RepoSummary,
+} from './githubTypes';
 
 /** The coding agents Traygent starts. */
 export type AgentId = 'claude' | 'opencode' | 'codex';
@@ -186,75 +199,6 @@ export interface AppSettings {
   agentUpdates: boolean;
 }
 
-/** Where one agent's CLI update run stands. */
-export type AgentUpdateState =
-  'running' | 'updated' | 'current' | 'inUse' | 'failed';
-
-/** The latest update run of one agent's local CLI. */
-export interface AgentUpdateStatus {
-  agent: AgentId;
-  state: AgentUpdateState;
-  /** CLI version after the run (`updated`, `current`), when known. */
-  version?: string;
-  /** Version before, only for `updated`. */
-  from?: string;
-  /** RFC 3339 time this state was reached. */
-  at: string;
-}
-
-/** How the connected account's token was obtained. */
-export type GithubSource = 'token' | 'gh';
-
-/** The one connected GitHub account; its token stays in the OS vault. */
-export interface GithubAccount {
-  login: string;
-  /** Stable GitHub user id. */
-  id: number;
-  source: GithubSource;
-}
-
-/** One repository of the account's `/user/repos` listing. */
-export interface RepoSummary {
-  owner: string;
-  name: string;
-  private: boolean;
-  /** RFC 3339 time of the last push, when GitHub reports one. */
-  pushedAt?: string;
-  /** Short description, for the tooltip. */
-  description?: string;
-}
-
-export interface GithubState {
-  /** Absent while no account is connected. */
-  account?: GithubAccount;
-  /** The account's repositories, newest push first, at most 1000; `[]` without one. */
-  repos: RepoSummary[];
-  /** True while the listing loads; a `traygent:snapshot` event follows. */
-  loading: boolean;
-  /** German error of the last listing, e.g. the token expired. */
-  error?: string;
-  /** RFC 3339 time of the last successful listing. */
-  listedAt?: string;
-  /** `%USERPROFILE%\Traygent`, resolved; the clone root while `cloneRoot` is `''`. */
-  defaultCloneRoot: string;
-}
-
-/** One sign-in the local GitHub CLI holds for github.com. */
-export interface LocalAccount {
-  login: string;
-  /** False when gh cannot hand out its token (e.g. an environment token, old gh). */
-  importable: boolean;
-  /** Already the connected account. */
-  connected: boolean;
-}
-
-/** Result of `github_local_accounts`. */
-export interface LocalAccounts {
-  accounts: LocalAccount[];
-  /** One German line when gh is missing or holds no sign-in. */
-  message?: string;
-}
-
 /** Mirrors `Snapshot` in src-tauri/src/models.rs; replaced wholesale on every change. */
 export interface Snapshot {
   /** Simulated browser-preview data; the native shell always sends false. */
@@ -275,9 +219,15 @@ export interface Snapshot {
   detecting: boolean;
   /**
    * Catalog order; only agents with an update run since app start, `[]`
-   * before. `running` entries settle through `traygent:snapshot` events.
+   * before. A run takes the agents one after the other, each change pushed
+   * as a `traygent:snapshot` event.
    */
   agentUpdates: AgentUpdateStatus[];
+  /**
+   * True while an agent update run is in progress, from `update_agents`
+   * (before any agent turns `running`) until its last result.
+   */
+  agentUpdatesRunning: boolean;
   /**
    * Increases with every native state change and every finished detection;
    * the panel drops a snapshot older than the one it shows. The demo counts

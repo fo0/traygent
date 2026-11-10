@@ -57,6 +57,7 @@ describe('golden snapshot fixture', () => {
           'github',
           'detecting',
           'agentUpdates',
+          'agentUpdatesRunning',
           'revision',
         ],
         optional: ['notice', 'checkedAt'],
@@ -71,6 +72,7 @@ describe('golden snapshot fixture', () => {
     expect(Array.isArray(fixture.recents)).toBe(true);
     // No agent update ran before the app started.
     expect(fixture.agentUpdates).toEqual([]);
+    expect(fixture.agentUpdatesRunning).toBe(false);
   });
 
   it('carries valid settings', () => {

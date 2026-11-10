@@ -60,9 +60,12 @@ export interface Commands {
    */
   github_refresh_repos: { args: undefined; result: Snapshot };
   /**
-   * Starts an update run over every agent CLI now, whatever the setting;
-   * resolves at once with `running` statuses, the results follow as
-   * `traygent:snapshot` events. Rejects while a run is in progress.
+   * Starts an update run over the ready local agent CLIs now, whatever the
+   * setting; resolves at once with `agentUpdatesRunning: true` and no agent
+   * `running` yet. The agents follow one after the other (`running`, then
+   * the result), each change a `traygent:snapshot` event. Rejects with a
+   * German message while a run is in progress, while the agents are still
+   * being detected, or without a ready local CLI.
    */
   update_agents: { args: undefined; result: Snapshot };
   autostart_status: { args: undefined; result: StartupStatus };

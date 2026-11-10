@@ -227,6 +227,7 @@ export function demoSnapshot(now: number = Date.now()): Snapshot {
     github: demoGithub(now),
     detecting: false,
     agentUpdates: [],
+    agentUpdatesRunning: false,
     revision: 1,
     checkedAt: new Date(now).toISOString(),
   };
