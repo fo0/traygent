@@ -23,7 +23,7 @@ pub(crate) fn start_detection(app: &AppHandle, service: &mut Service) {
 
 /// Runs the detection `service` already marked as begun. `detecting` is cleared on every
 /// path: a panicking probe ends as a failed run, a thread that cannot start aborts it.
-fn run_detection(app: &AppHandle, service: &mut Service) {
+pub(crate) fn run_detection(app: &AppHandle, service: &mut Service) {
     let images = service.settings().docker.images.clone();
     let app = app.clone();
     let spawned = std::thread::Builder::new()

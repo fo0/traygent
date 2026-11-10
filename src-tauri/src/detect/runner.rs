@@ -8,6 +8,11 @@ use std::time::{Duration, Instant};
 /// Probe output beyond this is drained and dropped.
 pub const MAX_OUTPUT: usize = 64 * 1024;
 pub const TIMEOUT: Duration = Duration::from_secs(5);
+/// How long a timed-out run waits for `taskkill` to end its process tree.
+#[cfg(windows)]
+const KILL_TREE_WAIT: Duration = Duration::from_secs(5);
+#[cfg(windows)]
+const CREATE_NO_WINDOW: u32 = 0x0800_0000;
 
 #[derive(Clone, Debug, Default, PartialEq, Eq)]
 pub struct RunOutput {
@@ -29,11 +34,17 @@ pub trait Runner: Sync {
 
 pub struct SystemRunner {
     pub timeout: Duration,
+    /// On a timeout, end the child's whole process tree first (Windows): an npm `.cmd` shim
+    /// would otherwise leave its `node` grandchild running.
+    pub kill_tree: bool,
 }
 
 impl Default for SystemRunner {
     fn default() -> Self {
-        Self { timeout: TIMEOUT }
+        Self {
+            timeout: TIMEOUT,
+            kill_tree: false,
+        }
     }
 }
 
@@ -48,7 +59,6 @@ impl Runner for SystemRunner {
         #[cfg(windows)]
         {
             use std::os::windows::process::CommandExt;
-            const CREATE_NO_WINDOW: u32 = 0x0800_0000;
             command.creation_flags(CREATE_NO_WINDOW);
         }
         let mut child = command.spawn().map_err(|error| match error.kind() {
@@ -68,6 +78,10 @@ impl Runner for SystemRunner {
                     std::thread::sleep(Duration::from_millis(20));
                 }
                 result => {
+                    #[cfg(windows)]
+                    if self.kill_tree {
+                        kill_tree(child.id());
+                    }
                     let _ = child.kill();
                     let _ = child.wait();
                     return Err(if result.is_ok() {
@@ -86,6 +100,38 @@ impl Runner for SystemRunner {
             success: status.success(),
             stdout: String::from_utf8_lossy(&bytes).into_owned(),
         })
+    }
+}
+
+/// Ends the process `pid` and its descendants: `taskkill /T /F` by absolute path, no window,
+/// waited for at most [`KILL_TREE_WAIT`]. Best effort; the caller still kills the child.
+#[cfg(windows)]
+fn kill_tree(pid: u32) {
+    use std::os::windows::process::CommandExt;
+    let host = super::Host {
+        windows: true,
+        system_root: std::env::var("SystemRoot").ok(),
+        ..super::Host::default()
+    };
+    let pid = pid.to_string();
+    let spawned = Command::new(host.taskkill())
+        .args(["/T", "/F", "/PID", pid.as_str()])
+        .stdin(Stdio::null())
+        .stdout(Stdio::null())
+        .stderr(Stdio::null())
+        .creation_flags(CREATE_NO_WINDOW)
+        .spawn();
+    let Ok(mut taskkill) = spawned else {
+        return;
+    };
+    let deadline = Instant::now() + KILL_TREE_WAIT;
+    while matches!(taskkill.try_wait(), Ok(None)) {
+        if Instant::now() >= deadline {
+            let _ = taskkill.kill();
+            let _ = taskkill.wait();
+            return;
+        }
+        std::thread::sleep(Duration::from_millis(20));
     }
 }
 

@@ -368,6 +368,9 @@ pub struct Snapshot {
     /// app started.
     #[serde(default)]
     pub agent_updates: Vec<AgentUpdateStatus>,
+    /// True while an agent update run is in progress.
+    #[serde(default)]
+    pub agent_updates_running: bool,
     /// True while a detection runs; a `traygent:snapshot` event follows.
     pub detecting: bool,
     /// Increases with every native state change and every finished detection; the panel

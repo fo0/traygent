@@ -1,7 +1,7 @@
 use super::*;
 use crate::detect::Detection;
 use crate::models::{AppSettings, EnvId, LaunchOptions, LaunchRequest, PerAgent, SessionMode};
-use crate::service::initial_statuses;
+use crate::service::{initial_statuses, DetectionEnd};
 use crate::testing::{windows_host, FakeFs, TempDir};
 use std::time::Duration;
 
@@ -17,17 +17,23 @@ fn status(agent: AgentId, state: AgentUpdateState) -> AgentUpdateStatus {
 
 /// A finished detection with Claude (exe) and Codex (npm shim) ready, OpenCode missing.
 fn detected(service: &mut Service) {
-    let clis = PerAgent {
-        claude: Some(Candidate {
-            path: CLAUDE_EXE.into(),
-            shim: false,
-        }),
-        opencode: None,
-        codex: Some(Candidate {
-            path: CODEX_CMD.into(),
-            shim: true,
-        }),
-    };
+    detected_with(
+        service,
+        PerAgent {
+            claude: Some(Candidate {
+                path: CLAUDE_EXE.into(),
+                shim: false,
+            }),
+            opencode: None,
+            codex: Some(Candidate {
+                path: CODEX_CMD.into(),
+                shim: true,
+            }),
+        },
+    );
+}
+
+fn detected_with(service: &mut Service, clis: PerAgent<Option<Candidate>>) {
     let (agents, environments) = initial_statuses();
     assert!(service.begin_detection());
     service.finish_detection(Some(Detection {
@@ -204,4 +210,121 @@ fn the_schedule_follows_the_setting_the_start_and_the_last_run() {
     service.finish_agent_updates(ended);
     assert!(!service.agent_updates_due(started, ended + Duration::from_secs(3600)));
     assert!(service.agent_updates_due(started, ended + agent_updates::INTERVAL));
+}
+
+/// A service with the setting on and a finished detection that found no local CLI.
+fn without_local_clis(dir: &TempDir) -> Service {
+    let mut service = Service::open(&dir.0);
+    let on = AppSettings {
+        agent_updates: true,
+        ..service.settings().clone()
+    };
+    service.save_settings(on).unwrap();
+    detected_with(&mut service, PerAgent::default());
+    service
+}
+
+#[test]
+fn a_run_without_a_local_cli_is_refused_and_begins_nothing() {
+    let dir = TempDir::new("service-agent-updates-empty");
+    let mut service = without_local_clis(&dir);
+    let revision = service.snapshot().revision;
+    assert_eq!(service.start_agent_updates(), Err(NO_LOCAL_AGENT.into()));
+    assert_eq!(NO_LOCAL_AGENT, "Kein lokaler Agent installiert.");
+    assert!(!service.snapshot().agent_updates_running);
+    assert_eq!(service.snapshot().revision, revision);
+    assert!(
+        service.begin_agent_updates(),
+        "the refused start set no run flag"
+    );
+}
+
+#[test]
+fn the_schedule_waits_an_interval_after_finding_no_local_cli() {
+    let dir = TempDir::new("service-agent-updates-schedule-empty");
+    let mut service = without_local_clis(&dir);
+    let started = Instant::now();
+    let first = started + agent_updates::STARTUP_DELAY;
+    assert!(service.agent_updates_due(started, first));
+    assert_eq!(service.start_scheduled_agent_updates(first), None);
+    assert!(!service.snapshot().agent_updates_running);
+    // No retry every tick: the next try is an interval after the empty one.
+    let tick = first + agent_updates::TICK;
+    assert!(!service.agent_updates_due(started, tick));
+    assert!(!service.agent_updates_due(started, first + Duration::from_secs(3600)));
+    assert!(service.agent_updates_due(started, first + agent_updates::INTERVAL));
+}
+
+#[test]
+fn the_schedule_retries_on_the_next_tick_while_the_clis_are_not_known() {
+    let dir = TempDir::new("service-agent-updates-schedule-detecting");
+    let mut service = Service::open(&dir.0);
+    let on = AppSettings {
+        agent_updates: true,
+        ..service.settings().clone()
+    };
+    service.save_settings(on).unwrap();
+    let started = Instant::now();
+    let first = started + agent_updates::STARTUP_DELAY;
+    assert_eq!(service.start_scheduled_agent_updates(first), None);
+    assert!(service.agent_updates_due(started, first + agent_updates::TICK));
+    detected(&mut service);
+    let targets = service.start_scheduled_agent_updates(first).unwrap();
+    assert_eq!(targets.len(), 2);
+    assert!(service.snapshot().agent_updates_running);
+    assert_eq!(service.start_scheduled_agent_updates(first), None);
+}
+
+#[test]
+fn the_snapshot_shows_a_run_in_progress() {
+    let mut service = Service::read_only("nur lesen");
+    detected(&mut service);
+    assert!(!service.snapshot().agent_updates_running);
+    service.start_agent_updates().unwrap();
+    assert!(service.snapshot().agent_updates_running);
+    service.finish_agent_updates(Instant::now());
+    assert!(!service.snapshot().agent_updates_running);
+}
+
+#[test]
+fn a_run_whose_thread_never_started_does_not_reset_the_schedule() {
+    let dir = TempDir::new("service-agent-updates-abort");
+    let mut service = Service::open(&dir.0);
+    let on = AppSettings {
+        agent_updates: true,
+        ..service.settings().clone()
+    };
+    service.save_settings(on).unwrap();
+    detected(&mut service);
+    let started = Instant::now();
+    let first = started + agent_updates::STARTUP_DELAY;
+    service.start_agent_updates().unwrap();
+    let revision = service.snapshot().revision;
+    service.abort_agent_updates();
+    let snapshot = service.snapshot();
+    assert!(snapshot.revision > revision);
+    assert!(!snapshot.agent_updates_running);
+    assert!(
+        service.agent_updates_due(started, first),
+        "no last run recorded"
+    );
+    assert!(service.start_agent_updates().is_ok());
+}
+
+#[test]
+fn a_detection_follows_every_run() {
+    let mut service = Service::read_only("nur lesen");
+    detected(&mut service);
+    // None running: one begins and the caller starts its thread.
+    assert!(service.begin_or_rerun_detection());
+    assert!(service.snapshot().detecting);
+    // One running (it may have probed a CLI mid-replace): it is marked stale and reruns.
+    assert!(!service.begin_or_rerun_detection());
+    assert_eq!(service.finish_detection(None), DetectionEnd::Rerun);
+    assert!(service.snapshot().detecting);
+    assert!(matches!(
+        service.finish_detection(None),
+        DetectionEnd::Finished(_)
+    ));
+    assert!(!service.snapshot().detecting);
 }

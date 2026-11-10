@@ -14,6 +14,8 @@ pub const UPDATE_RUNNING: &str = "Agenten werden bereits aktualisiert.";
 /// `update_agents` before the local CLIs are known.
 pub const UPDATE_DETECTING: &str =
     "Die Agenten werden noch gesucht. Bitte gleich noch einmal versuchen.";
+/// `update_agents` when the last detection found no local CLI.
+pub const NO_LOCAL_AGENT: &str = "Kein lokaler Agent installiert.";
 
 impl Service {
     /// The ready local CLIs a run updates, in catalog order; `None` while a detection runs
@@ -36,14 +38,34 @@ impl Service {
         true
     }
 
-    /// Begins a run over the ready local CLIs for the `update_agents` command.
+    /// Begins a run over the ready local CLIs for the `update_agents` command; refused,
+    /// beginning nothing, while one runs, while the CLIs are not known and without one.
     pub fn start_agent_updates(&mut self) -> Result<Vec<(AgentId, Candidate)>, String> {
         if self.updating {
             return Err(UPDATE_RUNNING.into());
         }
         let targets = self.agent_update_targets().ok_or(UPDATE_DETECTING)?;
+        if targets.is_empty() {
+            return Err(NO_LOCAL_AGENT.into());
+        }
         self.begin_agent_updates();
         Ok(targets)
+    }
+
+    /// The schedule's start, once [`Self::agent_updates_due`] agreed: `None` while the CLIs
+    /// are not known (the next tick retries). Without a ready local CLI nothing begins, but
+    /// the attempt counts as a run ended at `now`, so the schedule waits the full interval
+    /// instead of trying every tick.
+    pub fn start_scheduled_agent_updates(
+        &mut self,
+        now: Instant,
+    ) -> Option<Vec<(AgentId, Candidate)>> {
+        let targets = self.agent_update_targets()?;
+        if targets.is_empty() {
+            self.last_update_run = Some(now);
+            return None;
+        }
+        self.begin_agent_updates().then_some(targets)
     }
 
     /// Replaces the agent's status with the one a run just reached.
@@ -72,6 +94,13 @@ impl Service {
                 }
             }
         }
+        self.touch();
+    }
+
+    /// Clears a run that never started (its thread could not start); the schedule's wait
+    /// is not reset.
+    pub fn abort_agent_updates(&mut self) {
+        self.updating = false;
         self.touch();
     }
 

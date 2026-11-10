@@ -167,6 +167,7 @@ fn relative_env_dirs_yield_no_candidates() {
     assert!(host::gh_candidates(&host).is_empty() && host::git_candidates(&host).is_empty());
     assert!(host::wt_candidates(&host).is_empty() && host.gitconfig().is_none());
     assert_eq!(host.powershell(), "powershell.exe");
+    assert_eq!(host.taskkill(), r"C:\Windows\System32\taskkill.exe");
     host.codex_install_dir = Some(r"D:\codex".into());
     assert_eq!(
         paths(host::agent_candidates(AgentId::Codex, &host))[0],
@@ -190,6 +191,11 @@ fn tool_candidates_cover_the_known_locations() {
         host.powershell(),
         r"C:\Windows\System32\WindowsPowerShell\v1.0\powershell.exe"
     );
+    let moved = Host {
+        system_root: Some(r"D:\Win\".into()),
+        ..windows_host()
+    };
+    assert_eq!(moved.taskkill(), r"D:\Win\System32\taskkill.exe");
     assert_eq!(
         host.gitconfig().as_deref(),
         Some(r"C:\Users\max\.gitconfig")
@@ -484,6 +490,7 @@ mod system_runner {
     fn runner(millis: u64) -> SystemRunner {
         SystemRunner {
             timeout: Duration::from_millis(millis),
+            ..SystemRunner::default()
         }
     }
 
@@ -510,6 +517,12 @@ mod system_runner {
     fn times_out_and_kills() {
         let started = Instant::now();
         assert_eq!(runner(200).run("sleep", &["5"]), Err(RunError::Timeout));
+        // The tree kill is Windows-only; elsewhere the child is killed alone, as before.
+        let tree = SystemRunner {
+            kill_tree: true,
+            ..runner(200)
+        };
+        assert_eq!(tree.run("sleep", &["5"]), Err(RunError::Timeout));
         assert!(started.elapsed() < Duration::from_secs(3));
     }
 

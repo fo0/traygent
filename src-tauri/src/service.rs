@@ -15,7 +15,7 @@ use std::path::PathBuf;
 mod agent_updates;
 mod github;
 mod launch_prep;
-pub use agent_updates::{UPDATE_DETECTING, UPDATE_RUNNING};
+pub use agent_updates::{NO_LOCAL_AGENT, UPDATE_DETECTING, UPDATE_RUNNING};
 pub use github::Listing;
 pub use launch_prep::Prepared;
 
@@ -130,6 +130,7 @@ impl Service {
         snapshot.revision = self.revision;
         snapshot.github = self.github.clone();
         snapshot.agent_updates = self.agent_update_statuses();
+        snapshot.agent_updates_running = self.updating;
         snapshot.notice = self.notice().map(Into::into);
         snapshot
     }
@@ -145,6 +146,16 @@ impl Service {
         }
         self.touch();
         true
+    }
+
+    /// Asks for a fresh detection: a running one is marked stale and reruns by itself
+    /// ([`DetectionEnd::Rerun`]), else one begins and `true` tells the caller to start it.
+    pub fn begin_or_rerun_detection(&mut self) -> bool {
+        if self.detecting {
+            self.stale = true;
+            return false;
+        }
+        self.begin_detection()
     }
 
     /// Ends the running detection; `None` (a failed run) keeps the previous results.
@@ -199,13 +210,7 @@ impl Service {
         self.state = next;
         self.touch();
         // The Docker statuses depend on the images; a detection with the old ones is stale.
-        let start_detection = images_changed
-            && if self.detecting {
-                self.stale = true;
-                false
-            } else {
-                self.begin_detection()
-            };
+        let start_detection = images_changed && self.begin_or_rerun_detection();
         Ok(Saved {
             snapshot: self.snapshot(),
             start_detection,
@@ -343,6 +348,7 @@ pub fn build_snapshot(
         recents: recents.to_vec(),
         github: GithubState::default(),
         agent_updates: Vec::new(),
+        agent_updates_running: false,
         detecting,
         revision: 0,
         notice: None,

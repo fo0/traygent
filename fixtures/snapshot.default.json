@@ -390,6 +390,7 @@
     "defaultCloneRoot": ""
   },
   "agentUpdates": [],
+  "agentUpdatesRunning": false,
   "detecting": false,
   "revision": 0
 }

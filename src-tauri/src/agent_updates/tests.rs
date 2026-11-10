@@ -190,6 +190,17 @@ fn an_unreadable_process_list_counts_every_agent_as_in_use() {
 }
 
 #[test]
+fn a_node_process_with_an_unreadable_command_line_counts_for_every_agent() {
+    assert!(LIST_SCRIPT.contains("IsNullOrWhiteSpace($line)) { 'pkg unknown' }"));
+    assert_eq!(line_agent("pkg unknown"), None);
+    assert_eq!(used("pkg unknown\ntraygent-end\n"), [true, true, true]);
+    assert_eq!(
+        used("exe claude.exe\npkg unknown\ntraygent-end\n"),
+        [true, true, true]
+    );
+}
+
+#[test]
 fn an_agent_in_use_is_skipped_without_running_its_update() {
     let runner = FakeRunner::default()
         .processes("exe claude.exe\ntraygent-end\n")

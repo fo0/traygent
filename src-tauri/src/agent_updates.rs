@@ -25,9 +25,11 @@ const END_MARKER: &str = "traygent-end";
 
 /// Lists the processes that may hold an agent CLI, already filtered and deduplicated so the
 /// runner's output cap never hides one: `exe <image>` for a CLI binary, `pkg <match>` for a
-/// node or bun process whose command line names an agent's npm package, then the end
-/// marker. The Claude desktop app is `Claude.exe` too: a process from its install folders
-/// (UNVERIFIED paths, conventional) is no CLI, one without a readable path still counts.
+/// node or bun process whose command line names an agent's npm package, `pkg unknown` for
+/// one whose command line cannot be read (another user's or an elevated process; it counts
+/// for every agent), then the end marker. The Claude desktop app is `Claude.exe` too: a
+/// process from its install folders (UNVERIFIED paths, conventional) is no CLI, one without
+/// a readable path still counts.
 /// Windows PowerShell 5.1; no double quote anywhere (docs/adr/0003).
 const LIST_SCRIPT: &str = r"$ErrorActionPreference = 'Stop'
 $packages = 'claude-code|@opencode|opencode-ai|@openai[\\/]codex|codex\.js'
@@ -38,7 +40,9 @@ $found = foreach ($process in Get-CimInstance Win32_Process -Property Name,Execu
     if ([string]$process.ExecutablePath -notmatch $desktop) { 'exe ' + $name }
   }
   elseif ($name -match '^(node|bun)\.exe$') {
-    foreach ($match in [regex]::Matches([string]$process.CommandLine, $packages, 'IgnoreCase')) {
+    $line = [string]$process.CommandLine
+    if ([string]::IsNullOrWhiteSpace($line)) { 'pkg unknown' }
+    foreach ($match in [regex]::Matches($line, $packages, 'IgnoreCase')) {
       'pkg ' + $match.Value.ToLowerInvariant()
     }
   }
@@ -76,8 +80,8 @@ pub fn due(enabled: bool, uptime: Duration, since_last_run: Option<Duration>) ->
         }
 }
 
-/// The agent one line of the process list belongs to; `None` for a line the script never
-/// prints.
+/// The agent one line of the process list belongs to; `None` for `pkg unknown` (any agent)
+/// and for a line the script never prints.
 fn line_agent(line: &str) -> Option<AgentId> {
     let (kind, name) = line.split_once(' ')?;
     match (kind, name) {
