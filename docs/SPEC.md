@@ -205,17 +205,21 @@ Commands (Rust `#[tauri::command]`, German `Err` strings; panel calls only via `
   `update_agents` („Jetzt aktualisieren“) starts a run at once, whatever the setting; a second
   run while one is going is refused („Agenten werden bereits aktualisiert.“), as is one while a
   detection runs or before the first finished („Die Agenten werden noch gesucht. …“; the
-  schedule retries a minute later). A run takes the agents one after the other and ends the
-  4-hour wait anew.
+  schedule retries a minute later) and one without a ready local CLI („Kein lokaler Agent
+  installiert.“). A run takes the agents one after the other and ends the 4-hour wait anew; an
+  update command that runs into its timeout is ended with its whole process tree.
 - An agent is skipped (`inUse`) while a process of its CLI runs: its executable, or a `node` /
   `bun` process whose command line names its package — sessions started outside Traygent count;
-  the Claude desktop app (`Claude.exe` in its own install folders) does not.
+  the Claude desktop app (`Claude.exe` in its own install folders) does not, and a `node` / `bun`
+  process with an unreadable command line counts for every agent.
   The process list comes from `Get-CimInstance Win32_Process` through Windows PowerShell; a list
   that cannot be read, times out or is incomplete skips every agent (fail closed).
 - `Snapshot.agentUpdates` holds one `AgentUpdateStatus` per agent that had a run since the app
   started, in catalog order: `running`, `updated` (`from` → `version`), `current`, `inUse`,
-  `failed`, each with its time `at`. Every change emits `traygent:snapshot`; after a run that
-  updated a CLI a detection follows, so versions and paths refresh. Nothing is persisted.
+  `failed`, each with its time `at`; `Snapshot.agentUpdatesRunning` is true while a run is in
+  progress. `update_agents` returns before the first agent turns `running`. Every change emits
+  `traygent:snapshot`; a detection follows every run (one already running reruns), so versions
+  and paths refresh. Nothing is persisted.
 - A local `launch_session` of an agent in `running` is refused („<Agent> wird gerade
   aktualisiert.“); Docker starts are not affected, and the CLI in a container keeps its own
   update path.

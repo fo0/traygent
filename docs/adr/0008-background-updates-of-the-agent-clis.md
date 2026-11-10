@@ -13,7 +13,7 @@ The owner wants the connected agent CLIs (Claude Code, OpenCode, Codex) kept up 
 
 We will run each locally installed CLI's own update command (`claude update`, `opencode upgrade`, `codex update`) on its resolved path, hidden, with a 10-minute timeout, when `settings.agentUpdates` is on (default off): about a minute after the app started and then every 4 hours, plus on an explicit „Jetzt aktualisieren“. Traygent neither downloads nor compares versions itself.
 
-A CLI counts as in use while a process of it runs — its own executable, or a `node` / `bun` process whose command line names its package — read right before each agent's turn from `Get-CimInstance Win32_Process` through Windows PowerShell. The check fails closed: a process list that cannot be read, times out or arrives incomplete skips every agent. A local start of an agent that is being updated is refused with a message. The result per agent (`running`, `updated`, `current`, `inUse`, `failed`) lives in memory and reaches the panel as `Snapshot.agentUpdates`.
+A CLI counts as in use while a process of it runs — its own executable, or a `node` / `bun` process whose command line names its package (one whose command line cannot be read counts for every agent) — read right before each agent's turn from `Get-CimInstance Win32_Process` through Windows PowerShell. The check fails closed: a process list that cannot be read, times out or arrives incomplete skips every agent. A local start of an agent that is being updated is refused with a message. The result per agent (`running`, `updated`, `current`, `inUse`, `failed`) lives in memory and reaches the panel as `Snapshot.agentUpdates`.
 
 ## Consequences
 
@@ -25,10 +25,11 @@ A CLI counts as in use while a process of it runs — its own executable, or a `
 
 ### Negative / Trade-offs
 
-- A session that starts between the check and the update can still meet a CLI that is being replaced; only starts through Traygent are refused.
+- A session that starts between the check and the update can still meet a CLI that is being replaced — one opened by hand, or one Traygent started a moment before the check, whose CLI process does not exist yet. Only starts through Traygent during the update itself are refused.
+- Another program with the same image name (`claude.exe`, `codex.exe`) blocks that CLI's update while it is open; only the Claude desktop app's install folders are excluded.
 - A CLI that is always open never updates — the status says „in Benutzung“.
 - The update command's output is not shown; a failure is one word, and the user falls back to the command in Settings → Agenten.
-- A PowerShell start every four hours per run; machines that block PowerShell get „in Benutzung“ forever (fail closed).
+- A PowerShell start per agent in every run; machines that block PowerShell get „in Benutzung“ forever (fail closed).
 
 ### Neutral
 
