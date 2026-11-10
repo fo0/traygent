@@ -206,7 +206,8 @@ Commands (Rust `#[tauri::command]`, German `Err` strings; panel calls only via `
   run while one is going is refused („Agenten werden bereits aktualisiert.“), as is one while a
   detection runs or before the first finished („Die Agenten werden noch gesucht. …“; the
   schedule retries a minute later) and one without a ready local CLI („Kein lokaler Agent
-  installiert.“). A run takes the agents one after the other and ends the 4-hour wait anew; an
+  installiert.“). A run takes the agents one after the other and ends the 4-hour wait anew (the
+  schedule counts a try without a ready local CLI as a run); an
   update command that runs into its timeout is ended with its whole process tree.
 - An agent is skipped (`inUse`) while a process of its CLI runs: its executable, or a `node` /
   `bun` process whose command line names its package — sessions started outside Traygent count;

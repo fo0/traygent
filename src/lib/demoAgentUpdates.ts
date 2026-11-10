@@ -88,7 +88,8 @@ function withStatus(
 /**
  * The steps of a run started on `snapshot`: per ready local agent `running`,
  * then its result; last the run ends and the local probe of an updated agent
- * carries its new version, as the detection after a native run would.
+ * carries its new version — an approximation of the detection that follows a
+ * native run (the demo shows no `detecting` phase for it).
  */
 export function agentUpdateSteps(
   snapshot: Snapshot,

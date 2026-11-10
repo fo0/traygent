@@ -20,7 +20,10 @@
   } = $props();
   let starting = $state(false);
   let error = $state('');
-  const busy = $derived(starting || snapshot.agentUpdatesRunning);
+  // A run is refused while a detection runs, and one follows every run.
+  const busy = $derived(
+    starting || snapshot.agentUpdatesRunning || snapshot.detecting,
+  );
 
   async function update() {
     if (busy) return;
@@ -36,11 +39,8 @@
   }
 </script>
 
-<section
-  class="agent-updates"
-  aria-labelledby="agent-updates-heading"
-  aria-busy={busy}
->
+<!-- No aria-busy here: it would hold back the status rows it contains. -->
+<section class="agent-updates" aria-labelledby="agent-updates-heading">
   <h3 id="agent-updates-heading">Agenten</h3>
   <div class="agent-updates-row">
     <label class="agent-updates-option">

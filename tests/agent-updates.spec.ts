@@ -119,10 +119,6 @@ test('natively the button stays off while a run is in progress', async ({
   const dialog = await openUpdates(page);
   const button = dialog.getByRole('button', { name: 'Jetzt aktualisieren' });
   await expect(button).toHaveAttribute('aria-disabled', 'true');
-  await expect(dialog.getByRole('region', { name: 'Agenten' })).toHaveAttribute(
-    'aria-busy',
-    'true',
-  );
   // `force`: an aria-disabled button stays clickable, it just does nothing.
   await button.click({ force: true });
   expect(await readCalls(page, 'update_agents')).toEqual([]);
