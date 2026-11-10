@@ -2,6 +2,7 @@
 //! detection, launch builder, `state.json`) and the platform-independent rules of the shell.
 //! The browser preview serves its own demo snapshot (`src/lib/demo.ts`).
 
+pub mod agent_updates;
 pub mod catalog;
 pub mod detect;
 pub mod github;

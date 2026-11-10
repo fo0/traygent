@@ -19,6 +19,7 @@ fn sample() -> Persisted {
     let mut settings = AppSettings {
         terminal: TerminalId::Console,
         shared_window: true,
+        agent_updates: true,
         ..AppSettings::default()
     };
     settings.docker.gh_token = true;
@@ -78,6 +79,7 @@ fn save_then_load_round_trips_with_a_version() {
     );
     assert_eq!(value["settings"]["terminal"], "console");
     assert_eq!(value["settings"]["sharedWindow"], true);
+    assert_eq!(value["settings"]["agentUpdates"], true);
     assert_eq!(
         value["github"],
         json!({ "login": "octo-cat", "id": 42, "source": "gh" })

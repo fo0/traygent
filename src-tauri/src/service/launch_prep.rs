@@ -39,6 +39,13 @@ impl Service {
         fs: &dyn Fs,
         nonce: &str,
     ) -> Result<Prepared, String> {
+        // The update replaces the local CLI; a session started now could find it half written.
+        if request.env == EnvId::Local && self.agent_updating(request.agent) {
+            return Err(format!(
+                "{} wird gerade aktualisiert.",
+                request.agent.label()
+            ));
+        }
         let repo = request.repo.as_ref().map(repo::validate).transpose()?;
         let target = match &repo {
             Some(repo) => self.repo_target(repo, &request.folder, host, fs)?,

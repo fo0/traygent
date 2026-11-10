@@ -42,6 +42,7 @@ impl Default for AppSettings {
             agents: PerAgent::from_fn(|_| LaunchOptions::default()),
             docker: DockerSettings::default(),
             github: GithubSettings::default(),
+            agent_updates: false,
         }
     }
 }

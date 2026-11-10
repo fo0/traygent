@@ -129,6 +129,7 @@ fn parse_settings(object: &Map<String, Value>) -> AppSettings {
         environments: environments(object).unwrap_or_else(|| defaults.environments.clone()),
         terminal: field(object, "terminal", defaults.terminal),
         shared_window: field(object, "sharedWindow", defaults.shared_window),
+        agent_updates: field(object, "agentUpdates", defaults.agent_updates),
         ..defaults.clone()
     };
     for agent in AgentId::ALL {

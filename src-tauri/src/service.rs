@@ -4,16 +4,18 @@
 use crate::detect::Detection;
 use crate::launch;
 use crate::models::{
-    AgentId, AgentStatus, AppSettings, EnvId, EnvStatus, GithubState, LaunchOptions, LaunchRequest,
-    ProbeState, RecentSession, Snapshot,
+    AgentId, AgentStatus, AgentUpdateStatus, AppSettings, EnvId, EnvStatus, GithubState,
+    LaunchOptions, LaunchRequest, PerAgent, ProbeState, RecentSession, Snapshot,
 };
 use crate::store::{self, Persisted};
 use crate::{catalog, ports, recents, settings};
 use chrono::{DateTime, Utc};
 use std::path::PathBuf;
 
+mod agent_updates;
 mod github;
 mod launch_prep;
+pub use agent_updates::{UPDATE_DETECTING, UPDATE_RUNNING};
 pub use github::Listing;
 pub use launch_prep::Prepared;
 
@@ -36,6 +38,12 @@ pub struct Service {
     github: GithubState,
     /// Increases whenever the account changes; a listing begun before is dropped.
     github_generation: u64,
+    /// The last update run per agent since the app started (`service/agent_updates.rs`).
+    agent_updates: PerAgent<Option<AgentUpdateStatus>>,
+    /// True while an update run is in progress.
+    updating: bool,
+    /// When the last update run ended; in memory only.
+    last_update_run: Option<std::time::Instant>,
 }
 
 /// A saved settings change; `start_detection` asks the caller to start one (the Docker
@@ -85,6 +93,9 @@ impl Service {
                 ..GithubState::default()
             },
             github_generation: 0,
+            agent_updates: PerAgent::default(),
+            updating: false,
+            last_update_run: None,
             state,
         }
     }
@@ -118,6 +129,7 @@ impl Service {
         );
         snapshot.revision = self.revision;
         snapshot.github = self.github.clone();
+        snapshot.agent_updates = self.agent_update_statuses();
         snapshot.notice = self.notice().map(Into::into);
         snapshot
     }
@@ -330,6 +342,7 @@ pub fn build_snapshot(
         environments,
         recents: recents.to_vec(),
         github: GithubState::default(),
+        agent_updates: Vec::new(),
         detecting,
         revision: 0,
         notice: None,
