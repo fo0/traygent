@@ -1,6 +1,8 @@
 # Monthly, one grouped PR per ecosystem. Workflow actions are pinned to full SHAs
 # with a version comment, which Dependabot updates together. The cooldown keeps
 # versions younger than a week out of version updates; security updates skip it.
+# Security updates get their own group per ecosystem, minor and patch only, so a
+# major never rides along with a security fix and arrives as its own PR.
 version: 2
 updates:
   - package-ecosystem: github-actions
@@ -35,6 +37,10 @@ updates:
     groups:
       npm:
         patterns: ['*']
+      npm-security:
+        applies-to: security-updates
+        patterns: ['*']
+        update-types: [minor, patch]
   - package-ecosystem: cargo
     directory: /src-tauri
     schedule:
@@ -47,3 +53,7 @@ updates:
     groups:
       cargo:
         patterns: ['*']
+      cargo-security:
+        applies-to: security-updates
+        patterns: ['*']
+        update-types: [minor, patch]
