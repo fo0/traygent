@@ -102,6 +102,8 @@ Built with **Tauri 2, Rust, Svelte 5 and TypeScript**. Prerequisites: **Node.js 
 pnpm install --frozen-lockfile
 pnpm desktop:dev       # run the desktop app
 pnpm verify            # lint, typecheck, tests, build
+pnpm test:e2e          # Playwright against the browser demo
+cargo test --locked --manifest-path src-tauri/Cargo.toml --features updates   # Rust tests
 pnpm build:installer   # unsigned NSIS installer (Windows) → src-tauri/target/release/bundle/nsis/
 ```
 
