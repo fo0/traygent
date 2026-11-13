@@ -7,7 +7,7 @@
  */
 import type { AgentUpdateStatus } from './agentUpdateTypes';
 import type { GithubState } from './githubTypes';
-import type { AgentProfile, ProfileStatus } from './profileTypes';
+import type { AgentProfile, ProfileShare, ProfileStatus } from './profileTypes';
 
 export type { AgentUpdateState, AgentUpdateStatus } from './agentUpdateTypes';
 export type {
@@ -18,7 +18,7 @@ export type {
   LocalAccounts,
   RepoSummary,
 } from './githubTypes';
-export type { AgentProfile, ProfileStatus } from './profileTypes';
+export type * from './profileTypes';
 
 /** The coding agents Traygent starts. */
 export type AgentId = 'claude' | 'opencode' | 'codex';
@@ -209,6 +209,8 @@ export interface AppSettings {
   profiles: Record<AgentId, AgentProfile[]>;
   /** The profile a start begins with: `default` or one of `profiles`. */
   agentProfile: Record<AgentId, string>;
+  /** Extra shared names per agent; empty lists by default. */
+  profileShare: Record<AgentId, ProfileShare>;
 }
 
 /** Mirrors `Snapshot` in src-tauri/src/models.rs; replaced wholesale on every change. */

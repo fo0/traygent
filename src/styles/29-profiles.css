@@ -142,6 +142,10 @@
 .profiles .field-error {
   margin: 4px 0 0;
 }
+/* The extra shared names, below the list and its add row. */
+.profiles .profile-share {
+  margin: 10px 0 0;
+}
 
 @media (forced-colors: active) {
   .agent-tile .profile-mark {

@@ -30,6 +30,11 @@ describe('demo profiles', () => {
       codex: [],
     });
     expect(snapshot.settings.agentProfile.claude).toBe('default');
+    expect(snapshot.settings.profileShare).toEqual({
+      claude: { dirs: ['.caveman-sessions'], files: ['orca-state.json'] },
+      opencode: { dirs: [], files: [] },
+      codex: { dirs: [], files: [] },
+    });
     expect(
       snapshot.profiles.map((p) => [p.id, p.label, p.signedIn, p.account]),
     ).toEqual([
@@ -65,6 +70,21 @@ describe('demo profiles', () => {
     settings.agentProfile.claude = 'weg';
     await expect(bridge.saveSettings(settings)).rejects.toThrow(
       'Standard-Profil gibt es nicht.',
+    );
+  });
+
+  it('saves shared names and refuses one the sync handles, named natively', async () => {
+    const bridge = createDemoBridge(0);
+    const { settings } = await bridge.snapshot();
+    settings.profileShare.claude.files.push('notes.md');
+    const saved = await bridge.saveSettings(settings);
+    expect(saved.settings.profileShare.claude.files).toEqual([
+      'orca-state.json',
+      'notes.md',
+    ]);
+    settings.profileShare.claude.dirs.push('Skills');
+    await expect(bridge.saveSettings(settings)).rejects.toThrow(
+      'Name „Skills“ für Claude Code wird bereits abgeglichen.',
     );
   });
 
