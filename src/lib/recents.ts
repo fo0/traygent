@@ -87,14 +87,16 @@ export function restoreRecent(
 
 /**
  * „Bearbeiten …“, as natively (src-tauri/src/service.rs → update_recent): new
- * options (trimmed, a blank model or effort `default`) and ports on the entry; its place, start time and count
- * stay. Null when the id is no longer listed.
+ * options (trimmed, a blank model or effort `default`), ports and profile
+ * (already normalized, `undefined` for „Standard“) on the entry; its place,
+ * start time and count stay. Null when the id is no longer listed.
  */
 export function editRecent(
   list: readonly RecentSession[],
   id: string,
   options: LaunchOptions,
   ports: readonly string[],
+  profile?: string,
 ): RecentSession[] | null {
   if (!list.some((item) => item.id === id)) return null;
   const trimmed = {
@@ -103,9 +105,17 @@ export function editRecent(
     effort: options.effort.trim() || 'default',
     extraArgs: options.extraArgs.trim(),
   };
-  return list.map((item) =>
-    item.id === id ? { ...item, options: trimmed, ports: [...ports] } : item,
-  );
+  return list.map((item) => {
+    if (item.id !== id) return item;
+    const edited: RecentSession = {
+      ...item,
+      options: trimmed,
+      ports: [...ports],
+    };
+    if (profile) edited.profile = profile;
+    else delete edited.profile;
+    return edited;
+  });
 }
 
 /** Distinct folders of the recent sessions, newest first. */

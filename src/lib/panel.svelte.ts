@@ -234,8 +234,10 @@ export class Panel {
     recent: RecentSession,
     options: LaunchOptions,
     ports: string[],
+    profile?: string,
   ) {
-    this.accept(await this.#bridge.updateRecent(recent.id, options, ports));
+    const { id } = recent;
+    this.accept(await this.#bridge.updateRecent(id, options, ports, profile));
   }
 
   /** Saves the whole settings object; rejects with the German message. */

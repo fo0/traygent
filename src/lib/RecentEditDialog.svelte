@@ -1,5 +1,6 @@
 <script lang="ts">
   import { onDestroy, untrack } from 'svelte';
+  import Dropdown from './Dropdown.svelte';
   import Modal from './Modal.svelte';
   import OptionFields from './OptionFields.svelte';
   import PortPicker from './PortPicker.svelte';
@@ -13,6 +14,7 @@
   } from './agents';
   import { errorMessage } from './format';
   import { normalizePorts } from './ports';
+  import { DEFAULT_PROFILE, recentProfileItems } from './profiles';
   import type { LaunchOptions, RecentSession, Snapshot } from './types';
   import {
     argsProblem,
@@ -21,8 +23,9 @@
     shimArgsProblem,
   } from './validation';
 
-  // „Bearbeiten …“ of a „Zuletzt“ row: the options and ports its ▶ sends.
-  // Staged like the settings; „Speichern“ stores them without a start.
+  // „Bearbeiten …“ of a „Zuletzt“ row: the options, ports (Docker) and
+  // profile (Lokal, an agent with an extra profile) its ▶ sends. Staged like
+  // the settings; „Speichern“ stores them without a start.
   let {
     snapshot,
     recent,
@@ -34,7 +37,11 @@
     recent: RecentSession;
     returnFocus?: () => HTMLElement | null | undefined;
     /** Rejects with the German message; the dialog then stays open. */
-    onSave: (options: LaunchOptions, ports: string[]) => Promise<void>;
+    onSave: (
+      options: LaunchOptions,
+      ports: string[],
+      profile: string | undefined,
+    ) => Promise<void>;
     onClose: () => void;
   } = $props();
 
@@ -42,6 +49,19 @@
   const docker = $derived(recent.env === 'docker');
   let options = $state<LaunchOptions>(untrack(() => ({ ...recent.options })));
   let ports = $state<string[]>(untrack(() => [...recent.ports]));
+  /** „Standard“ first; `[]` when the entry has no profile to choose. */
+  const profiles = $derived(
+    recentProfileItems(snapshot, recent.agent, recent.env),
+  );
+  /** A profile no longer listed shows (and saves) as „Standard“. */
+  let profile = $state(
+    untrack(() => {
+      const stored = recent.profile;
+      return profiles.some((item) => item.id === stored) && stored
+        ? stored
+        : DEFAULT_PROFILE;
+    }),
+  );
   let error = $state('');
   let saving = $state(false);
   let alive = true;
@@ -62,12 +82,15 @@
   const next = $derived({
     options: sentOptions(entry, options),
     ports: docker ? normalizePorts(ports) : [],
+    profile:
+      profiles.length && profile !== DEFAULT_PROFILE ? profile : undefined,
   });
   const dirty = $derived(
     JSON.stringify(next) !==
       JSON.stringify({
         options: sentOptions(entry, recent.options),
         ports: recent.ports,
+        profile: recent.profile,
       }),
   );
   const blocked = $derived(!dirty || saving || invalid);
@@ -77,7 +100,11 @@
     saving = true;
     error = '';
     try {
-      await onSave($state.snapshot(next.options), [...next.ports]);
+      await onSave(
+        $state.snapshot(next.options),
+        [...next.ports],
+        next.profile,
+      );
       if (alive) onClose();
     } catch (cause) {
       if (alive) error = errorMessage(cause);
@@ -111,6 +138,19 @@
           modelProblem={model}
           argsProblem={args}
         >
+          {#if profiles.length}
+            <label for="recent-profile">Profil</label>
+            <div class="field-cell">
+              <Dropdown
+                id="recent-profile"
+                label="Profil"
+                items={profiles}
+                value={profile}
+                onChange={(id) => (profile = id)}
+                variant="field"
+              />
+            </div>
+          {/if}
           {#if docker}
             <span class="field-label" aria-hidden="true">Ports</span>
             <PortPicker

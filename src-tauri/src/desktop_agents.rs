@@ -162,9 +162,10 @@ pub async fn update_recent(
     id: String,
     options: LaunchOptions,
     ports: Vec<String>,
+    profile: Option<String>,
 ) -> Result<traygent_core::Snapshot, String> {
     work(app, move |service| {
-        service.update_recent(&id, options, ports)
+        service.update_recent(&id, options, ports, profile)
     })
     .await
 }

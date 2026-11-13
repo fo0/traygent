@@ -95,9 +95,13 @@ Brand top left: icon + „Traygent“. Window ~480×760, frameless, tray popup l
    „Ports“ popover, the folder suggestions). Hiding an environment is a display preference, not
    a ban: its recents keep their environment and ▶ restarts them unchanged. „Bearbeiten …“
    (#3) opens a staged dialog with the row's model, thinking level, permission, extra
-   arguments and (Docker) ports; „Speichern“ stores them on the entry without a start
+   arguments, (Docker) ports and (Lokal, an agent with at least one extra profile, #37)
+   „Profil“ — „Standard“ and the agent's profiles; a stored profile removed since shows as
+   „Standard“, and saving stores that. „Speichern“ stores them on the entry without a start
    (`update_recent`, validated like a start; the dialog also applies the npm-shim argument rule) — place, start time and count stay, the next ▶
-   sends them. The agent, environment and folder define the entry and are not editable.
+   sends them. The profile follows the start rule (_Profiles_): absent, blank or `default`
+   and every Docker entry store none, an id the agent does not list is refused („Profil nicht
+   gefunden.“). The agent, environment and folder define the entry and are not editable.
    A row's profile: ▶ restarts with it (one removed since is refused natively, „Profil nicht
    gefunden.“); „In Composer übernehmen“ takes it over, or the saved „Standard-Profil“ when it
    is gone. A start of the same folder with another profile updates the row's profile.
@@ -185,7 +189,7 @@ Commands (Rust `#[tauri::command]`, German `Err` strings; panel calls only via `
 | `launch_session`                   | `{ request }`                                                                                    | `LaunchOutcome` (validates, opens terminal, records recent)   |
 | `remove_recent`                    | `{ id }`                                                                                         | `Snapshot`                                                    |
 | `restore_recent`                   | `{ recent }`                                                                                     | `Snapshot` (undo of remove)                                   |
-| `update_recent`                    | `{ id, options, ports }`                                                                         | `Snapshot` (edit, no start)                                   |
+| `update_recent`                    | `{ id, options, ports, profile: string \| null }`                                                | `Snapshot` (edit, no start)                                   |
 | `pick_folder`                      | `{ initial?: string }`                                                                           | `string \| null` (native folder dialog)                       |
 | `install_agent`                    | `{ agent }`                                                                                      | `void` (opens a terminal running the catalog install command) |
 | `open_folder`                      | `{ path }`                                                                                       | `void` (Explorer)                                             |

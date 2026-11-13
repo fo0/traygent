@@ -134,8 +134,9 @@ impl Service {
 
     /// The profile a start uses: none for the default one and for every environment but the
     /// local one (a container has its own home). Any other must be one of the agent's
-    /// profiles — a recent whose profile was removed does not start.
-    fn launch_profile(
+    /// profiles — a recent whose profile was removed does not start. „Bearbeiten …“ of a recent
+    /// stores its profile by the same rule.
+    pub(super) fn launch_profile(
         &self,
         agent: AgentId,
         env: EnvId,

@@ -1,6 +1,8 @@
 import { describe, expect, it } from 'vitest';
 import { demoSnapshot } from './demoData';
 import {
+  editedProfile,
+  recentProfileItems,
   MAX_PROFILES,
   agentProfiles,
   defaultProfile,
@@ -173,5 +175,32 @@ describe('profiles of a snapshot', () => {
         profile: 'team',
       }),
     ).toBe('Dieser Agent hat keine Profile.');
+  });
+});
+
+describe('the profile of an edited recent', () => {
+  it('is offered for a Lokal entry of an agent with an extra profile', () => {
+    const snapshot = demoSnapshot();
+    expect(recentProfileItems(snapshot, 'claude', 'local')).toEqual([
+      { id: 'default', label: 'Standard' },
+      { id: 'team', label: 'Team' },
+    ]);
+    expect(recentProfileItems(snapshot, 'claude', 'docker')).toEqual([]);
+    expect(recentProfileItems(snapshot, 'codex', 'local')).toEqual([]);
+    snapshot.settings.profiles.claude = [];
+    snapshot.profiles = [];
+    expect(recentProfileItems(snapshot, 'claude', 'local')).toEqual([]);
+  });
+
+  it('is stored as natively: none for „Standard“ and outside Lokal', () => {
+    const { settings } = demoSnapshot();
+    expect(editedProfile(settings, 'claude', 'local', ' team ')).toBe('team');
+    for (const standard of [undefined, '', '  ', 'default'])
+      expect(
+        editedProfile(settings, 'claude', 'local', standard),
+      ).toBeUndefined();
+    expect(editedProfile(settings, 'claude', 'docker', 'team')).toBeUndefined();
+    expect(editedProfile(settings, 'claude', 'local', 'gone')).toBeNull();
+    expect(editedProfile(settings, 'codex', 'local', 'team')).toBeNull();
   });
 });

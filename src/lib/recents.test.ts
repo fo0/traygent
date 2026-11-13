@@ -154,10 +154,13 @@ describe('recents', () => {
       recordStart([], { ...start, profile: 'default' }),
     ).not.toHaveProperty('profile');
     expect(recordStart([], start)).not.toHaveProperty('profile');
-    // „Bearbeiten …“ keeps it.
+    // „Bearbeiten …“ stores the profile it is given, none for „Standard“.
     const entry = recordStart([], { ...start, profile: 'team' });
-    expect(editRecent([entry], entry.id, options, [])?.[0]?.profile).toBe(
-      'team',
+    expect(editRecent([entry], entry.id, options, [], 'team')![0]).toEqual(
+      entry,
     );
+    const standard = editRecent([entry], entry.id, options, [])![0]!;
+    expect(standard).not.toHaveProperty('profile');
+    expect(standard).toEqual({ ...entry, profile: undefined });
   });
 });

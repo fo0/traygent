@@ -279,13 +279,15 @@ impl Service {
         self.commit_recents(list)
     }
 
-    /// „Bearbeiten …“ of a „Zuletzt“ row: replaces the options and ports the next restart
-    /// sends, validated like a start; the entry keeps its place, start time and count.
+    /// „Bearbeiten …“ of a „Zuletzt“ row: replaces the options, ports and profile the next
+    /// restart sends, validated and normalized like a start (the profile none for „Standard“
+    /// and outside the local environment); the entry keeps its place, start time and count.
     pub fn update_recent(
         &mut self,
         id: &str,
         options: LaunchOptions,
         ports: Vec<String>,
+        profile: Option<String>,
     ) -> Result<Snapshot, String> {
         let mut list = self.state.recents.clone();
         let recent = list
@@ -298,8 +300,10 @@ impl Service {
         if !ports.is_empty() && recent.env != EnvId::Docker {
             return Err(ports::DOCKER_ONLY.into());
         }
+        let profile = self.launch_profile(recent.agent, recent.env, profile.as_deref())?;
         recent.options = options;
         recent.ports = ports;
+        recent.profile = profile;
         self.commit_recents(list)
     }
 

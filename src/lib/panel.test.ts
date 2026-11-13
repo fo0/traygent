@@ -323,8 +323,8 @@ describe('Panel', () => {
     panel.accept(snapshot());
     const recent = panel.snapshot!.recents[0]!;
     const options = { ...recent.options, permission: 'bypass' as const };
-    await panel.updateRecent(recent, options, []);
-    expect(updateRecent).toHaveBeenCalledWith(recent.id, options, []);
+    await panel.updateRecent(recent, options, [], 'team');
+    expect(updateRecent).toHaveBeenCalledWith(recent.id, options, [], 'team');
     expect(panel.snapshot).toBe(edited);
     updateRecent.mockRejectedValueOnce(new Error('Ungültiges Modell.'));
     await expect(panel.updateRecent(recent, options, [])).rejects.toThrow(
