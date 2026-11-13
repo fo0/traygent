@@ -86,6 +86,7 @@ const ARGS: { [K in Command]?: Exclude<Commands[K]['args'], undefined> } = {
   open_folder: { path: 'C:\\x' },
   github_connect_token: { token: 'ghp_x' },
   github_import_local: { login: 'demo-user' },
+  profile_login: { agent: 'claude' as AgentId, profile: 'team' },
 };
 
 /** A Tauri invoke call, with or without a type argument. */

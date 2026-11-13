@@ -27,6 +27,7 @@
     recent,
     snapshot,
     now,
+    profile,
     launching,
     onRestart,
     onAdopt,
@@ -40,6 +41,8 @@
     snapshot: Snapshot;
     /** The shared minute clock, for the relative time. */
     now: number;
+    /** The label of the row's profile, `''` for „Standard“. */
+    profile: string;
     /** A start runs; the row's start waits for it. */
     launching: boolean;
     /** Starts exactly these options again, as a new session. */
@@ -120,6 +123,7 @@
       recent.folder,
       repo,
       env.label,
+      profile && `Profil: ${profile}`,
       optionTitle,
       `Freigabe: ${permission.label}`,
       ports.length && portsTitle,
@@ -182,7 +186,7 @@
 </script>
 
 <li class="recent-row">
-  <AgentBadge agent={recent.agent} {label} />
+  <AgentBadge agent={recent.agent} {label} {profile} />
   <span class="recent-text"
     ><span class="recent-name">{name}</span>{#if parent}<span
         class="recent-parent"><bdi>{parent}</bdi></span

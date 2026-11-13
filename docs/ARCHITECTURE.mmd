@@ -5,12 +5,14 @@ flowchart TD
         ComposerTs["composerState.svelte.ts Neue Session form, folder or repo"]
         DraftTs["settingsDraft.svelte.ts staged Agenten, Umgebung, clone root"]
         GithubActionsTs["githubActions.svelte.ts account actions, listing refresh"]
+        ProfileActionsTs["profileActions.svelte.ts profile sync and sign-in"]
         ModalsTs["modals.svelte.ts dialog and focus return"]
         UpdaterTs["updater.svelte.ts and updates.ts"]
         AutostartTs["autostart.svelte.ts staged autostart"]
         Components["Composer, RecentList, AppFooter, SettingsDialog, Modal"]
         GithubComponents["FolderField, RepoSuggestions, GithubSettings, GithubConnect, InlineConfirm"]
-        Helpers["agents.ts, recents.ts, validation.ts pure rules"]
+        ProfileComponents["ProfileChip, ProfileMark, ProfileSettings"]
+        Helpers["agents.ts, recents.ts, profiles.ts, validation.ts pure rules"]
         TargetTs["target.ts folder, repo or search; repo matching"]
         ThemeTs["theme.ts theme preference"]
         Bridge["bridge.ts native or demo, traygent:snapshot listener"]
@@ -25,6 +27,7 @@ flowchart TD
         DesktopAgents("desktop_agents.rs agent commands, start_detection")
         DesktopGithub("desktop_github.rs GitHub commands, start_listing")
         DesktopAgentUpdates("desktop_agent_updates.rs update_agents, schedule thread")
+        DesktopProfiles("desktop_profiles.rs sync_profiles, profile_login, detection step")
         DesktopStartup["desktop_startup.rs Run value adapter"]
         DesktopUpdates["desktop_updates.rs update commands"]
         TrayPopup["tray_popup.rs and windows.rs Win32"]
@@ -35,17 +38,19 @@ flowchart TD
         ServiceRs["service.rs Service: settings, recents, detection, snapshot"]
         LaunchPrepRs["service/launch_prep.rs resolve, repo folder, clone or reuse"]
         ServiceGithubRs["service/github.rs account and listing commits"]
+        ServiceProfilesRs["service/profiles.rs statuses, sync before a local start"]
+        ProfilesRs["profiles.rs and profiles/* recipe, Homes, links, file sync, status"]
         AgentUpdatesRs["agent_updates.rs in-use check, update commands, schedule rule"]
         RepoRs["repo.rs classification, clone folder and URL"]
         GithubRs["github.rs and github/* api, http, gh, discover, process, vault, secret"]
         StoreRs["store.rs versioned state.json"]
-        SettingsRs["settings.rs defaults and validation"]
+        SettingsRs["settings.rs and settings/profiles.rs defaults and validation"]
         RecentsRs["recents.rs recent sessions"]
         CatalogRs["catalog.rs agent catalog"]
         DetectRs["detect.rs, host.rs, runner.rs CLI and Docker probes"]
         LaunchRs["launch.rs, agents.rs, docker.rs, quote.rs argv builder"]
         SpawnRs["spawn.rs detached process"]
-        ModelsRs["models.rs and models/github.rs IPC model"]
+        ModelsRs["models.rs, models/github.rs, models/profiles.rs IPC model"]
         StartupRs["startup.rs login-startup rules"]
         PopupRs["popup.rs popup geometry and dismissal"]
         UpdatesRs["updates.rs and installer.rs, feature updates"]
@@ -64,6 +69,7 @@ flowchart TD
         Git(["git.exe clone from github.com, user's Git credentials"])
         GhCli(["gh.exe sign-ins, token read on consent"])
         Vault[("OS credential vault keyring, traygent / github-id")]
+        ConfigDirs[("USERPROFILE .claude and .claude-id, junctions, backups")]
     end
 
     AppSvelte --> PanelTs
@@ -75,6 +81,10 @@ flowchart TD
     Components --> AutostartTs
     Components --> Helpers
     Components --> GithubComponents
+    Components --> ProfileComponents
+    ProfileComponents --> ProfileActionsTs
+    PanelTs --> ProfileActionsTs
+    ProfileActionsTs --> Bridge
     GithubComponents --> TargetTs
     GithubComponents --> GithubActionsTs
     ComposerTs --> TargetTs
@@ -97,6 +107,11 @@ flowchart TD
     DesktopRs --> DesktopAgents
     DesktopRs --> DesktopGithub
     DesktopRs --> DesktopAgentUpdates
+    DesktopRs --> DesktopProfiles
+    IpcTs -- "Tauri IPC, camelCase JSON" --> DesktopProfiles
+    DesktopAgents -- "detection step, run_plan for save and launch" --> DesktopProfiles
+    DesktopProfiles -- "short lock, commit statuses" --> ServiceRs
+    DesktopProfiles -- "sync or read, no lock" --> ProfilesRs
     IpcTs -- "Tauri IPC, camelCase JSON" --> DesktopAgentUpdates
     DesktopAgentUpdates -- "short lock, commit statuses" --> ServiceRs
     DesktopAgentUpdates -- "run thread, no lock" --> AgentUpdatesRs
@@ -115,6 +130,11 @@ flowchart TD
     ServiceRs --> CatalogRs
     ServiceRs --> LaunchPrepRs
     ServiceRs --> ServiceGithubRs
+    ServiceRs --> ServiceProfilesRs
+    ServiceProfilesRs --> ProfilesRs
+    LaunchPrepRs --> ProfilesRs
+    ProfilesRs --> ConfigDirs
+    ProfilesRs -- "junctions via one hidden call" --> PowerShell
     LaunchPrepRs --> RepoRs
     LaunchPrepRs --> LaunchRs
     ServiceGithubRs --> GithubRs

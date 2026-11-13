@@ -42,6 +42,8 @@ export function recordStart(
     ports: [...request.ports],
     lastStartedAt: now.toISOString(),
     starts: (previous?.starts ?? 0) + 1,
+    ...(request.profile &&
+      request.profile !== 'default' && { profile: request.profile }),
   };
 }
 

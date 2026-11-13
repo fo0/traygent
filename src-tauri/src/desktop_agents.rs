@@ -48,6 +48,7 @@ fn detection_thread(app: &AppHandle, mut images: PerAgent<String>) {
         })
         .ok();
         let state = app.state::<NativeState>();
+        crate::desktop_profiles::read_or_sync(&state);
         let mut service = state.lock();
         match service.finish_detection(detection) {
             DetectionEnd::Finished(snapshot) => {
@@ -64,7 +65,7 @@ fn detection_thread(app: &AppHandle, mut images: PerAgent<String>) {
 }
 
 /// Spawns the plan; a failed wt.exe start falls back to a console window.
-fn start(plan: &LaunchPlan, fallback: Option<&LaunchPlan>) -> Result<(), String> {
+pub(crate) fn start(plan: &LaunchPlan, fallback: Option<&LaunchPlan>) -> Result<(), String> {
     match (spawn::spawn(plan), fallback) {
         (Ok(()), _) => Ok(()),
         (Err(_), Some(console)) => spawn::spawn(console),
@@ -78,12 +79,21 @@ pub async fn save_settings(
     settings: AppSettings,
 ) -> Result<traygent_core::Snapshot, String> {
     let handle = app.clone();
-    work(app, move |service| {
+    let (plan, changed) = work(app.clone(), move |service| {
         let saved = service.save_settings(settings)?;
-        if !saved.start_detection {
-            return Ok(saved.snapshot);
+        if saved.start_detection {
+            run_detection(&handle, service);
         }
-        run_detection(&handle, service);
+        Ok((service.profile_plan(), saved.profiles_changed))
+    })
+    .await?;
+    // A changed profile list is synced at once; the statuses are read anew either way.
+    // Without the service lock: the settings are saved, whatever the sync does.
+    let outcome = crate::desktop_profiles::run_plan(plan, changed).await;
+    work(app, move |service| {
+        if let Ok(outcome) = outcome {
+            service.apply_profiles(outcome);
+        }
         Ok(service.snapshot())
     })
     .await
@@ -94,14 +104,35 @@ pub async fn launch_session(
     app: AppHandle,
     request: LaunchRequest,
 ) -> Result<LaunchOutcome, String> {
-    let outcome = work(app.clone(), move |service| {
+    let (prepared, plan) = work(app.clone(), move |service| {
         let host = Host::current();
         let prepared = service.prepare_launch(&request, &host, &RealFs, &service::nonce())?;
+        let plan = service.launch_sync_plan(&prepared.request);
+        Ok((prepared, plan))
+    })
+    .await?;
+    // Every profile of the agent is brought in line before its session starts — without
+    // the service lock, so the panel stays responsive during a long first adoption.
+    // A sync that broke down (its worker panicked) is a warning like any other sync
+    // problem: the session still starts.
+    let synced = match plan {
+        Some(plan) => Some(crate::desktop_profiles::run_plan(plan, true).await),
+        None => None,
+    };
+    let outcome = work(app.clone(), move |service| {
+        // The lock was free meanwhile: the agent may be updating now, the profile gone.
+        service.confirm_launch(&prepared.request)?;
+        let warning = match synced {
+            Some(Ok(synced)) => service.finish_launch_sync(&prepared.request, synced)?,
+            Some(Err(_)) => Some(service::SYNC_WARNING.to_string()),
+            None => None,
+        };
         start(&prepared.plan, prepared.fallback.as_ref())?;
         let recent = service.record_launch(&prepared.request, chrono::Utc::now());
         Ok(LaunchOutcome {
             recent,
             snapshot: service.snapshot(),
+            warning,
         })
     })
     .await?;

@@ -5,7 +5,10 @@
 //! overwritten; a corrupt file is renamed to `state.json.corrupt-<timestamp>` and replaced
 //! by defaults. Unknown fields are ignored; missing, unreadable or invalid ones take their
 //! default ([`settings::sanitize`]).
-use crate::models::{AgentId, AppSettings, EnvId, GithubAccount, LaunchOptions, RecentSession};
+use crate::models::{
+    AgentId, AgentProfile, AppSettings, EnvId, GithubAccount, LaunchOptions, RecentSession,
+    DEFAULT_PROFILE,
+};
 use crate::{github, recents, settings};
 use serde::de::DeserializeOwned;
 use serde_json::{Map, Value};
@@ -123,6 +126,8 @@ fn parse_settings(object: &Map<String, Value>) -> AppSettings {
     let agents = object.get("agents").and_then(Value::as_object);
     let docker = object.get("docker").and_then(Value::as_object);
     let images = docker.and_then(|docker| docker.get("images")?.as_object().cloned());
+    let profiles = object.get("profiles").and_then(Value::as_object);
+    let agent_profile = object.get("agentProfile").and_then(Value::as_object);
     let mut settings = AppSettings {
         default_agent: field(object, "defaultAgent", defaults.default_agent),
         default_env: field(object, "defaultEnv", defaults.default_env),
@@ -140,6 +145,14 @@ fn parse_settings(object: &Map<String, Value>) -> AppSettings {
             let fallback = defaults.docker.images.get(agent).clone();
             *settings.docker.images.get_mut(agent) = field(images, agent.id(), fallback);
         }
+        // A file from before the profiles has neither: no extra profile, `default` chosen.
+        if let Some(list) = profiles.and_then(|profiles| profiles.get(agent.id())?.as_array()) {
+            *settings.profiles.get_mut(agent) = list.iter().filter_map(parse_profile).collect();
+        }
+        if let Some(chosen) = agent_profile {
+            *settings.agent_profile.get_mut(agent) =
+                field(chosen, agent.id(), DEFAULT_PROFILE.to_string());
+        }
     }
     if let Some(docker) = docker {
         settings.docker.gh_token = field(docker, "ghToken", false);
@@ -149,6 +162,11 @@ fn parse_settings(object: &Map<String, Value>) -> AppSettings {
         settings.github.clone_root = field(github, "cloneRoot", String::new());
     }
     settings
+}
+
+/// One malformed entry is dropped, the other profiles kept; [`settings::sanitize`] validates.
+fn parse_profile(value: &Value) -> Option<AgentProfile> {
+    serde_json::from_value(value.clone()).ok()
 }
 
 /// The composer's environments; an id a newer version added is dropped, the rest kept.

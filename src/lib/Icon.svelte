@@ -171,6 +171,14 @@
         attributes: { d: 'M20 14.5A8 8 0 1 1 9.5 4a6.5 6.5 0 0 0 10.5 10.5Z' },
       },
     ],
+    // An agent profile: a sign-in of its own.
+    user: [
+      ring(12, 8.5, 3.5),
+      {
+        tag: 'path',
+        attributes: { d: 'M5 20c0-3.9 3.1-6.5 7-6.5s7 2.6 7 6.5' },
+      },
+    ],
     // A private repository.
     lock: [
       box(5.5, 10.5, 13, 9.5),

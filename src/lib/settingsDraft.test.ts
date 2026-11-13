@@ -158,4 +158,40 @@ describe('SettingsDraft', () => {
     draft.value.github.cloneRoot = '  ';
     expect(draft.invalidIn('github')).toBe(false);
   });
+
+  it('stages profiles: added by name with a derived id, removed with the default', () => {
+    const saved = demoSettings();
+    const draft = new SettingsDraft(saved);
+    expect(draft.addProfile('claude', '  Kunde A ')).toBe('');
+    expect(draft.value.profiles.claude).toEqual([
+      { id: 'team', label: 'Team' },
+      { id: 'kunde-a', label: 'Kunde A' },
+    ]);
+    expect(draft.addProfile('claude', 'team')).toBe('Profil gibt es schon.');
+    expect(draft.addProfile('claude', 'Standard')).toBe(
+      '„Standard“ ist reserviert.',
+    );
+    expect(draft.dirty).toBe(true);
+    expect(saved.profiles.claude).toHaveLength(1);
+    // Saved profiles sign in; a staged one waits for „Speichern“.
+    expect(draft.savedProfile('claude', 'default')).toBe(true);
+    expect(draft.savedProfile('claude', 'team')).toBe(true);
+    expect(draft.savedProfile('claude', 'kunde-a')).toBe(false);
+    draft.value.agentProfile.claude = 'team';
+    draft.removeProfile('claude', 'kunde-a');
+    expect(draft.value.agentProfile.claude).toBe('team');
+    draft.removeProfile('claude', 'team');
+    expect(draft.value.profiles.claude).toEqual([]);
+    expect(draft.value.agentProfile.claude).toBe('default');
+    expect(draft.invalid).toBe(false);
+  });
+
+  it('marks the Agenten tab when a staged default is not listed', () => {
+    const draft = new SettingsDraft(demoSettings());
+    draft.value.agentProfile.claude = 'weg';
+    expect(draft.invalidIn('agents')).toBe(true);
+    expect(draft.problem('agents.claude.profiles')).toBe(
+      'Standard-Profil gibt es nicht.',
+    );
+  });
 });

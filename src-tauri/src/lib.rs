@@ -10,6 +10,7 @@ pub mod launch;
 pub mod models;
 pub mod popup;
 pub mod ports;
+pub mod profiles;
 pub mod recents;
 pub mod repo;
 pub mod service;

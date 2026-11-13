@@ -23,7 +23,8 @@ export function demoRecents(
     ago: number,
     starts: number,
     ports?: string[],
-    repo?: string,
+    repo?: string | undefined,
+    profile?: string,
   ][] = [
     [`${DEMO_HOME}\\Projekte\\traygent`, 'claude', 'local', {}, 5, 14],
     [
@@ -68,10 +69,13 @@ export function demoRecents(
       { effort: 'low', permission: 'ask' },
       9 * 24 * 60,
       1,
+      [],
+      undefined,
+      'team',
     ],
   ];
   return entries.map(
-    ([folder, agent, env, options, ago, starts, ports, repo]) => ({
+    ([folder, agent, env, options, ago, starts, ports, repo, profile]) => ({
       id: recentId(folder, agent, env),
       agent,
       env,
@@ -81,6 +85,7 @@ export function demoRecents(
       ports: ports ?? [],
       lastStartedAt: new Date(now - ago * MINUTE).toISOString(),
       starts,
+      ...(profile && { profile }),
     }),
   );
 }

@@ -6,8 +6,10 @@ use serde::{Deserialize, Serialize};
 
 mod agent_updates;
 mod github;
+mod profiles;
 pub use agent_updates::*;
 pub use github::*;
+pub use profiles::*;
 
 /// The coding agents Traygent starts.
 #[derive(
@@ -158,6 +160,9 @@ pub struct AgentCatalogEntry {
     /// Environments it can run in.
     pub environments: Vec<EnvId>,
     pub install: InstallInfo,
+    /// Several profiles (sign-ins) of this CLI can be kept and started
+    /// ([`crate::profiles::recipe`]).
+    pub profiles: bool,
 }
 
 /// What a start uses; agent defaults and recent sessions store this.
@@ -211,6 +216,10 @@ pub struct LaunchRequest {
     /// `127.0.0.1:3000:3000`; always `[]` for any other environment (docs/SPEC.md → Ports).
     #[serde(default)]
     pub ports: Vec<String>,
+    /// The agent profile to start with; absent or `default` = the CLI's own home. Ignored
+    /// (normalized to none) outside the local environment.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub profile: Option<String>,
 }
 
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
@@ -228,6 +237,9 @@ pub struct RecentSession {
     /// The ports the last start published (Docker only, else `[]`).
     #[serde(default)]
     pub ports: Vec<String>,
+    /// The profile the last start used; absent for the default one.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub profile: Option<String>,
     /// RFC 3339.
     pub last_started_at: String,
     pub starts: u32,
@@ -344,6 +356,11 @@ pub struct AppSettings {
     pub github: GithubSettings,
     /// Update the local agent CLIs in the background while no session uses them.
     pub agent_updates: bool,
+    /// Extra profiles per agent, besides the CLI's own home (`default`); `[]` for an agent
+    /// whose catalog entry has `profiles: false`.
+    pub profiles: PerAgent<Vec<AgentProfile>>,
+    /// The profile a new session starts with: `default` or one of `profiles`' ids.
+    pub agent_profile: PerAgent<String>,
 }
 
 /// Mirrors `Snapshot` in `src/lib/types.ts`; replaced wholesale on every change.
@@ -371,6 +388,9 @@ pub struct Snapshot {
     /// True while an agent update run is in progress.
     #[serde(default)]
     pub agent_updates_running: bool,
+    /// For every agent with catalog `profiles: true`: `default` first, then settings order.
+    #[serde(default)]
+    pub profiles: Vec<ProfileStatus>,
     /// True while a detection runs; a `traygent:snapshot` event follows.
     pub detecting: bool,
     /// Increases with every native state change and every finished detection; the panel
@@ -389,6 +409,9 @@ pub struct Snapshot {
 pub struct LaunchOutcome {
     pub recent: RecentSession,
     pub snapshot: Snapshot,
+    /// German, non-fatal: the profiles could not be synced completely; the session started.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub warning: Option<String>,
 }
 
 #[cfg(test)]

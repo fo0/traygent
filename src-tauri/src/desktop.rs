@@ -81,6 +81,7 @@ pub fn run() {
             };
             let host = traygent_core::detect::Host::current();
             service.set_default_clone_root(traygent_core::repo::default_clone_root(&host));
+            service.set_profile_homes(traygent_core::profiles::Homes::of(&host));
             app.manage(NativeState {
                 service: Mutex::new(service),
             });
@@ -135,6 +136,8 @@ pub fn run() {
             crate::desktop_agents::install_agent,
             crate::desktop_agents::open_folder,
             crate::desktop_agent_updates::update_agents,
+            crate::desktop_profiles::sync_profiles,
+            crate::desktop_profiles::profile_login,
             crate::desktop_github::github_connect_token,
             crate::desktop_github::github_local_accounts,
             crate::desktop_github::github_import_local,

@@ -15,9 +15,11 @@ use std::path::PathBuf;
 mod agent_updates;
 mod github;
 mod launch_prep;
+mod profiles;
 pub use agent_updates::{NO_LOCAL_AGENT, UPDATE_DETECTING, UPDATE_RUNNING};
 pub use github::Listing;
-pub use launch_prep::Prepared;
+pub use launch_prep::{Prepared, PROFILE_MISSING};
+pub use profiles::SYNC_WARNING;
 
 pub const RECENT_GONE: &str = "Diese Session steht nicht mehr in „Zuletzt“.";
 pub const SAVE_FAILED: &str = "Einstellungen und Sessions werden nicht gespeichert: state.json konnte nicht geschrieben werden.";
@@ -44,6 +46,9 @@ pub struct Service {
     updating: bool,
     /// When the last update run ended; in memory only.
     last_update_run: Option<std::time::Instant>,
+    /// Where profiles live on this host, the facts last read about them and what the last
+    /// sync could not do (`service/profiles.rs`).
+    profiles: profiles::ProfileState,
 }
 
 /// A saved settings change; `start_detection` asks the caller to start one (the Docker
@@ -52,6 +57,8 @@ pub struct Service {
 pub struct Saved {
     pub snapshot: Snapshot,
     pub start_detection: bool,
+    /// The profile lists changed: the caller syncs the profiles.
+    pub profiles_changed: bool,
 }
 
 /// How a detection run ends.
@@ -96,6 +103,7 @@ impl Service {
             agent_updates: PerAgent::default(),
             updating: false,
             last_update_run: None,
+            profiles: profiles::ProfileState::default(),
             state,
         }
     }
@@ -131,6 +139,7 @@ impl Service {
         snapshot.github = self.github.clone();
         snapshot.agent_updates = self.agent_update_statuses();
         snapshot.agent_updates_running = self.updating;
+        snapshot.profiles = self.profile_statuses();
         snapshot.notice = self.notice().map(Into::into);
         snapshot
     }
@@ -207,6 +216,7 @@ impl Service {
         };
         self.persist(&next)?;
         let images_changed = next.settings.docker.images != self.state.settings.docker.images;
+        let profiles_changed = next.settings.profiles != self.state.settings.profiles;
         self.state = next;
         self.touch();
         // The Docker statuses depend on the images; a detection with the old ones is stale.
@@ -214,6 +224,7 @@ impl Service {
         Ok(Saved {
             snapshot: self.snapshot(),
             start_detection,
+            profiles_changed,
         })
     }
 
@@ -254,11 +265,13 @@ impl Service {
             .map(crate::repo::validate)
             .transpose()?;
         let mut list = self.state.recents.clone();
+        let profile = recents::stored_profile(recent.env, recent.profile.as_deref());
         let recent = RecentSession {
             folder,
             repo,
             options,
             ports,
+            profile,
             ..recent
         };
         recents::restore(&mut list, recent)?;
@@ -349,6 +362,12 @@ pub fn build_snapshot(
         github: GithubState::default(),
         agent_updates: Vec::new(),
         agent_updates_running: false,
+        profiles: crate::profiles::status::list(
+            None,
+            settings,
+            &Default::default(),
+            &Default::default(),
+        ),
         detecting,
         revision: 0,
         notice: None,

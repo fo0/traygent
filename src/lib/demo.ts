@@ -13,6 +13,8 @@ import {
   demoLocalAccounts,
   demoRepos,
 } from './demoGithub';
+import { demoProfiles, signedIn, syncedProfiles } from './demoProfiles';
+import { launchProfileProblem } from './profiles';
 import {
   editRecent,
   recordStart,
@@ -110,7 +112,8 @@ export function createDemoBridge(latency = 150, detection = 600): DemoBridge {
       const saved = structuredClone(settings);
       saved.docker.ports = normalizePorts(saved.docker.ports);
       saved.environments = normalizeEnvs(saved.environments);
-      change({ settings: saved });
+      const profiles = demoProfiles(saved, data.catalog, data.profiles);
+      change({ settings: saved, profiles });
       return copy();
     },
     async launchSession(request) {
@@ -132,7 +135,8 @@ export function createDemoBridge(latency = 150, detection = 600): DemoBridge {
         (repo ? repoProblem(repo) : '') ||
         (repo && !given ? '' : folderProblem(request.folder)) ||
         optionsProblem(request) ||
-        launchPortsProblem(request);
+        launchPortsProblem(request) ||
+        launchProfileProblem(data, request);
       if (problem) throw new Error(problem);
       // Every demo folder exists: a repository start reuses the folder it
       // brings (a recent's restart), else starts in its clone folder, as
@@ -238,6 +242,21 @@ export function createDemoBridge(latency = 150, detection = 600): DemoBridge {
       };
       scheduleSteps(steps, apply, detection / 2);
       return copy();
+    },
+    async syncProfiles() {
+      await delay();
+      change({ profiles: syncedProfiles(data.profiles, Date.now()) });
+      return copy();
+    },
+    async profileLogin(agent, profile) {
+      await delay();
+      if (!data.profiles.some((p) => p.agent === agent && p.id === profile))
+        throw new Error('Dieses Profil gibt es nicht.');
+      // No terminal opens; the sign-in „finishes“ like a detection.
+      setTimeout(() => {
+        change({ profiles: signedIn(data.profiles, agent, profile) });
+        emit();
+      }, detection);
     },
     async observe(callback) {
       listeners.add(callback);

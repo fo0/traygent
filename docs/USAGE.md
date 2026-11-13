@@ -9,6 +9,7 @@ Everything the panel does, control by control. The UI labels are German; each on
 - [Panel and tray](#panel-and-tray)
 - [Supported agents in detail](#supported-agents-in-detail)
 - [Start from a GitHub repository](#start-from-a-github-repository)
+- [Several accounts — „Profile“](#several-accounts--profile)
 - [Docker sessions](#docker-sessions)
 - [Where Traygent keeps its state](#where-traygent-keeps-its-state)
 
@@ -24,13 +25,14 @@ One composer, no prose:
   - **Denken** — the effort level; only where the agent has one.
   - **Freigabe** — the permission mode: a symbol that cycles **Nachfragen** (ask) → **Auto** → bypass, its label in the tooltip, the bypass in a warning colour. The bypass label follows each CLI — **Bypass** for Claude Code, **YOLO** for Codex and OpenCode.
   - **Session** — **Neu** (new) / **Fortsetzen** (continue) / **Auswahl** (pick from the agent's session list), where the agent supports them.
+  - **Profil** — Lokal only, once the agent has a second profile ([below](#several-accounts--profile)): a round mark — a person for **Standard**, else the profile's initial — that picks which sign-in the next start uses; in a warning colour while that profile is not signed in.
   - **Ports** — Docker only: checkboxes for common dev-server ports (3000 Next.js · Node, 5173 Vite, 4200 Angular, 8000 Django · FastAPI, 8080 Spring, 5000 Flask · ASP.NET, 4321 Astro, 6006 Storybook) plus custom Docker specs such as `8080:80` or `3000-3002/udp`. Ports bind to `127.0.0.1` unless an IP is typed explicitly.
 - **Starten** (start) or **Enter** opens the session. When the agent's CLI is missing locally, the button reads **Installieren …** and opens **Einstellungen → Agenten** for it — never a dead start.
 
 ## Recent sessions — „Zuletzt“
 
 - One single-line row per folder, agent and environment, newest first, at most 20.
-- Each row shows the agent icon, folder name and parent path, then fixed columns at the right edge, so every icon sits in the same column from row to row (an absent part leaves its column empty): published ports, a repository icon when it was started from GitHub, the environment icon, the options as symbols and a relative time.
+- Each row shows the agent icon (with the profile's initial on its corner when it started with a profile other than **Standard**), folder name and parent path, then fixed columns at the right edge, so every icon sits in the same column from row to row (an absent part leaves its column empty): published ports, a repository icon when it was started from GitHub, the environment icon, the options as symbols and a relative time.
 - Options as symbols: the chosen model as a one-letter badge (Opus **O**, Sonnet **S**, Haiku **H**; Codex models by their own word: Sol **S**, Astra **A**, Terra **T**, Luna **L**), the thinking level as signal bars, the permission as a symbol.
 - A click anywhere on the row (or **▶**) starts that session again with exactly those settings — once per press, so a double-click never starts it twice.
 - The **⋯** menu offers **In Composer übernehmen** (copy into the composer), **Bearbeiten …** (edit the model, thinking level, permission, extra arguments and Docker ports the row starts with, without starting it), **Ordner öffnen** (open the folder in Explorer), **Pfad kopieren** (copy the folder path) and **Entfernen** (remove) with **Rückgängig** (undo) for 8 seconds.
@@ -44,7 +46,7 @@ One composer, no prose:
 
 Nothing applies until **Speichern** (save); **Abbrechen** (cancel) drops it.
 
-- **Agenten** (agents) — per agent the local status (version or why not) and the Docker readiness, the recommended install command with a copy button and **Installieren** (install; opens a terminal running it; refresh detection afterwards), the update command, and the defaults: model, effort, permission and extra CLI arguments (validated).
+- **Agenten** (agents) — per agent the local status (version or why not) and the Docker readiness, the recommended install command with a copy button and **Installieren** (install; opens a terminal running it; refresh detection afterwards), the update command, and the defaults: model, effort, permission and extra CLI arguments (validated). Claude Code also has **Profile** ([below](#several-accounts--profile)).
 - **Umgebung** (environment) — the environments the composer shows (**Umgebungen** = environments; recents of a hidden one still restart unchanged), default environment and agent, terminal (Windows Terminal or Konsole = classic console) with **Ein Fenster für alle Sessions** (one window for all sessions; Windows Terminal only, off by default: every session opens as a new tab of one shared window), the Docker image per agent and **GitHub-Token weitergeben** (forward the GitHub token; off by default).
 - **GitHub** — the connected account (**login · Token** or **login · gh CLI**) with **Aktualisieren** (refresh) for its repository list and **Trennen** (disconnect, inline confirmation); without one, **Lokale Anmeldung prüfen** (check local sign-in) + **Übernehmen** (adopt) imports a GitHub CLI sign-in, or a personal access token connects with **Verbinden** (connect). Account actions apply at once; the **Klon-Ordner** (clone folder) is staged like every setting.
 - **App** — theme (System / Hell = light / Dunkel = dark) and **Mit Windows starten** (start with Windows, [details](WINDOWS_AUTOSTART.md)).
@@ -76,6 +78,17 @@ The folder field also takes a repository ([ADR-0005](adr/0005-start-from-a-githu
 - **One account** — a personal access token or an imported `gh` sign-in (read only after **Übernehmen**), verified against GitHub's `/user`. The token lives in the Windows Credential Manager, never in `state.json`; it is used only to read the repository list and never reaches the clone, a command line or an environment variable. **Trennen** removes Traygent's copy; `gh` stays signed in.
 - **Limits** — repositories outside the account's list are found only when typed as `owner/name` or pasted as a URL; a repository created since the last list read appears after **Aktualisieren**; a token rotated in `gh` must be imported again.
 - **The list** — read at startup, after connecting, on **Aktualisieren** and when the field gets focus with a list older than 15 minutes; at most 1000 repositories, kept in memory only.
+
+## Several accounts — „Profile“
+
+Claude Code can keep several sign-ins side by side, say a private and a team subscription ([ADR-0009](adr/0009-agent-profiles-with-linked-config-directories.md)). Each profile has its own login; skills, agents, commands, plugins, settings, MCP servers and history stay the same in all of them.
+
+1. **Add** — **Einstellungen → Agenten → Claude Code → Profile**: type a name into **Neues Profil**, press **Enter** or **+**, then **Speichern**. The name gives the folder `%USERPROFILE%\.claude-<name>` (the field's tooltip shows it); a profile named **Team** adopts an existing `.claude-team` together with its login. A folder of that name that is not a Claude Code folder (no `.claude.json`, no login) is left alone: the row says „Profilordner gehört nicht zu Claude Code“ and the profile neither starts nor signs in — pick another name.
+2. **Sign in** — **Anmelden** on the profile's row opens a terminal running `claude auth login` for that profile. After signing in, refresh (**F5**): the row shows the account instead of **Nicht angemeldet**.
+3. **Pick** — **Standard-Profil** sets the one new sessions start with; the composer's **Profil** chip changes it for the next start, and a „Zuletzt“ row restarts with the profile it last used.
+4. **What stays in sync** — the folders `skills`, `agents`, `commands`, `rules`, `output-styles`, `workflows`, `agent-memory`, `themes`, `plugins`, `projects`, `file-history`, `plans`, `tasks` and `paste-cache` are links into **Standard**'s, so every profile sees the same files at every moment. `settings.json`, `CLAUDE.md`, `keybindings.json`, `history.jsonl` and the MCP servers and projects of `.claude.json` are copied before every local start, after a profile change, at app start and on **Jetzt synchronisieren** — so a change made in a running session reaches the other profiles with the next start through Traygent. The login (`.credentials.json`) and the account data are never copied.
+
+On a profile's first sync **Standard** wins, but nothing is lost: a folder of the profile first hands over what **Standard** lacks, MCP servers and projects only one side has are added to the other, and every file a sync overwrites — later too, on either side — is first copied to `.traygent-backup\<time>` in the folder it belongs to (**Standard**'s in `%USERPROFILE%\.claude`). Backups are never cleaned up. An MCP server or project removed in one profile is removed in the others with the next sync (the removed copy stays in the backup). A copied file or a history line deleted in one profile is not deleted in the others; the next sync brings it back. A file a running session just wrote is left for the next sync. A sync that fails shows a warning icon on the row (its tooltip says why) and „Profile konnten nicht vollständig synchronisiert werden.“ after **Starten**; the session starts anyway. Docker sessions ignore the profile and keep their one volume. Removing a profile leaves its folder and login on disk.
 
 ## Docker sessions
 

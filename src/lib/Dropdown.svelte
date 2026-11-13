@@ -19,6 +19,7 @@
     variant = 'chip',
     onEnter,
     lead,
+    glyph,
   }: {
     /** Element id; the list's id derives from it. */
     id: string;
@@ -35,6 +36,11 @@
     onEnter?: (() => void) | undefined;
     /** The chip's leading mark. */
     lead?: Snippet;
+    /**
+     * A chip that shows only its mark (the lead): this is its accessible
+     * name, naming the value; no text, no caret.
+     */
+    glyph?: string | undefined;
   } = $props();
 
   const listId = $derived(`${id}-list`);
@@ -117,10 +123,10 @@
     {id}
     type="button"
     class={variant === 'chip'
-      ? 'chip chip-button dropdown-chip'
+      ? ['chip chip-button dropdown-chip', glyph && 'chip-icon']
       : 'text-field dropdown-field'}
     role="combobox"
-    aria-label={variant === 'chip' ? label : undefined}
+    aria-label={variant === 'chip' ? (glyph ?? label) : undefined}
     aria-haspopup="listbox"
     aria-expanded={open}
     aria-controls={open ? listId : undefined}
@@ -137,11 +143,8 @@
       if (open) pressClosedPopup();
       open = false;
     }}
-    >{@render lead?.()}<span class="dropdown-text">{text}</span><Icon
-      name="down"
-      size={10}
-      class="dropdown-caret"
-    /></button
+    >{@render lead?.()}{#if !glyph}<span class="dropdown-text">{text}</span
+      ><Icon name="down" size={10} class="dropdown-caret" />{/if}</button
   >
   {#if open}
     <ChoiceList

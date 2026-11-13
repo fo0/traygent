@@ -1,4 +1,5 @@
 import { toggleEnv } from './environments';
+import { DEFAULT_PROFILE, newProfileProblem, profileId } from './profiles';
 import type { AgentId, AppSettings, EnvId } from './types';
 import { settingsProblems, type SettingsField } from './validation';
 
@@ -60,6 +61,33 @@ export class SettingsDraft {
         docker.images[agent] = this.saved.docker.images[agent];
       }
     }
+  }
+
+  /**
+   * Stages one more profile of `agent` from a typed name, its id derived
+   * (`profiles.ts → profileId`). Returns why it was refused, `''` when added.
+   */
+  addProfile(agent: AgentId, name: string) {
+    const list = (this.value.profiles[agent] ??= []);
+    const problem = newProfileProblem(name, list);
+    if (!problem) list.push({ id: profileId(name.trim()), label: name.trim() });
+    return problem;
+  }
+
+  /** Stages a removal; a removed default profile falls back to „Standard“. */
+  removeProfile(agent: AgentId, id: string) {
+    const list = this.value.profiles[agent] ?? [];
+    this.value.profiles[agent] = list.filter((profile) => profile.id !== id);
+    if (this.value.agentProfile[agent] === id)
+      this.value.agentProfile[agent] = DEFAULT_PROFILE;
+  }
+
+  /** Whether a profile of `agent` is saved, not only staged (it can sign in). */
+  savedProfile(agent: AgentId, id: string) {
+    return (
+      id === DEFAULT_PROFILE ||
+      !!this.saved.profiles?.[agent]?.some((profile) => profile.id === id)
+    );
   }
 
   /** A plain copy for `save_settings`. */

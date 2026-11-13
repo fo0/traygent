@@ -14,6 +14,8 @@ pub(crate) struct FakeFs {
     pub dirs: HashSet<String>,
     pub created: Mutex<Vec<String>>,
     pub read_only: bool,
+    /// Profile directories that hold someone else's data.
+    pub foreign: HashSet<String>,
 }
 
 impl FakeFs {
@@ -47,6 +49,9 @@ impl Fs for FakeFs {
         }
         self.created.lock().unwrap().push(path.into());
         Ok(())
+    }
+    fn refuses_sign_in(&self, _: crate::models::AgentId, dir: &str, _: &str) -> bool {
+        self.foreign.contains(dir)
     }
 }
 
@@ -95,4 +100,26 @@ impl Drop for TempDir {
     fn drop(&mut self) {
         let _ = std::fs::remove_dir_all(&self.0);
     }
+}
+
+/// Directory links for the engine tests on every platform: symbolic links, so no test
+/// spawns PowerShell. The real junction linker has one dedicated Windows test.
+pub(crate) struct TestLinker;
+
+impl crate::profiles::Linker for TestLinker {
+    fn link(&self, links: &[crate::profiles::links::Link]) {
+        for pair in links {
+            #[cfg(unix)]
+            let _ = std::os::unix::fs::symlink(&pair.target, &pair.link);
+            #[cfg(windows)]
+            let _ = std::os::windows::fs::symlink_dir(&pair.target, &pair.link);
+        }
+    }
+}
+
+/// A linker that creates nothing: PowerShell blocked, a timeout.
+pub(crate) struct NoLinker;
+
+impl crate::profiles::Linker for NoLinker {
+    fn link(&self, _: &[crate::profiles::links::Link]) {}
 }

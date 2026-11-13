@@ -4,6 +4,7 @@ Temporary working context. **Clean up aggressively — delete when resolved.**
 
 ## Current Work
 
+- **Agent profiles** — #33 / PR #34: Claude Code profiles with junction-linked config dirs and file sync ([ADR-0009](docs/adr/0009-agent-profiles-with-linked-config-directories.md), `docs/SPEC.md → Profiles`). Linux gates only; nothing ran on Windows — BACKLOG #52, `docs/VALIDATION.md` items 12–16. (2026-11-13)
 - **Agent CLI auto-update** — #16: `settings.agentUpdates` (default off), Settings → Updates → „Agenten“, `update_agents`, schedule thread, in-use check through PowerShell CIM ([ADR-0008](docs/adr/0008-background-updates-of-the-agent-clis.md)). Linux gates green; nothing ran on Windows — BACKLOG #46. Follow-up: open sessions in „Zuletzt“ (#17, BACKLOG #47). (2026-11-10)
 - **Composer UX polish** — #5: collapsing agent row, GitHub menu in the folder field, `Dropdown` / `ModelCombo` / `ChoiceList` replace every native select and datalist (composer chips, Settings → Agenten, „Bearbeiten …“). Linux gates green; WebView2 look unchecked on Windows. (2026-11-07)
 - **RepoWatch parity** — merged with PR #18 (Closes #17) on 2026-11-04 without GitHub CI on its last commits (GitHub incident; owner-ordered merge, local gates green). Open: the native Windows checks BACKLOG #41–#44. (2026-11-04)

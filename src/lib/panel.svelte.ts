@@ -1,9 +1,14 @@
 import type { NoticeTone } from './StatusBanners.svelte';
-import { agentLabel } from './agents';
 import type { Bridge, ObserveSnapshots } from './bridgeTypes';
 import { errorMessage } from './format';
 import { GithubActions } from './githubActions.svelte';
-import { Notices, PANEL_NOTICE } from './notices.svelte';
+import {
+  LAUNCH_NOTICE,
+  Notices,
+  PANEL_NOTICE,
+  startedNotice,
+} from './notices.svelte';
+import { ProfileActions } from './profileActions.svelte';
 import type {
   AgentId,
   AppSettings,
@@ -19,8 +24,7 @@ export interface PanelDeps {
   observe: ObserveSnapshots;
 }
 
-/** Key of the start notice: one per panel, a newer start replaces it. */
-export const LAUNCH_NOTICE = 'launch';
+export { LAUNCH_NOTICE } from './notices.svelte';
 /** An undo offer stays this long (`agent_docs/ux_rules.md` rule 7). */
 export const UNDO_TIMEOUT = 8000;
 /** After an install the CLI is detected on demand: the install runs on. */
@@ -45,6 +49,8 @@ export class Panel {
   readonly notices = new Notices();
   /** Settings → GitHub and the listing refresh. */
   readonly github: GithubActions;
+  /** Settings → Agenten → „Profile“: sync and sign-in. */
+  readonly profiles: ProfileActions;
   #bridge: Bridge;
   #observe: ObserveSnapshots;
   /** Bumped by every load, refresh and cleanup; their stale answers are dropped. */
@@ -64,6 +70,10 @@ export class Panel {
       notices: this.notices,
       accept: (value) => this.accept(value),
       current: () => this.snapshot,
+    });
+    this.profiles = new ProfileActions({
+      bridge,
+      accept: (value) => this.accept(value),
     });
   }
 
@@ -166,7 +176,7 @@ export class Panel {
     }
   }
 
-  /** Starts a session; true when the terminal opened. */
+  /** Starts a session; true when the terminal opened, also with a warning. */
   async launch(request: LaunchRequest): Promise<boolean> {
     if (this.launching) return false;
     this.launching = true;
@@ -174,14 +184,7 @@ export class Panel {
     try {
       const outcome = await this.#bridge.launchSession(request);
       this.accept(outcome.snapshot);
-      const label = agentLabel(outcome.snapshot, request.agent);
-      this.notices.show({
-        key: LAUNCH_NOTICE,
-        text: outcome.snapshot.demo
-          ? `${label} gestartet (Demo).`
-          : `${label} gestartet.`,
-        tone: 'subtle',
-      });
+      this.notices.show(startedNotice(outcome, request.agent));
       return true;
     } catch (cause) {
       this.notices.show({

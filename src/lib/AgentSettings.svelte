@@ -3,6 +3,7 @@
   import AgentDefaults from './AgentDefaults.svelte';
   import CopyField from './CopyField.svelte';
   import Icon from './Icon.svelte';
+  import ProfileSettings from './ProfileSettings.svelte';
   import Segmented, { type Segment } from './Segmented.svelte';
   import {
     AGENT_ICONS,
@@ -14,6 +15,7 @@
   } from './agents';
   import { errorMessage } from './format';
   import { installNote } from './panel.svelte';
+  import type { ProfileActions } from './profileActions.svelte';
   import type { SettingsDraft } from './settingsDraft.svelte';
   import type { AgentId, ProbeState, Snapshot } from './types';
 
@@ -24,12 +26,15 @@
     draft,
     agent = $bindable(),
     demo,
+    profiles,
     onInstall,
   }: {
     snapshot: Snapshot;
     draft: SettingsDraft;
     agent: AgentId;
     demo: boolean;
+    /** „Profile“: sign-in and sync, both immediate. */
+    profiles: ProfileActions;
     /**
      * Opens the install terminal; rejects on failure. Resolves true when the
      * dialog closes with it (the composer's install flow), so no note is due.
@@ -165,4 +170,11 @@
       </div>{/if}
   </section>
   <AgentDefaults {entry} {draft} />
+  {#if entry.profiles}<ProfileSettings
+      {entry}
+      {snapshot}
+      {draft}
+      {demo}
+      actions={profiles}
+    />{/if}
 {/if}

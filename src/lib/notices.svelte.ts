@@ -1,7 +1,11 @@
 import type { NoticeTone } from './StatusBanners.svelte';
+import { agentLabel } from './agents';
+import type { AgentId, LaunchOutcome } from './types';
 
 /** Key of the one general panel notice (refresh, settings). */
 export const PANEL_NOTICE = 'panel';
+/** Key of the start notice: one per panel, a newer start replaces it. */
+export const LAUNCH_NOTICE = 'launch';
 /** Subtle success notices close on their own after this many milliseconds. */
 export const SUCCESS_TIMEOUT = 3000;
 const LIMIT = 4;
@@ -66,4 +70,24 @@ export class Notices {
   get(key: string) {
     return this.items.find((item) => item.key === key);
   }
+}
+
+/**
+ * What a start that opened its terminal says. A warning (e.g. a profile sync
+ * that failed) joins it and stays: the session did start.
+ */
+export function startedNotice(
+  outcome: LaunchOutcome,
+  agent: AgentId,
+): Omit<Notice, 'id'> {
+  const label = agentLabel(outcome.snapshot, agent);
+  const text = outcome.snapshot.demo
+    ? `${label} gestartet (Demo).`
+    : `${label} gestartet.`;
+  const { warning } = outcome;
+  return {
+    key: LAUNCH_NOTICE,
+    text: warning ? `${text} ${warning}` : text,
+    tone: warning ? 'warning' : 'subtle',
+  };
 }

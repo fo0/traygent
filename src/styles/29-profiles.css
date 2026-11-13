@@ -1,0 +1,150 @@
+/*
+ * Agent profiles (#33): the composer's mark-only „Profil“ chip, the round
+ * profile mark on a „Zuletzt“ row's agent tile and Settings → Agenten →
+ * „Profile“. Tokens from
+ * 00-tokens.css only.
+ */
+
+/* The profile as its initial on a round tile, like an account avatar (the
+   model's letter sits on a square one). */
+.profile-mark {
+  display: inline-grid;
+  flex-shrink: 0;
+  place-items: center;
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  background: color-mix(in srgb, currentColor 18%, transparent);
+  color: var(--text-2);
+  font-size: 10px;
+  font-weight: 700;
+  line-height: 1;
+}
+.chip .profile-mark {
+  width: 16px;
+  height: 16px;
+  color: inherit;
+}
+
+/* „Zuletzt“: the profile on the agent tile's corner, so it takes no width
+   from the folder name; the ring separates it from the tile. */
+.agent-tile {
+  position: relative;
+  display: grid;
+  flex-shrink: 0;
+}
+.agent-tile .profile-mark {
+  position: absolute;
+  right: -5px;
+  bottom: -5px;
+  width: 13px;
+  height: 13px;
+  background: var(--accent);
+  box-shadow: 0 0 0 1.5px var(--surface);
+  color: var(--on-accent);
+  font-size: 9px;
+}
+.recent-row:hover .agent-tile .profile-mark {
+  box-shadow: 0 0 0 1.5px var(--hover);
+}
+
+/* The chip is the last before „Starten“: its list opens to the left. */
+.profile-chip {
+  display: inline-flex;
+}
+.profile-chip .choice-list {
+  right: 0;
+  left: auto;
+}
+/* A profile that is not signed in: the warning colour, like bypass. */
+.profile-chip[data-warn='true'] .chip,
+.profile-chip[data-warn='true'] .chip:hover {
+  border-color: var(--wait-line);
+  background:
+    linear-gradient(var(--wait-soft), var(--wait-soft)), var(--raised);
+  color: var(--wait);
+}
+
+/* Settings → Agenten → „Profile“. */
+.profiles-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  margin-bottom: 10px;
+}
+.profiles-head h3 {
+  margin: 0;
+}
+.profiles-head .text-button {
+  margin: 0;
+}
+.profiles .field-grid {
+  margin-bottom: 8px;
+}
+.profile-list {
+  display: grid;
+  gap: 2px;
+  margin: 0 0 8px;
+  padding: 0;
+  list-style: none;
+  font-size: var(--font-size-meta);
+}
+.profile-list li {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-height: var(--row-height);
+  padding: 2px 4px 2px 10px;
+  border-radius: 6px;
+  background: var(--raised);
+  white-space: nowrap;
+}
+.profile-name {
+  flex: 0 0 28%;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  font-weight: 500;
+}
+.profile-account {
+  flex: 1 1 auto;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  color: var(--text-2);
+}
+.profile-account[data-out='true'] {
+  color: var(--text-3);
+}
+.profile-warn {
+  display: inline-flex;
+  flex: none;
+  color: var(--wait);
+}
+.profile-list .text-button {
+  flex: none;
+  margin: 0;
+}
+.profiles .text-button[aria-disabled='true'] {
+  color: var(--text-3);
+  cursor: default;
+}
+.profiles .text-button[aria-disabled='true']:hover {
+  background: transparent;
+}
+.profile-list .profile-remove,
+.profile-slot {
+  flex: none;
+  min-width: 24px;
+  min-height: 24px;
+}
+.profiles .field-error {
+  margin: 4px 0 0;
+}
+
+@media (forced-colors: active) {
+  .agent-tile .profile-mark {
+    border: 1px solid CanvasText;
+  }
+}

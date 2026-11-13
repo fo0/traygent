@@ -138,6 +138,7 @@
     closeAfterInstall={modals.installFlow}
     returnFocus={modals.returnFocus}
     github={panel.github}
+    profiles={panel.profiles}
     onSaveSettings={(settings) => panel.saveSettings(settings)}
     onInstallAgent={(agent) => panel.installAgent(agent)}
     onUpdateAgents={() => panel.updateAgents()}

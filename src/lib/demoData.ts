@@ -13,6 +13,7 @@ import type {
   Snapshot,
 } from './types';
 import { demoGithub } from './demoGithub';
+import { demoProfileSettings, demoProfileStatuses } from './demoProfiles';
 import { DEMO_HOME, demoRecents } from './demoRecents';
 
 /** `default` (with the catalog's hint) plus the five levels. */
@@ -80,6 +81,7 @@ export const DEMO_CATALOG: AgentCatalogEntry[] = [
       update: 'claude update',
       requires: 'Git for Windows empfohlen',
     },
+    profiles: true,
   },
   {
     id: 'opencode',
@@ -98,6 +100,7 @@ export const DEMO_CATALOG: AgentCatalogEntry[] = [
       update: 'opencode upgrade',
       requires: 'Node.js und npm',
     },
+    profiles: false,
   },
   {
     id: 'codex',
@@ -122,6 +125,7 @@ export const DEMO_CATALOG: AgentCatalogEntry[] = [
       update: 'codex update',
       requires: 'Windows 10 1809 oder neuer',
     },
+    profiles: false,
   },
 ];
 
@@ -173,6 +177,8 @@ export function demoSettings(): AppSettings {
     },
     github: { cloneRoot: '' },
     agentUpdates: false,
+    profiles: demoProfileSettings(),
+    agentProfile: { claude: 'default', opencode: 'default', codex: 'default' },
   };
 }
 
@@ -212,9 +218,10 @@ const DEMO_AGENTS: AgentStatus[] = [
  * the machine. It starts as if the startup detection had just finished.
  */
 export function demoSnapshot(now: number = Date.now()): Snapshot {
+  const settings = demoSettings();
   return {
     demo: true,
-    settings: demoSettings(),
+    settings,
     catalog: structuredClone(DEMO_CATALOG),
     portPresets: structuredClone(DEMO_PORT_PRESETS),
     agents: structuredClone(DEMO_AGENTS),
@@ -228,6 +235,7 @@ export function demoSnapshot(now: number = Date.now()): Snapshot {
     detecting: false,
     agentUpdates: [],
     agentUpdatesRunning: false,
+    profiles: demoProfileStatuses(settings, DEMO_CATALOG, now),
     revision: 1,
     checkedAt: new Date(now).toISOString(),
   };

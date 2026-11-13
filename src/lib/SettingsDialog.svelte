@@ -12,6 +12,7 @@
   import { Autostart } from './autostart.svelte';
   import { errorMessage } from './format';
   import type { GithubActions } from './githubActions.svelte';
+  import type { ProfileActions } from './profileActions.svelte';
   import { SettingsDraft } from './settingsDraft.svelte';
   import { SETTINGS_TABS, type SettingsTab } from './settingsTabs';
   import { appliedTheme, applyTheme, rememberTheme } from './theme';
@@ -29,6 +30,7 @@
     closeAfterInstall = false,
     returnFocus,
     github,
+    profiles,
     onSaveSettings,
     onInstallAgent,
     onUpdateAgents,
@@ -52,6 +54,8 @@
     closeAfterInstall?: boolean;
     /** Settings → GitHub: account actions that apply at once. */
     github: GithubActions;
+    /** Settings → Agenten → „Profile“: sign-in and sync apply at once. */
+    profiles: ProfileActions;
     /** Saves the whole settings object; rejects with the German message. */
     onSaveSettings: (settings: AppSettings) => Promise<Snapshot>;
     /** An immediate action, not staged: opens the install terminal. */
@@ -231,7 +235,14 @@
     tabindex="0"
   >
     {#if tab === 'agents'}
-      <AgentSettings {snapshot} {draft} bind:agent {demo} onInstall={install} />
+      <AgentSettings
+        {snapshot}
+        {draft}
+        bind:agent
+        {demo}
+        {profiles}
+        onInstall={install}
+      />
     {:else if tab === 'environment'}
       <EnvSettings {snapshot} {draft} />
     {:else if tab === 'github'}
