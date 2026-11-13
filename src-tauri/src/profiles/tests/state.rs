@@ -2,7 +2,7 @@
 use super::*;
 use crate::profiles::json::{Base, Shared};
 use crate::profiles::node::Node;
-use crate::profiles::state::{merge_keys, Known, Merged, Refused};
+use crate::profiles::state::{merge_keys, Known, Merged, NotJson};
 use serde_json::{json, Value};
 
 fn parsed(path: &Path) -> Value {
@@ -38,8 +38,9 @@ fn shared_keys_are_united_entry_by_entry() {
         r#"{"id":"default","projects":{"C:/a":{"n":1},"C:/both":{"n":1}},"mcpServers":{"docs":1}}"#;
     let theirs =
         r#"{"mcpServers":{"tickets":2},"id":"team","projects":{"C:/both":{"n":2},"C:/b":{"n":3}}}"#;
-    for newer in [true, false] {
-        let merged = merge(ours, theirs, Known::Nothing, newer);
+    // (A first sync passes `true`: the default home wins it whatever the file times.)
+    {
+        let merged = merge(ours, theirs, Known::Nothing, true);
         assert!(!merged.lost_default && merged.lost_profile, "the conflict");
         let (new_ours, new_theirs) = texts(merged);
         assert_eq!(
@@ -51,10 +52,15 @@ fn shared_keys_are_united_entry_by_entry() {
             r#"{"mcpServers":{"tickets":2,"docs":1},"id":"team","projects":{"C:/both":{"n":1},"C:/b":{"n":3},"C:/a":{"n":1}}}"#
         );
     }
-    // With a base (here one that knows nothing) the newer file wins.
-    let (new_ours, new_theirs) = texts(merge(ours, theirs, Known::Values(&[]), false));
-    assert!(new_ours.unwrap().contains(r#""C:/both":{"n":2}"#));
-    assert!(new_theirs.unwrap().contains(r#""C:/both":{"n":2}"#));
+    // Later the newer file wins — with a base (here one that knows nothing) and without
+    // one (a profile synced by a version from before the base).
+    for known in [Known::Values(&[]), Known::Nothing] {
+        let merged = merge(ours, theirs, known, false);
+        assert!(merged.lost_default && !merged.lost_profile);
+        let (new_ours, new_theirs) = texts(merged);
+        assert!(new_ours.unwrap().contains(r#""C:/both":{"n":2}"#));
+        assert!(new_theirs.unwrap().contains(r#""C:/both":{"n":2}"#));
+    }
     // The same values in another layout are no change, on either side.
     let same = merge(
         "{\"mcpServers\": {\"a\": 1,\n \"b\": [1, 2]}}",
@@ -85,14 +91,18 @@ fn shared_keys_are_united_entry_by_entry() {
         r#"{"projects":null}"#,
         r#"{"mcpServers":{},"projects":"x"}"#,
     ] {
-        let fine = r#"{"projects":{"p":{}}}"#;
-        let refused = Err(Refused::NoObject("projects".into()));
+        let fine = r#"{"projects":{"p":{}},"mcpServers":{"a":1}}"#;
         for (ours, theirs) in [(odd, fine), (fine, odd)] {
-            let (ours, theirs) = (Some(ours.as_bytes()), Some(theirs.as_bytes()));
-            assert_eq!(
-                merge_keys(ours, theirs, &keys(), Known::Nothing, true),
-                refused
-            );
+            let merged = merge(ours, theirs, Known::Nothing, true);
+            assert_eq!(merged.skipped, ["projects"]);
+            // The key stays as it is on both sides and out of the base; the rest merges.
+            assert_eq!(merged.shared, nodes(r#"{"mcpServers":{"a":1}}"#));
+            for (old, new) in [(ours, merged.default), (theirs, merged.profile)] {
+                let new: Value = serde_json::from_str(&text(new).unwrap_or(old.into())).unwrap();
+                let old: Value = serde_json::from_str(old).unwrap();
+                assert_eq!(new["projects"], old["projects"]);
+                assert_eq!(new["mcpServers"], json!({"a": 1}));
+            }
         }
     }
     // A profile without a state file gets one with the shared keys only.
@@ -126,7 +136,7 @@ fn shared_keys_are_united_entry_by_entry() {
         let fine: Option<&[u8]> = Some(b"{\"mcpServers\":{}}");
         for (ours, theirs) in [(broken, fine), (fine, broken)] {
             let merged = merge_keys(ours, theirs, &keys(), Known::Nothing, true);
-            assert_eq!(merged, Err(Refused::NotJson));
+            assert_eq!(merged, Err(NotJson));
         }
     }
 }

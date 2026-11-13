@@ -1,7 +1,12 @@
+import { readFileSync } from 'node:fs';
+import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
 import { demoSettings } from './demoData';
 import {
+  HANDLED_NAMES,
   MAX_SHARED,
+  NEVER_SHARED,
+  PROTECTED_PREFIXES,
   agentShare,
   parseShareNames,
   shareProblems,
@@ -49,7 +54,7 @@ describe('shared names: the rules', () => {
     expect(
       problems(
         ['.caveman-sessions', 'a', 'a'.repeat(64), 'skills2', 'CON2'],
-        ['orca-state.json', 'settings.local.json', 'nul_x', '.claude.jsonx'],
+        ['orca-state.json', 'settings.local.json', 'nul_x', 'claude.json'],
       ),
     ).toEqual({});
   });
@@ -113,8 +118,6 @@ describe('shared names: the rules', () => {
       'claude.md',
       'keybindings.json',
       'history.jsonl',
-      '.claude.json',
-      '.CREDENTIALS.json',
     ])
       expect(problems([], [name]).files, name).toBe(
         `Name „${name}“ für ${CC} wird bereits abgeglichen.`,
@@ -123,6 +126,47 @@ describe('shared names: the rules', () => {
     expect(problems([], ['projects']).files).toBe(
       `Name „projects“ für ${CC} wird bereits abgeglichen.`,
     );
+  });
+
+  it('refuse the state and sign-in files, their copies and the account caches', () => {
+    for (const name of [
+      '.claude.json',
+      '.claude.json.backup',
+      '.claude.jsonx',
+      '.CREDENTIALS.json',
+      '.credentials.json.bak',
+      'remote-settings.json',
+      'Policy-Limits.json',
+    ])
+      expect(problems([], [name]).files, name).toBe(
+        `Name „${name}“ für ${CC} ist ungültig.`,
+      );
+    for (const name of ['backups', 'statsig', 'Cache', 'telemetry', 'debug'])
+      expect(problems([name]).dirs, name).toBe(
+        `Name „${name}“ für ${CC} ist ungültig.`,
+      );
+    expect(
+      problems(['caches', 'my-debug'], ['remote-settings.json.x']),
+    ).toEqual({});
+  });
+
+  it('hold the same name lists as the native side', () => {
+    const native = JSON.parse(
+      readFileSync(
+        join(process.cwd(), 'fixtures/profile-share-names.json'),
+        'utf8',
+      ),
+    ).claude;
+    const lower = (list: string[]) =>
+      list.map((name) => name.toLowerCase()).sort();
+    expect([...HANDLED_NAMES].sort()).toEqual(lower(native.handled));
+    expect([...NEVER_SHARED].sort()).toEqual(lower(native.neverShared));
+    expect([...PROTECTED_PREFIXES].sort()).toEqual(
+      lower(native.protectedPrefixes),
+    );
+    expect(native.ownPrefix).toBe('.traygent');
+    expect(native.maxPerList).toBe(MAX_SHARED);
+    expect(native.maxNameChars).toBe(64);
   });
 
   it('refuse a name twice, ignoring case, within and across both lists', () => {

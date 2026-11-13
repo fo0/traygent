@@ -321,6 +321,8 @@ impl Pair {
             None if synced.skipped => {}
             None => {
                 self.note(Some(name), Ok(synced.change));
+                let errors = &mut self.report.errors;
+                errors.extend(synced.partial.filter(|partial| !errors.contains(partial)));
             }
         }
         synced.change

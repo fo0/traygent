@@ -35,31 +35,76 @@ fn is_device(name: &str) -> bool {
     numbered || DEVICES.contains(&stem.as_str())
 }
 
-/// The names the recipe shares, syncs or protects itself.
+/// The names the recipe shares or syncs itself.
 fn handled(recipe: &Recipe) -> impl Iterator<Item = &'static str> + '_ {
-    let files = [recipe.state_file, recipe.credentials];
     recipe
         .shared_dirs
         .iter()
         .chain(recipe.synced_files)
         .copied()
-        .chain(files)
         .chain(recipe.history)
         .chain(recipe.settings.as_ref().map(|rule| rule.file))
 }
 
+/// The state file's and the sign-in's name: no shared name may start with either
+/// (`.claude.json.backup`, `.credentials.json.bak` carry the same identity).
+fn protected(recipe: &Recipe) -> [&'static str; 2] {
+    [recipe.state_file, recipe.credentials]
+}
+
+/// What decides whether a name can be shared, as data: the panel checks its copy against
+/// `fixtures/profile-share-names.json`, which a test writes from this.
+#[derive(Clone, Debug, PartialEq, Eq, serde::Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct NameLists {
+    /// „wird bereits abgeglichen“: the recipe shares or syncs these.
+    pub handled: Vec<&'static str>,
+    /// „ist ungültig“: a name that starts with one of these.
+    pub protected_prefixes: Vec<&'static str>,
+    /// „ist ungültig“: these names.
+    pub never_shared: Vec<&'static str>,
+    /// „ist ungültig“: a name that starts with this (Traygent's own).
+    pub own_prefix: &'static str,
+    /// „ist ungültig“: a name whose part before the first dot is one of these, or one of
+    /// `numberedDevices` followed by one digit.
+    pub devices: Vec<&'static str>,
+    pub numbered_devices: Vec<&'static str>,
+    pub max_name_chars: usize,
+    pub max_per_list: usize,
+}
+
+/// Every comparison in it ignores ASCII case.
+pub fn name_lists(recipe: &Recipe) -> NameLists {
+    NameLists {
+        handled: handled(recipe).collect(),
+        protected_prefixes: protected(recipe).to_vec(),
+        never_shared: recipe.never_shared.to_vec(),
+        own_prefix: OWN_PREFIX,
+        devices: DEVICES.to_vec(),
+        numbered_devices: NUMBERED_DEVICES.to_vec(),
+        max_name_chars: MAX_NAME_CHARS,
+        max_per_list: MAX_SHARED,
+    }
+}
+
 /// `^[A-Za-z0-9._-]{1,64}$`, not `.` or `..`, no trailing dot, no device name, nothing of
-/// Traygent's own and nothing the recipe handles (names compared without case, as the file
-/// system does).
+/// Traygent's own, nothing that starts with the state file's or the sign-in's name and none
+/// of the recipe's never-shared names — all [`NameError::Invalid`]; and nothing the recipe
+/// handles already ([`NameError::Handled`]). Names are compared without case, as the file
+/// system does.
 pub fn check_name(recipe: &Recipe, name: &str) -> Result<(), NameError> {
     let plain = |c: char| c.is_ascii_alphanumeric() || matches!(c, '.' | '_' | '-');
     let lower = name.to_ascii_lowercase();
+    let starts = |prefix: &str| lower.starts_with(&prefix.to_ascii_lowercase());
+    let same = |known: &&str| known.eq_ignore_ascii_case(name);
     if name.is_empty()
         || name.len() > MAX_NAME_CHARS
         || !name.chars().all(plain)
         || name.ends_with('.')
         || is_device(name)
-        || lower.starts_with(OWN_PREFIX)
+        || starts(OWN_PREFIX)
+        || protected(recipe).into_iter().any(starts)
+        || recipe.never_shared.iter().any(same)
     {
         return Err(NameError::Invalid);
     }

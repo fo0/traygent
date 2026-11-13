@@ -93,9 +93,9 @@ fn every_refused_name_has_its_error() {
         "keybindings.json",
         "settings.json",
         "history.jsonl",
-        ".claude.json",
-        ".credentials.json",
-        ".Credentials.JSON",
+        "todos",
+        "session-env",
+        "History.JSONL",
     ] {
         assert_eq!(error(&[name], &[]), handled(name), "dir {name}");
         assert_eq!(error(&[], &[name]), handled(name), "file {name}");

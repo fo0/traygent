@@ -16,14 +16,9 @@ use std::path::Path;
 pub const MAX_STATE_BYTES: u64 = 64 * 1024 * 1024;
 const UNREADABLE: &str = "ist kein lesbares JSON und bleibt unverändert";
 
-/// Why two state files are not merged.
-#[derive(Clone, Debug, PartialEq, Eq)]
-pub enum Refused {
-    /// One of the files is no JSON object.
-    NotJson,
-    /// A key merged entry by entry holds something that is no object (`"projects": null`).
-    NoObject(String),
-}
+/// One of the two files is no JSON object.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub struct NotJson;
 
 /// What is known about the pair's last sync.
 #[derive(Clone, Copy, Debug)]
@@ -46,6 +41,9 @@ struct Side<'a> {
     full: Entries,
     /// The subset without the fields that belong to this side.
     shared: Entries,
+    /// Keys merged entry by entry that hold something else here (`"projects": null`); they
+    /// are in neither subset.
+    odd: Vec<&'a str>,
 }
 
 /// `value` without the side-owned fields of its entries.
@@ -67,11 +65,9 @@ fn stripped(key: &str, value: &Node, shared: &Shared) -> Node {
 }
 
 impl<'a> Side<'a> {
-    fn read(bytes: Option<&'a [u8]>, shared: &Shared) -> Result<Self, Refused> {
+    fn read(bytes: Option<&'a [u8]>, shared: &Shared<'a>) -> Result<Self, NotJson> {
         let doc = match bytes {
-            Some(bytes) => {
-                serde_json::from_slice(without_bom(bytes)).map_err(|_| Refused::NotJson)?
-            }
+            Some(bytes) => serde_json::from_slice(without_bom(bytes)).map_err(|_| NotJson)?,
             None => RawEntries::default(),
         };
         let mut side = Self {
@@ -79,14 +75,16 @@ impl<'a> Side<'a> {
             doc,
             full: Entries::new(),
             shared: Entries::new(),
+            odd: Vec::new(),
         };
         for (key, entries) in keys(shared) {
             let Some(raw) = side.doc.get(key) else {
                 continue;
             };
-            let value = Node::from_raw(raw).ok_or(Refused::NotJson)?;
+            let value = Node::from_raw(raw).ok_or(NotJson)?;
             if entries && value.as_object().is_none() {
-                return Err(Refused::NoObject(key.to_string()));
+                side.odd.push(key);
+                continue;
             }
             side.shared
                 .push((key.to_string(), stripped(key, &value, shared)));
@@ -251,12 +249,16 @@ pub struct Merged {
     pub lost_profile: bool,
     /// The shared subset both sides now hold: the next sync's base.
     pub shared: Entries,
+    /// Keys merged entry by entry that hold no object on a side: left as they are on both
+    /// sides and out of the base.
+    pub skipped: Vec<String>,
 }
 
 /// Both files with the shared subset merged three ways against what is `known` of the last
 /// sync: who differs from the base has changed something, down to the fields of an entry;
 /// what one side removed is removed on the other; where both changed the same value the
-/// default home wins if `default_newer` — and always when the pair has no base of its own.
+/// default home wins if `default_newer` — and always against another profile's base. A
+/// shared key that holds no object on a side is left out ([`Merged::skipped`]).
 /// The fields that belong to each side ([`Shared::own_fields`]) neither travel nor count
 /// as a difference. While one file is missing nothing is removed.
 pub fn merge_keys(
@@ -265,8 +267,19 @@ pub fn merge_keys(
     shared: &Shared,
     known: Known,
     default_newer: bool,
-) -> Result<Merged, Refused> {
-    let (ours, theirs) = (Side::read(default, shared)?, Side::read(profile, shared)?);
+) -> Result<Merged, NotJson> {
+    let (mut ours, mut theirs) = (Side::read(default, shared)?, Side::read(profile, shared)?);
+    // A key that is no object on one side is merged on neither.
+    let skipped: Vec<&str> = ours.odd.iter().chain(&theirs.odd).copied().collect();
+    let mut kept = shared.entries.to_vec();
+    kept.retain(|key| !skipped.contains(key));
+    let shared = &Shared {
+        entries: &kept,
+        ..*shared
+    };
+    if !skipped.is_empty() {
+        (ours, theirs) = (Side::read(default, shared)?, Side::read(profile, shared)?);
+    }
     let sides = [&ours.shared, &theirs.shared];
     let (merged, mut lost) = match (default, profile) {
         (Some(_), Some(_)) => {
@@ -274,10 +287,11 @@ pub fn merge_keys(
                 Known::Nothing => (None, None),
                 Known::Values(base) => (Some(without_resets(base, sides, shared)), None),
                 Known::Names(names) => (Some(from_names(names, sides, shared)), None),
-                Known::Seed(seed) => (None, Some(seed)),
+                // A seed the default home holds nothing of tells nothing.
+                Known::Seed(seed) => (None, Some(without_resets(seed, [sides[0]; 2], shared))),
             };
             let pair = [ours.shared.as_slice(), theirs.shared.as_slice()];
-            let merged = merge_pair(&[], base.as_deref(), seed, pair, default_newer);
+            let merged = merge_pair(&[], base.as_deref(), seed.as_deref(), pair, default_newer);
             let lost = [
                 merged.conflict && !merged.a_wins,
                 merged.conflict && merged.a_wins,
@@ -298,6 +312,7 @@ pub fn merge_keys(
         lost_default: lost[0],
         lost_profile: lost[1],
         shared: merged,
+        skipped: skipped.iter().map(|key| key.to_string()).collect(),
     })
 }
 
@@ -315,7 +330,8 @@ pub struct Fallback<'a> {
 /// seed of another profile ([`Fallback`]). Until the rule's first sync succeeded (`first`) the pair's
 /// own base and names are ignored and each file that is rewritten goes to its side's
 /// backup first; later a file goes there when the merge takes something from it. An
-/// unparsable file on either side stops the rule; it is never overwritten.
+/// unparsable file on either side stops the rule; it is never overwritten. A shared key
+/// that holds no object is skipped and reported, the rest is merged ([`Synced::partial`]).
 pub fn sync_state(
     name: &str,
     [default, profile]: [&Path; 2],
@@ -348,22 +364,22 @@ pub fn sync_state(
         (None, None, Some(seed)) => Known::Seed(seed),
         (None, None, None) => Known::Nothing,
     };
+    // The default home wins a first sync; later the newer file does.
     let newer = match (&ours, &theirs) {
-        (Some(ours), Some(theirs)) => ours.modified >= theirs.modified,
+        (Some(ours), Some(theirs)) => first || ours.modified >= theirs.modified,
         _ => true,
     };
     let merged = match merge_keys(bytes(&ours), bytes(&theirs), shared, known, newer) {
         Ok(merged) => merged,
-        Err(Refused::NotJson) => {
+        Err(NotJson) => {
             synced.error = Some(fail(UNREADABLE));
             return synced;
         }
-        Err(Refused::NoObject(key)) => {
-            let what = format!("„{key}“ ist kein Objekt und bleibt unverändert");
-            synced.error = Some(fail(&what));
-            return synced;
-        }
     };
+    let odd = merged.skipped.first().map(|key| {
+        let what = format!("„{key}“ ist kein Objekt und bleibt unverändert");
+        fail(&what)
+    });
     let outs = [
         Out {
             path: default,
@@ -387,5 +403,6 @@ pub fn sync_state(
         &mut synced.change,
     );
     synced.error = done.err().map(fail);
+    synced.partial = odd.filter(|_| synced.error.is_none());
     synced
 }

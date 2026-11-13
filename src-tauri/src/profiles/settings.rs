@@ -89,11 +89,11 @@ fn reset(base: &[(String, Node)], side: &[(String, Node)]) -> bool {
 }
 
 /// The settings file of a pair. The shared part of both sides is merged against the base
-/// of `profile_dir`; each side then is that merge plus its own keys. With a base the newer
-/// file wins a conflict. Until the rule's first sync succeeded (`first`), whenever there is
-/// no base and when a side was reset ([`reset`]), the default home wins and nothing is
-/// removed — except, for a pair without a base, what `seed` (the base of another profile of
-/// the agent) says the default home has removed already. A side is written only when its
+/// of `profile_dir`; each side then is that merge plus its own keys. The newer file wins a
+/// conflict — the default home until the rule's first sync succeeded (`first`). Until then,
+/// whenever there is no base and when a side was reset ([`reset`]), nothing is removed —
+/// except, for a pair without a base, what `seed` (the base of another profile of the
+/// agent) says the default home has removed already; the default home wins such a merge. A side is written only when its
 /// content (not its formatting) changes, and goes to its backup first on the first sync,
 /// when it loses a key or a list item, and when a conflict went against it. The base is
 /// written last, after both sides.
@@ -144,11 +144,15 @@ fn run(
             let was_reset = base
                 .as_ref()
                 .is_some_and(|base| reset(base, &a.shared) || reset(base, &b.shared));
+            // A seed whose keys the default home holds none of tells nothing either.
+            let seed = seed.filter(|seed| !reset(seed, &a.shared));
             let (base, seed) = match was_reset {
                 true => (None, None),
                 false => (base.as_deref(), seed),
             };
-            let newer = modified(&ours.seen) >= modified(&theirs.seen);
+            // The default home wins a first sync; later the newer file does, with or
+            // without a base (a profile synced by a version from before the base).
+            let newer = first || modified(&ours.seen) >= modified(&theirs.seen);
             let merged = merge_pair(rule.set_paths, base, seed, [&a.shared, &b.shared], newer);
             (default_wins, conflict) = (merged.a_wins, merged.conflict);
             merged.shared

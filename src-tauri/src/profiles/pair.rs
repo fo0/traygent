@@ -4,8 +4,8 @@
 //! sign-in is ever written there — and it exists in profile directories alone, outside
 //! every shared directory: no rule links, syncs or backs it up.
 use super::files::{
-    load, unchanged, writable, write_atomic, Backups, Change, Loaded, CHANGED_MEANWHILE,
-    MAX_FILE_BYTES,
+    load, unchanged, writable, write_atomic, write_stamped, Backups, Change, Loaded,
+    CHANGED_MEANWHILE, MAX_FILE_BYTES,
 };
 use super::node::{same_object, to_file, Entries, Node};
 use std::path::Path;
@@ -23,6 +23,9 @@ pub struct Synced {
     /// neither succeeded nor failed.
     pub skipped: bool,
     pub error: Option<String>,
+    /// The rule went through, but had to leave a part alone: reported like an error, yet
+    /// the rule has had its sync.
+    pub partial: Option<String>,
 }
 
 #[cfg(test)]
@@ -127,11 +130,7 @@ pub(super) fn commit(
         if !unchanged(out.path, out.seen.as_ref()) {
             return Err(CHANGED_MEANWHILE);
         }
-        write_atomic(out.path, bytes)?;
-        if let (Some(time), Ok(file)) = (time, std::fs::File::options().write(true).open(out.path))
-        {
-            let _ = file.set_modified(time);
-        }
+        write_stamped(out.path, bytes, time)?;
         *written = true;
     }
     write_base(profile_dir, name, shared).map_err(|()| BASE_FAILED)

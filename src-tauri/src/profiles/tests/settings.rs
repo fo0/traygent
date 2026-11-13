@@ -46,8 +46,31 @@ fn force_login_org_uuid_and_env_api_key_never_cross_profiles_or_reach_the_base()
         "theme": "dark",
         "forceLoginOrgUUID": "org-team-synthetic",
         "apiKeyHelper": "helper-team-synthetic",
-        "env": {"ANTHROPIC_API_KEY": "key-team-synthetic", "aws_profile": "aws-team-synthetic"}
+        "otelHeadersHelper": "otel-helper-team-synthetic",
+        "env": {
+            "ANTHROPIC_API_KEY": "key-team-synthetic",
+            "aws_profile": "aws-team-synthetic",
+            "OTEL_EXPORTER_OTLP_HEADERS": "otel-team-synthetic",
+            "VERTEX_REGION_CLAUDE_4_0_SONNET": "vertex-team-synthetic",
+            "CLAUDE_CODE_CLIENT_KEY": "mtls-team-synthetic",
+            "CLOUD_ML_REGION": "region-team-synthetic",
+            "CLAUDE_CODE_SKIP_BEDROCK_AUTH": "skip-team-synthetic",
+            "HTTPS_PROXY": "http://proxy.example.test:8080"
+        }
     });
+    // One of every kind of account- or organisation-bound setting.
+    const TEAM_ONLY: [&str; 9] = [
+        "helper-team-synthetic",
+        "otel-helper-team-synthetic",
+        "key-team-synthetic",
+        "aws-team-synthetic",
+        "otel-team-synthetic",
+        "vertex-team-synthetic",
+        "mtls-team-synthetic",
+        "region-team-synthetic",
+        "skip-team-synthetic",
+    ];
+    let team_only = || TEAM_ONLY.map(|secret| ("team", secret));
     put(&world, "default", default, 10);
     put(&world, "team", team, 20);
     put(&world, "solo", json!({"model": "opus"}), 30);
@@ -70,6 +93,11 @@ fn force_login_org_uuid_and_env_api_key_never_cross_profiles_or_reach_the_base()
                 "anthropic_",
                 "apikeyhelper",
                 "aws_",
+                "otel",
+                "vertex_region",
+                "claude_code_client",
+                "cloud_ml_region",
+                "claude_code_skip",
                 "synthetic",
             ] {
                 assert!(!text.contains(word), "{word} in the base of {id}");
@@ -84,23 +112,22 @@ fn force_login_org_uuid_and_env_api_key_never_cross_profiles_or_reach_the_base()
         ("default", "org-default-synthetic"),
         ("default", "key-default-synthetic"),
         ("team", "org-team-synthetic"),
-        ("team", "helper-team-synthetic"),
-        ("team", "key-team-synthetic"),
-        ("team", "aws-team-synthetic"),
     ]);
+    check(&team_only());
     // The shared part did travel; a profile without the keys stays without them.
     assert_eq!(
         parsed(&settings(&world, "solo")),
-        json!({"model": "opus", "env": {"EDITOR": "vim"}, "theme": "dark"})
-    );
-    assert_eq!(
-        parsed(&settings(&world, "team"))["env"],
         json!({
-            "ANTHROPIC_API_KEY": "key-team-synthetic",
-            "aws_profile": "aws-team-synthetic",
-            "EDITOR": "vim"
+            "model": "opus",
+            // The proxy describes the machine, not the account: it is shared.
+            "env": {"EDITOR": "vim", "HTTPS_PROXY": "http://proxy.example.test:8080"},
+            "theme": "dark"
         })
     );
+    let team_env = parsed(&settings(&world, "team"))["env"].clone();
+    assert_eq!(team_env.as_object().unwrap().len(), 9);
+    assert_eq!(team_env["EDITOR"], "vim");
+    assert_eq!(team_env["CLOUD_ML_REGION"], "region-team-synthetic");
     assert_eq!(parsed(&settings(&world, "default"))["model"], "opus");
 
     // Later syncs: a changed, a removed and a new own key each stay where they are.
@@ -131,6 +158,7 @@ fn force_login_org_uuid_and_env_api_key_never_cross_profiles_or_reach_the_base()
             ("team", "key-team-synthetic"),
             ("solo", "key-solo-synthetic"),
         ]);
+        check(&team_only()[1..]);
         let (ours, team, solo) = (
             parsed(&settings(&world, "default")),
             parsed(&settings(&world, "team")),
@@ -182,25 +210,35 @@ fn a_profile_synced_by_the_previous_version_starts_without_a_base() {
         r#"{"version":1,"syncedAt":"2026-11-13T08:00:00Z","done":["settings.json","CLAUDE.md","keybindings.json",".claude.json"]}"#,
     );
     world.synced(&["team"], 1);
-    // No base: nothing is removed, and the default home wins although the profile's file
-    // is newer.
-    let merged = json!({"theme": "dark", "a": 1, "b": 2});
+    // No base: nothing is removed. The rule has had its first sync, so the newer file
+    // wins as it did in the version that wrote the marker — here the profile's.
+    let merged = json!({"theme": "light", "a": 1, "b": 2});
     assert_eq!(parsed(&settings(&world, "default")), merged);
     assert_eq!(parsed(&settings(&world, "team")), merged);
     assert_eq!(parsed(&base(&world, "team")), merged);
-    // The conflict went against the profile: its file is kept. The default home only
+    // The conflict went against the default home: its file is kept. The profile only
     // gained a key.
     assert_eq!(
-        parsed(&world.backup("team").join(FILE)),
-        json!({"theme": "light", "b": 2})
+        parsed(&world.backup("default").join(FILE)),
+        json!({"theme": "dark", "a": 1})
     );
-    assert!(!world.dir("default").join(".traygent-backup").exists());
+    assert!(!world.dir("team").join(".traygent-backup").exists());
+    // The other way round the default home's newer file wins.
+    let older = World::new("settings-upgrade-default");
+    put(&older, "default", json!({"theme": "dark"}), 900);
+    put(&older, "team", json!({"theme": "light"}), 10);
+    write(
+        &older.dir("team").join(MARKER),
+        r#"{"version":1,"done":["settings.json"]}"#,
+    );
+    older.synced(&["team"], 1);
+    assert_eq!(parsed(&settings(&older, "team"))["theme"], "dark");
     // With the base recorded a removal travels.
-    put(&world, "team", json!({"theme": "dark", "b": 2}), 950);
+    put(&world, "team", json!({"theme": "light", "b": 2}), 950);
     world.synced(&["team"], 2);
     assert_eq!(
         parsed(&settings(&world, "default")),
-        json!({"theme": "dark", "b": 2})
+        json!({"theme": "light", "b": 2})
     );
 }
 

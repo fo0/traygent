@@ -278,3 +278,72 @@ fn the_ordered_json_value_reads_and_prints_what_json_allows() {
         "{\n  \"a\": -0,\n  \"b\": 1E5,\n  \"c\": 18446744073709551616,\n  \"d\": 0.10\n}\n"
     );
 }
+
+/// Another profile's base only tells what the default home removed of the things that
+/// base knew: what a new profile holds beyond it is its own and stays.
+#[test]
+fn a_seed_removes_only_what_it_knows_and_nothing_after_a_reset() {
+    let world = World::new("settings-seed-partial");
+    put(
+        &world,
+        "default",
+        json!({"theme": "dark", "permissions": {"allow": ["a"]}, "nested": {"x": 1, "y": 2}}),
+        10,
+    );
+    world.synced(&["team"], 1);
+    // The default home drops the whole `permissions` block, `nested.x` and changes nothing
+    // else; the new profile holds more than the old block ever had.
+    put(
+        &world,
+        "default",
+        json!({"theme": "dark", "nested": {"y": 2}}),
+        100,
+    );
+    let theirs = json!({
+        "theme": "dark",
+        "permissions": {"allow": ["a", "b", "c"], "deny": ["d"], "defaultMode": "plan"},
+        "nested": {"x": 5, "y": 2, "z": 3}
+    });
+    put(&world, "solo", theirs.clone(), 900);
+    own(&world, "solo");
+    world.synced(&["team", "solo"], 2);
+    let merged = json!({
+        "theme": "dark",
+        // `a` was the seed's and went with the block; `b`, `c`, `deny` and the mode are new.
+        "permissions": {"allow": ["b", "c"], "deny": ["d"], "defaultMode": "plan"},
+        // `x` differs from the seed's value: the profile changed it, it stays.
+        "nested": {"y": 2, "x": 5, "z": 3}
+    });
+    for id in ["default", "team", "solo"] {
+        assert_eq!(parsed(&settings(&world, id)), merged, "{id}");
+    }
+    assert_eq!(parsed(&world.backup("solo").join(FILE)), theirs);
+    // A block the profile holds exactly as the seed knew it goes entirely.
+    let exact = World::new("settings-seed-exact");
+    let old = json!({"theme": "dark", "permissions": {"allow": ["a"]}, "old": 1});
+    put(&exact, "default", old.clone(), 10);
+    exact.synced(&["team"], 1);
+    put(&exact, "default", json!({"theme": "dark"}), 100);
+    put(&exact, "solo", old.clone(), 900);
+    own(&exact, "solo");
+    exact.synced(&["team", "solo"], 2);
+    for id in ["default", "team", "solo"] {
+        assert_eq!(
+            parsed(&settings(&exact, id)),
+            json!({"theme": "dark"}),
+            "{id}"
+        );
+    }
+    // The default home emptied (none of the seed's keys left): the seed tells nothing,
+    // the new profile keeps everything and the default home gets it back.
+    let reset = World::new("settings-seed-reset");
+    put(&reset, "default", old.clone(), 10);
+    reset.synced(&["team"], 1);
+    put(&reset, "default", json!({}), 100);
+    put(&reset, "solo", old.clone(), 900);
+    own(&reset, "solo");
+    reset.synced(&["solo", "team"], 2);
+    for id in ["default", "team", "solo"] {
+        assert_eq!(parsed(&settings(&reset, id)), old, "{id}");
+    }
+}

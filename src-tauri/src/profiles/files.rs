@@ -110,6 +110,16 @@ fn is_link(path: &Path) -> bool {
 /// reader never sees half a file. A link at `path` is refused: the rename would replace the
 /// link, not the file behind it.
 pub(crate) fn write_atomic(path: &Path, bytes: &[u8]) -> Result<(), &'static str> {
+    write_stamped(path, bytes, None)
+}
+
+/// [`write_atomic`] with the file time `modified`. The temp file is stamped before the
+/// rename, so whatever a session writes right after it keeps its own, newer time.
+pub(crate) fn write_stamped(
+    path: &Path,
+    bytes: &[u8],
+    modified: Option<SystemTime>,
+) -> Result<(), &'static str> {
     use std::io::Write;
     if is_link(path) {
         return Err(IS_A_LINK);
@@ -125,6 +135,9 @@ pub(crate) fn write_atomic(path: &Path, bytes: &[u8]) -> Result<(), &'static str
     let written = std::fs::File::create(&temp)
         .and_then(|mut file| {
             file.write_all(bytes)?;
+            if let Some(modified) = modified {
+                let _ = file.set_modified(modified);
+            }
             file.sync_all()
         })
         .and_then(|()| std::fs::rename(&temp, path));
@@ -139,11 +152,7 @@ pub(crate) fn write_atomic(path: &Path, bytes: &[u8]) -> Result<(), &'static str
 /// how old the content is, not when it arrived, so the copy never looks newer than a third
 /// profile's own edit.
 fn copy_to(path: &Path, source: &Loaded) -> Result<(), &'static str> {
-    write_atomic(path, &source.bytes)?;
-    if let Ok(file) = std::fs::File::options().write(true).open(path) {
-        let _ = file.set_modified(source.modified);
-    }
-    Ok(())
+    write_stamped(path, &source.bytes, Some(source.modified))
 }
 
 /// The folder one sync run moves replaced data into:

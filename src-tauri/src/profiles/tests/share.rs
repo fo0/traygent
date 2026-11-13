@@ -105,7 +105,7 @@ fn the_sync_checks_every_extra_name_again_and_skips_what_fails() {
     );
     assert_eq!(
         check_name(recipe, ".Credentials.json"),
-        Err(NameError::Handled)
+        Err(NameError::Invalid)
     );
     assert_eq!(check_name(recipe, "settings.json"), Err(NameError::Handled));
     // What a plan built from unchecked settings would hold.
@@ -245,4 +245,55 @@ fn a_sign_in_is_refused_only_for_a_directory_that_is_someone_elses() {
         &path("default"),
         &ProfileShare::default()
     ));
+}
+
+const NAMES_FIXTURE: &str = concat!(
+    env!("CARGO_MANIFEST_DIR"),
+    "/../fixtures/profile-share-names.json"
+);
+
+/// The lists behind the name rule, per agent with a recipe, as the panel test reads them.
+/// `TRAYGENT_UPDATE_FIXTURES=1` rewrites the file; run prettier on it afterwards.
+#[test]
+fn the_name_lists_match_their_fixture() {
+    use crate::profiles::share::name_lists;
+    let lists: serde_json::Map<String, serde_json::Value> = AgentId::ALL
+        .into_iter()
+        .filter_map(|agent| Some((agent.id().to_string(), name_lists(recipe(agent)?))))
+        .map(|(agent, lists)| (agent, serde_json::to_value(lists).unwrap()))
+        .collect();
+    let lists = serde_json::Value::Object(lists);
+    if std::env::var_os("TRAYGENT_UPDATE_FIXTURES").is_some() {
+        let mut text = serde_json::to_string_pretty(&lists).unwrap();
+        text.push('\n');
+        std::fs::write(NAMES_FIXTURE, text).unwrap();
+    }
+    let text = std::fs::read_to_string(NAMES_FIXTURE).expect("fixtures/profile-share-names.json");
+    let fixture: serde_json::Value = serde_json::from_str(&text).unwrap();
+    assert_eq!(
+        fixture, lists,
+        "rerun with TRAYGENT_UPDATE_FIXTURES=1, then prettier"
+    );
+    // Every listed name is refused by the rule the lists describe.
+    let claude = recipe(CLAUDE).unwrap();
+    let lists = name_lists(claude);
+    for name in &lists.handled {
+        assert_eq!(check_name(claude, name), Err(NameError::Handled), "{name}");
+    }
+    let prefixed = lists
+        .protected_prefixes
+        .iter()
+        .map(|name| format!("{name}.bak"));
+    let invalid = lists.never_shared.iter().map(|name| name.to_uppercase());
+    let own = [
+        format!("{}-x", lists.own_prefix),
+        "Nul.txt".into(),
+        "lpt1".into(),
+    ];
+    for name in prefixed.chain(invalid).chain(own) {
+        assert_eq!(check_name(claude, &name), Err(NameError::Invalid), "{name}");
+    }
+    for name in &lists.protected_prefixes {
+        assert_eq!(check_name(claude, name), Err(NameError::Invalid), "{name}");
+    }
 }

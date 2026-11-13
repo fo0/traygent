@@ -1,0 +1,49 @@
+{
+  "claude": {
+    "devices": ["con", "prn", "aux", "nul"],
+    "handled": [
+      "skills",
+      "agents",
+      "commands",
+      "rules",
+      "output-styles",
+      "workflows",
+      "agent-memory",
+      "themes",
+      "plugins",
+      "projects",
+      "file-history",
+      "plans",
+      "tasks",
+      "paste-cache",
+      "hooks",
+      "todos",
+      "session-env",
+      "CLAUDE.md",
+      "keybindings.json",
+      "history.jsonl",
+      "settings.json"
+    ],
+    "maxNameChars": 64,
+    "maxPerList": 16,
+    "neverShared": [
+      "policy-limits.json",
+      "policy-limits.json.stamp.json",
+      "remote-settings.json",
+      "cache",
+      "statsig",
+      "telemetry",
+      "backups",
+      "debug",
+      "shell-snapshots",
+      "ide",
+      "local",
+      "sessions",
+      "jobs",
+      "daemon"
+    ],
+    "numberedDevices": ["com", "lpt"],
+    "ownPrefix": ".traygent",
+    "protectedPrefixes": [".claude.json", ".credentials.json"]
+  }
+}

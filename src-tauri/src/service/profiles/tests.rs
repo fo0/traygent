@@ -133,7 +133,7 @@ fn saving_validates_profiles_and_a_removed_default_falls_back() {
     refused.profile_share.claude.files = vec![".credentials.json".into()];
     assert_eq!(
         service.save_settings(refused).unwrap_err(),
-        "Name „.credentials.json“ für Claude Code wird bereits abgeglichen."
+        "Name „.credentials.json“ für Claude Code ist ungültig."
     );
     let invalid = service.save_settings(with_profiles(&[("Team", "Team")]));
     assert!(invalid

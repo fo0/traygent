@@ -5,6 +5,8 @@ use super::*;
 use crate::profiles::pair::AFTER_READ;
 use serde_json::{json, Value};
 
+mod seed;
+
 const DEMO: &str = "C:/Code/demo";
 
 fn parsed(path: &Path) -> Value {
@@ -246,20 +248,45 @@ fn a_rebuilt_entry_is_valid_in_any_layout_and_does_not_go_back_and_forth() {
 
 #[test]
 fn odd_values_are_left_alone_or_merged_as_plain_values() {
-    // A shared key that is no object: neither file is touched, the profile reports it.
+    // A shared key that is no object is left as it is on both sides and reported; the
+    // other shared keys are merged and the rule has had its sync.
     let world = World::new("subset-null");
-    let ours = r#"{"projects":null,"mcpServers":{"docs":{}}}"#;
+    let ours = r#"{"projects":null,"mcpServers":{"docs":{}},"showSpinnerTree":true}"#;
     let theirs = r#"{"projects":{"C:/Code/demo":{}},"mcpServers":{}}"#;
     write(&world.state("default"), ours);
     write(&world.state("team"), theirs);
-    let reports = world.sync(&["team"], 1);
-    assert_eq!(
-        reports[0].errors,
-        [".claude.json: „projects“ ist kein Objekt und bleibt unverändert"]
+    for minute in [1, 2] {
+        let reports = world.sync(&["team"], minute);
+        assert_eq!(
+            reports[0].errors,
+            [".claude.json: „projects“ ist kein Objekt und bleibt unverändert"]
+        );
+        assert_eq!(read(&world.state("default")), ours);
+        assert_eq!(
+            parsed(&world.state("team")),
+            json!({"projects": {DEMO: {}}, "mcpServers": {"docs": {}}, "showSpinnerTree": true})
+        );
+        assert_eq!(
+            parsed(&base(&world, "team")),
+            json!({"mcpServers": {"docs": {}}, "showSpinnerTree": true})
+        );
+    }
+    let marker = read_marker(&world.dir("team")).unwrap();
+    assert!(marker.done.iter().any(|rule| rule == ".claude.json"));
+    assert_eq!(marker.synced_at, None, "not a sync without an error");
+    // Once the key is an object again it is merged — united, the base knows nothing of it.
+    write(
+        &world.state("default"),
+        r#"{"projects":{"C:/Code/a":{}},"mcpServers":{"docs":{}},"showSpinnerTree":true}"#,
     );
-    assert_eq!(read(&world.state("default")), ours);
-    assert_eq!(read(&world.state("team")), theirs);
-    assert!(!base(&world, "team").exists());
+    world.synced(&["team"], 3);
+    for id in ["default", "team"] {
+        let projects = parsed(&world.state(id))["projects"]
+            .as_object()
+            .unwrap()
+            .len();
+        assert_eq!(projects, 2, "{id}");
+    }
 
     // An entry that is no object on one side is one value: it follows the side that
     // changed it, and no runtime field of the other side's entry is copied anywhere.

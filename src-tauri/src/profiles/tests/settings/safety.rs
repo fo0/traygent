@@ -229,10 +229,27 @@ fn the_recipe_names_what_belongs_to_the_sign_in() {
         "AWS_REGION",
         "GOOGLE_APPLICATION_CREDENTIALS",
         "AZURE_TENANT_ID",
+        "OTEL_EXPORTER_OTLP_HEADERS",
+        "otel_exporter_otlp_endpoint",
+        "VERTEX_REGION_CLAUDE_4_0_SONNET",
+        "CLAUDE_CODE_CLIENT_CERT",
+        "CLAUDE_CODE_CLIENT_KEY_PASSPHRASE",
+        "CLOUD_ML_REGION",
+        "CLAUDE_CODE_SKIP_BEDROCK_AUTH",
+        "CLAUDE_CODE_SKIP_VERTEX_AUTH",
+        "claude_code_skip_foundry_auth",
     ] {
         assert!(rule.own_env(name), "{name}");
     }
+    // The proxy describes the machine's network, not the account: shared.
     for name in [
+        "HTTP_PROXY",
+        "HTTPS_PROXY",
+        "NO_PROXY",
+        "CLAUDE_CODE_SKIP_PROMPT_HISTORY",
+        "CLAUDE_CODE_SKIP",
+        "CLOUD_ML_REGION_2",
+        "VERTEX_REGION",
         "EDITOR",
         "CLAUDE_CONFIG_DIR_2",
         "CLAUDE_CODE_MAX_OUTPUT_TOKENS",
@@ -243,12 +260,13 @@ fn the_recipe_names_what_belongs_to_the_sign_in() {
     let doc = object(
         r#"{"apiKeyHelper":"h","forceLoginOrgUUID":"o","forceLoginMethod":"m","awsAuthRefresh":"r",
             "awsCredentialExport":"e","anthropicProfile":"p","anthropicProfiles":{},
+            "otelHeadersHelper":"t",
             "env":{"AWS_PROFILE":"x"},"theme":"dark"}"#,
     );
     let parts = split(&doc, rule);
     // `env` is shared only while it holds a shared variable.
     assert_eq!(parts.shared, object(r#"{"theme":"dark"}"#));
-    assert_eq!(parts.own.len(), 7);
+    assert_eq!(parts.own.len(), 8);
     assert_eq!(parts.own_env, object(r#"{"AWS_PROFILE":"x"}"#));
     // A non-object `env` is an ordinary shared value.
     assert_eq!(split(&object(r#"{"env":"x"}"#), rule).shared.len(), 1);

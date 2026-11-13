@@ -54,6 +54,10 @@ pub struct Recipe {
     pub shared_values: &'static [&'static str],
     /// Fields inside the entries of one shared key that stay per profile.
     pub own_fields: Option<OwnFields>,
+    /// Names in the config directory that hold an account's identity, policy or machine
+    /// state: the user can never add them to what the profiles share. Neither can any name
+    /// that starts with the state file's or the sign-in's ([`share::check_name`]).
+    pub never_shared: &'static [&'static str],
     /// The arguments that sign a profile in.
     pub login_args: &'static [&'static str],
 }
@@ -92,6 +96,8 @@ pub struct SettingsRule {
     /// upper case, matched without case.
     pub own_env_prefixes: &'static [&'static str],
     pub own_env_names: &'static [&'static str],
+    /// … and by a prefix together with a suffix (`CLAUDE_CODE_SKIP_<provider>_AUTH`).
+    pub own_env_affixes: &'static [(&'static str, &'static str)],
     /// Lists of strings below these paths (keys joined with `.`) are merged as sets.
     pub set_paths: &'static [&'static str],
 }
@@ -132,6 +138,7 @@ const CLAUDE: Recipe = Recipe {
             "awsCredentialExport",
             "anthropicProfile",
             "anthropicProfiles",
+            "otelHeadersHelper",
         ],
         env_key: "env",
         own_env_prefixes: &[
@@ -140,8 +147,18 @@ const CLAUDE: Recipe = Recipe {
             "AWS_",
             "GOOGLE_",
             "AZURE_",
+            // Organisation-bound telemetry endpoints and their auth headers.
+            "OTEL_",
+            "VERTEX_REGION_",
+            // The mTLS client certificate and key.
+            "CLAUDE_CODE_CLIENT_",
         ],
-        own_env_names: &["CLAUDE_CONFIG_DIR", "CLAUDE_CODE_OAUTH_TOKEN"],
+        own_env_names: &[
+            "CLAUDE_CONFIG_DIR",
+            "CLAUDE_CODE_OAUTH_TOKEN",
+            "CLOUD_ML_REGION",
+        ],
+        own_env_affixes: &[("CLAUDE_CODE_SKIP_", "_AUTH")],
         set_paths: &["permissions.", "autoMode."],
     }),
     history: Some("history.jsonl"),
@@ -152,6 +169,22 @@ const CLAUDE: Recipe = Recipe {
         prefixes: &["last"],
         names: &["hasUnseenTeamArtifacts"],
     }),
+    never_shared: &[
+        "policy-limits.json",
+        "policy-limits.json.stamp.json",
+        "remote-settings.json",
+        "cache",
+        "statsig",
+        "telemetry",
+        "backups",
+        "debug",
+        "shell-snapshots",
+        "ide",
+        "local",
+        "sessions",
+        "jobs",
+        "daemon",
+    ],
     login_args: &["auth", "login"],
 };
 

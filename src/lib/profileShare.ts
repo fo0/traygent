@@ -37,10 +37,29 @@ const HANDLED = new Set(
     'CLAUDE.md',
     'keybindings.json',
     'history.jsonl',
-    '.claude.json',
-    '.credentials.json',
   ].map((name) => name.toLowerCase()),
 );
+/** The state and sign-in files and anything named after them, e.g. a backup copy. */
+export const PROTECTED_PREFIXES = ['.claude.json', '.credentials.json'];
+/** Account caches and logs: they belong to one sign-in and are never shared. */
+export const NEVER_SHARED = new Set([
+  'policy-limits.json',
+  'policy-limits.json.stamp.json',
+  'remote-settings.json',
+  'cache',
+  'statsig',
+  'telemetry',
+  'backups',
+  'debug',
+  'shell-snapshots',
+  'ide',
+  'local',
+  'sessions',
+  'jobs',
+  'daemon',
+]);
+/** The names the sync handles itself, as the native side lists them. */
+export const HANDLED_NAMES: ReadonlySet<string> = HANDLED;
 const NOUNS: Record<ShareKind, string> = { dirs: 'Ordner', files: 'Dateien' };
 
 export const emptyShare = (): ProfileShare => ({ dirs: [], files: [] });
@@ -61,11 +80,14 @@ export const shareText = (names: readonly string[]) => names.join(', ');
 
 /** Whether `name` can be a file or folder name inside a profile folder. */
 function invalidName(name: string) {
+  const lower = name.toLowerCase();
   return (
     !NAME.test(name) ||
     name.endsWith('.') ||
     DEVICE.test(name) ||
-    name.toLowerCase().startsWith(OWN_PREFIX)
+    lower.startsWith(OWN_PREFIX) ||
+    PROTECTED_PREFIXES.some((prefix) => lower.startsWith(prefix)) ||
+    NEVER_SHARED.has(lower)
   );
 }
 

@@ -10,11 +10,16 @@ impl SettingsRule {
     /// Variable names are compared without case, as Windows does.
     pub fn own_env(&self, name: &str) -> bool {
         let upper = name.to_ascii_uppercase();
+        let affixed = |(prefix, suffix): &(&str, &str)| {
+            let between = upper.strip_prefix(prefix);
+            between.is_some_and(|rest| rest.ends_with(suffix))
+        };
         self.own_env_names.contains(&upper.as_str())
             || self
                 .own_env_prefixes
                 .iter()
                 .any(|prefix| upper.starts_with(prefix))
+            || self.own_env_affixes.iter().any(affixed)
     }
 }
 
@@ -140,9 +145,10 @@ impl<'a> Merge<'a> {
 
     /// For a pair that has no base of its own: the base is the one of another profile of
     /// the agent and `a`, the default home, wins. The base then only tells what the default
-    /// home has removed — a key or list item `b` still has that the base knows and `a`
-    /// lacks goes; everything else is united as without a base, so a value `b` holds from
-    /// an older state never replaces the default home's.
+    /// home has removed: of what `b` still has and `a` lacks, exactly the part the base
+    /// knows goes ([`Merge::unknown`]) — what the base never saw is `b`'s own and stays.
+    /// Everything else is united as without a base, so a value `b` holds from an older
+    /// state never replaces the default home's.
     pub fn seeded(set_paths: &'a [&'a str]) -> Self {
         Self {
             seeded: true,
@@ -198,27 +204,65 @@ impl<'a> Merge<'a> {
             let was = known(key);
             match in_b.get(key.as_str()) {
                 Some(other) => {
-                    let sub = if path.is_empty() {
-                        key.clone()
-                    } else {
-                        format!("{path}.{key}")
-                    };
+                    let sub = sub_path(path, key);
                     merged.push((key.clone(), self.value(was, value, other, &sub)));
                 }
                 None if !self.seeded && was == Some(value) => {}
                 None => merged.push((key.clone(), value.clone())),
             }
         }
-        for (key, value) in b {
-            let removed = match known(key) {
-                Some(_) if self.seeded => true,
-                was => was == Some(value),
+        for (key, value) in b.iter().filter(|(key, _)| !in_a.contains_key(key.as_str())) {
+            let kept = match known(key) {
+                Some(seed) if self.seeded => self.unknown(seed, value, &sub_path(path, key)),
+                was => (was != Some(value)).then(|| value.clone()),
             };
-            if !in_a.contains_key(key.as_str()) && !removed {
-                merged.push((key.clone(), value.clone()));
-            }
+            merged.extend(kept.map(|kept| (key.clone(), kept)));
         }
         merged
+    }
+
+    /// What is left of `value` — something only `b` has — without the part the seed knows
+    /// (the default home removed that): two objects are compared key by key, two sets item
+    /// by item, and a parent goes only when nothing of it is left. Any other value goes when
+    /// it is the seed's and stays when `b` changed it.
+    fn unknown(&self, seed: &Node, value: &Node, path: &str) -> Option<Node> {
+        if let (Node::Object(seed), Node::Object(entries)) = (seed, value) {
+            let seed = index(seed);
+            let left: Entries = entries
+                .iter()
+                .filter_map(|(key, child)| {
+                    let left = match seed.get(key.as_str()) {
+                        Some(known) => self.unknown(known, child, &sub_path(path, key))?,
+                        None => child.clone(),
+                    };
+                    Some((key.clone(), left))
+                })
+                .collect();
+            return (!left.is_empty()).then_some(Node::Object(left));
+        }
+        if let (Some(seed), Some(items), true) = (
+            seed.as_strings(),
+            value.as_strings(),
+            is_set(self.set_paths, path),
+        ) {
+            let seed: HashSet<&str> = seed.into_iter().collect();
+            let left: Vec<Node> = items
+                .into_iter()
+                .filter(|item| !seed.contains(item))
+                .map(|item| Node::Leaf(item.into()))
+                .collect();
+            return (!left.is_empty()).then_some(Node::Array(left));
+        }
+        (seed != value).then(|| value.clone())
+    }
+}
+
+/// `path` one key deeper.
+fn sub_path(path: &str, key: &str) -> String {
+    if path.is_empty() {
+        key.to_string()
+    } else {
+        format!("{path}.{key}")
     }
 }
 
@@ -232,8 +276,9 @@ pub struct Merged {
 
 /// The shared parts of the default home (`a`) and a profile (`b`) merged: against the
 /// pair's own `base` when it has one — the side with the newer file (`a_newer`) then wins a
-/// conflict; else against the `seed` of another profile ([`Merge::seeded`]); else without a
-/// base. Without a base of its own the default home wins.
+/// conflict; else against the `seed` of another profile ([`Merge::seeded`]), the default
+/// home winning; else without a base, nothing removed, `a_newer` deciding again. The caller
+/// passes `a_newer` as true for a rule's first sync: the default home wins it.
 pub fn merge_pair(
     set_paths: &[&str],
     base: Option<&[(String, Node)]>,
@@ -244,7 +289,7 @@ pub fn merge_pair(
     let (mut merge, base) = match (base, seed) {
         (Some(base), _) => (Merge::new(set_paths, a_newer), Some(base)),
         (None, Some(seed)) => (Merge::seeded(set_paths), Some(seed)),
-        (None, None) => (Merge::new(set_paths, true), None),
+        (None, None) => (Merge::new(set_paths, a_newer), None),
     };
     let shared = merge.objects(base, a, b);
     Merged {

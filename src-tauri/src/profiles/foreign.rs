@@ -2,8 +2,8 @@
 //! to something else and is never touched — by the sync or by a sign-in.
 use super::links;
 use super::marker::MARKER;
+use super::pair::BASE_DIR;
 use super::recipe;
-use super::settings::BASE_DIR;
 use super::share::Sharing;
 use crate::models::{AgentId, ProfileShare};
 use std::path::Path;
@@ -36,7 +36,7 @@ pub(super) fn is_foreign(
     for entry in std::fs::read_dir(dir)? {
         let entry = entry?;
         let name = entry.file_name();
-        // Traygent's own: the merge base of the settings rule.
+        // Traygent's own: the merge bases of the settings and the state file.
         if name.to_str() == Some(BASE_DIR) {
             continue;
         }
