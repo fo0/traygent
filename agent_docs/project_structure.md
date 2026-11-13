@@ -13,6 +13,7 @@ src-tauri/  Rust core crate (traygent_core: catalog, settings/ (profiles, share)
             + desktop bin (desktop*.rs incl. desktop_github.rs, desktop_agent_updates.rs, desktop_profiles.rs, tray_popup/),
             Tauri config, capabilities, icons
 fixtures/   snapshot.default.json — golden native snapshot (written by a Rust test, checked by Vitest);
+            profile-share-names.json — extra-name lists (written by a Rust test, checked by Vitest);
             targets.json, port-vectors.json — test vectors shared by the panel and Rust
 tests/      Playwright specs (browser demo + labelled IPC mock), support/
 scripts/    icon generator, README capture, release/updater helpers + node:test

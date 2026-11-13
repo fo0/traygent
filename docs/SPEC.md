@@ -157,7 +157,8 @@ Later (BACKLOG, not now): see [BACKLOG.md](../BACKLOG.md).
 
 `src/lib/types.ts` is the contract; Rust mirrors it field by field. A Rust test writes the
 default native snapshot to `fixtures/snapshot.default.json`, and a panel test checks that it
-satisfies `Snapshot`. Per-agent flags, install commands and Docker recipes:
+satisfies `Snapshot`; the same way `fixtures/profile-share-names.json` keeps the panel's
+extra-name rules equal to Rust's (_Profiles → Extra entries_). Per-agent flags, install commands and Docker recipes:
 `docs/AGENT_RECIPES.md`.
 
 Detection runs off the UI thread at startup and on `refresh_detection`; while it runs the
@@ -313,10 +314,16 @@ Commands (Rust `#[tauri::command]`, German `Err` strings; panel calls only via `
   per agent `dirs` (linked like the recipe's directories) and `files` (whole-file like
   `CLAUDE.md`), plain names inside the config directory. Name: `^[A-Za-z0-9._-]{1,64}$`, no
   trailing dot (so not `.` / `..`), no Windows device name with or without an extension (`con`,
-  `prn`, `aux`, `nul`, `com0`–`com9`, `lpt0`–`lpt9`), not starting with `.traygent`, none the
-  recipe handles (its shared directories, `settings.json`, `CLAUDE.md`, `keybindings.json`,
-  `history.jsonl`, `.claude.json`, `.credentials.json`) — all ignoring case; unique ignoring case
-  across both lists; at most 16 per list. Saving trims, drops empty names and exact repeats
+  `prn`, `aux`, `nul`, `com0`–`com9`, `lpt0`–`lpt9`), not starting with `.traygent`,
+  `.claude.json` or `.credentials.json` (copies such as `.claude.json.backup` carry the same
+  identity), none of the recipe's `never_shared` names (account policy, caches and machine state:
+  `policy-limits.json`, `policy-limits.json.stamp.json`, `remote-settings.json`, `cache`,
+  `statsig`, `telemetry`, `backups`, `debug`, `shell-snapshots`, `ide`, `local`, `sessions`,
+  `jobs`, `daemon`) — all „ist ungültig“ — and none the recipe handles itself (its shared
+  directories, `settings.json`, `CLAUDE.md`, `keybindings.json`, `history.jsonl`: „wird bereits
+  abgeglichen“); all ignoring ASCII case; unique ignoring case across both lists; at most 16 per
+  list. The lists behind the rule are written by a Rust test to `fixtures/profile-share-names.json`
+  (`share.rs → name_lists`), and the panel's copy (`profileShare.ts`) is tested against it. Saving trims, drops empty names and exact repeats
   within a list, then refuses: „<Agent> unterstützt keine Profile.“ (an entry for an agent
   without a recipe), „Höchstens 16 weitere Ordner für <Agent> möglich.“, „Höchstens 16 weitere
   Dateien für <Agent> möglich.“, „Name „<name>“ für <Agent> ist ungültig.“, „Name „<name>“ für
@@ -359,10 +366,14 @@ Commands (Rust `#[tauri::command]`, German `Err` strings; panel calls only via `
      fehlgeschlagen“.
   2. `settings.json`: a three-way merge (below) of its shared part. Shared is the top-level
      object without the own keys `apiKeyHelper`, `forceLoginOrgUUID`, `forceLoginMethod`,
-     `awsAuthRefresh`, `awsCredentialExport`, `anthropicProfile`, `anthropicProfiles` and without
-     the own variables of `env`: names starting with `ANTHROPIC_`, `CLAUDE_CODE_USE_`, `AWS_`,
-     `GOOGLE_` or `AZURE_`, and `CLAUDE_CONFIG_DIR`, `CLAUDE_CODE_OAUTH_TOKEN` (ASCII case
-     ignored; the recipe's `SettingsRule`). Own keys and variables never leave their file, never
+     `awsAuthRefresh`, `awsCredentialExport`, `anthropicProfile`, `anthropicProfiles`,
+     `otelHeadersHelper` and without the own variables of `env`: names starting with
+     `ANTHROPIC_`, `CLAUDE_CODE_USE_`, `AWS_`, `GOOGLE_`, `AZURE_`, `OTEL_` (organisation-bound
+     telemetry), `VERTEX_REGION_` or `CLAUDE_CODE_CLIENT_` (the mTLS client certificate and key);
+     `CLAUDE_CONFIG_DIR`, `CLAUDE_CODE_OAUTH_TOKEN`, `CLOUD_ML_REGION`; and
+     `CLAUDE_CODE_SKIP_<…>_AUTH` (ASCII case ignored; the recipe's `SettingsRule`). `HTTP_PROXY`,
+     `HTTPS_PROXY` and `NO_PROXY` stay shared on purpose: they describe the machine's network,
+     not an account. Own keys and variables never leave their file, never
      reach the base and never make two sides differ; `env` is shared only while it holds a shared
      variable. Lists of strings below `permissions.` and `autoMode.` merge as sets: an item one
      side added stays, one a side removed since the base goes; „Standard“'s order, then the
@@ -380,7 +391,8 @@ Commands (Rust `#[tauri::command]`, German `Err` strings; panel calls only via `
      content writes nothing; a file on one side is copied to the other; differing files — until
      the rule's first sync succeeded „Standard“ wins, later the newer modification time (a tie:
      „Standard“). The losing file is copied to its own side's backup before every overwrite,
-     whichever side it is. A copy keeps its source's file time; writes are temp file + rename; a
+     whichever side it is. A copy keeps its source's file time (set before the rename); writes
+     are temp file + rename; a
      link as source is followed, a link as target never replaced (checked before the backup);
      errors as `<name>: …` — „ist eine Verknüpfung und wird nicht überschrieben“, „ist zu groß“
      (over 8 MiB), „ist keine Datei“, „Zugriff fehlgeschlagen“.
@@ -398,10 +410,12 @@ Commands (Rust `#[tauri::command]`, German `Err` strings; panel calls only via `
      onboarding state, caches — keeps its bytes and place and is never read into the base; only a
      changed key is written anew, an unchanged entry keeps its bytes, the layout (indent, line
      ends, final line break, a byte order mark) is kept; a missing file is created with the shared
-     subset only. Errors: „.claude.json: ist kein lesbares JSON und bleibt unverändert“,
-     „.claude.json: „<key>“ ist kein Objekt und bleibt unverändert“ (`mcpServers` or `projects`
-     holding anything but an object, e.g. `null`), „.claude.json: ist zu groß“ (over 64 MiB) and
-     those of every merged write. Upgrade: a pair without a value base whose marker still has the
+     subset only. `mcpServers` or `projects` holding anything but an object on either side (e.g.
+     `null`) is skipped: left as it is on both sides and kept out of the base, while the other
+     keys merge and the rule counts as synced; the profile still reports „.claude.json: „<key>“
+     ist kein Objekt und bleibt unverändert“ (the first such key), so `syncedAt` does not move
+     while it stands. Errors: „.claude.json: ist kein lesbares JSON und bleibt unverändert“,
+     „.claude.json: ist zu groß“ (over 64 MiB) and those of every merged write. Upgrade: a pair without a value base whose marker still has the
      name-only `base` of an earlier version uses it once (not on the rule's first sync) — each
      recorded entry only one side still holds counts as removed on the other side; a key with 2
      or more recorded names of which one side holds none gets no base (reset).
@@ -414,15 +428,21 @@ Commands (Rust `#[tauri::command]`, German `Err` strings; panel calls only via `
   has stays, unless the base holds it with that very value (the other side removed it: it goes);
   a value only one side changed since the base is taken from that side; a value both changed
   differently is a conflict — decided whole for that value by the newer file (a tie:
-  „Standard“). Without a base of its own — the rule's first sync (until it succeeded the base is
-  ignored), a missing or unreadable base — „Standard“ wins every conflict and nothing is removed,
-  except that a pair takes the base another profile of the agent held at the start of the run as
-  a seed: what the seed knows and „Standard“ no longer has is dropped from the profile, so a new
-  profile does not bring back what „Standard“ removed. Reset guard: in `settings.json`, a base of
-  2 or more keys of which one side holds none merges without base and seed this run; in
-  `.claude.json`, the same per entry key (2 or more entries in the base, none on one side) unites
-  that key this run. While one file is missing nothing is removed; neither present → nothing to
-  do.
+  „Standard“). On the rule's first sync (until it succeeded once the pair's base is ignored)
+  „Standard“ wins every conflict. Without a base — first sync, a missing or unreadable base, a
+  reset — nothing is removed, and a rule already in `done` (a profile synced by a version from
+  before the base) lets the newer file win. A pair without a base of its own takes the base
+  another profile of the agent held at the start of the run as a seed; „Standard“ then wins every
+  conflict, and of what only the profile still has, exactly the part the seed knows is dropped
+  („Standard“ removed it): objects key by key, string sets item by item, a parent only when
+  nothing of it is left, any other value only when it equals the seed's. What the seed never saw
+  stays, so a new profile neither brings back what „Standard“ removed nor loses its own
+  additions. A seed of which „Standard“ holds none of 2 or more keys tells nothing and is not used
+  (`settings.json`: its top-level keys; `.claude.json`: per entry key, its entries). Reset guard:
+  in `settings.json`, a base of 2 or more keys of which one side holds none merges without base
+  and seed this run; in `.claude.json`, the same per entry key (2 or more entries in the base,
+  none on one side) unites that key this run. While one file is missing nothing is removed;
+  neither present → nothing to do.
 - **Merged writes** (`pair.rs → commit`): everything is checked before the first write — a link
   is never written through („<file>: ist eine Verknüpfung und wird nicht überschrieben“), a side
   whose size or file time changed since the read stops the rule („<file>: wurde gerade geändert,
@@ -430,7 +450,8 @@ Commands (Rust `#[tauri::command]`, German `Err` strings; panel calls only via `
   merges the new content). A side goes to its own home's backup first on the rule's first sync,
   when the merge takes something from it (a key, list item, entry or field, or an object or list
   replaced by something else) and when it lost a conflict. Writes are temp file + rename, „Standard“
-  first; a written file gets the newest file time of the two sides read, never the sync's moment.
+  first; a written file gets the newest file time of the two sides read, never the sync's moment,
+  set on the temp file before the rename (a session writing right after keeps its newer time).
   The base is written last, only when it changed: „<file>: Abgleichsstand konnte nicht
   gespeichert werden“ when that fails.
 - **Base** `<profile>\.traygent-base\settings.json` and `<profile>\.traygent-base\.claude.json`:
@@ -443,7 +464,7 @@ Commands (Rust `#[tauri::command]`, German `Err` strings; panel calls only via `
 - **Marker** `<profile>\.traygent-sync.json`, compact on one line:
   `{"version":1,"syncedAt":"<RFC 3339>","done":["settings.json","CLAUDE.md","keybindings.json",…,".claude.json"]}`.
   `done` lists the rules (`settings.json`, each whole-file rule by name — extra files included —
-  and `.claude.json`) whose first sync succeeded; a rule that failed stays a first sync in the
+  and `.claude.json`, also with a skipped key) whose first sync succeeded; a rule that failed stays a first sync in the
   next run. `syncedAt` moves only after a sync without errors. A name-only `base`
   (`{"mcpServers":[…],"projects":[…]}`) from an earlier version is kept as read until
   `.claude.json` syncs without an error, then dropped; it is never recorded anew. Written whenever
