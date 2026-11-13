@@ -5,6 +5,7 @@ use crate::models::{
 use crate::{catalog, launch, ports};
 
 pub mod profiles;
+pub mod share;
 
 /// Base image for every agent's container (docs/AGENT_RECIPES.md §4).
 pub const DEFAULT_IMAGE: &str = "node:22-trixie";
@@ -47,6 +48,7 @@ impl Default for AppSettings {
             agent_updates: false,
             profiles: PerAgent::default(),
             agent_profile: PerAgent::from_fn(|_| crate::models::DEFAULT_PROFILE.to_string()),
+            profile_share: PerAgent::default(),
         }
     }
 }
@@ -71,6 +73,7 @@ pub fn normalize(mut settings: AppSettings) -> AppSettings {
     let root = settings.github.clone_root.trim();
     settings.github.clone_root = launch::normalize_folder(root).unwrap_or_else(|_| root.into());
     profiles::normalize(&mut settings);
+    share::normalize(&mut settings);
     settings
 }
 
@@ -142,6 +145,7 @@ pub fn sanitize(settings: AppSettings) -> AppSettings {
         settings.github.clone_root = defaults.github.clone_root;
     }
     profiles::sanitize(&mut settings);
+    share::sanitize(&mut settings);
     settings
 }
 
@@ -156,7 +160,8 @@ pub fn validate(settings: &AppSettings) -> Result<(), String> {
     }
     ports::normalize_ports(&settings.docker.ports).map(drop)?;
     validate_clone_root(&settings.github.clone_root)?;
-    profiles::validate(settings)
+    profiles::validate(settings)?;
+    share::validate(settings)
 }
 
 /// At least one environment that can start a session, the default among them.

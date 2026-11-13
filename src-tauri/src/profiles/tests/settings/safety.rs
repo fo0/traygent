@@ -111,9 +111,19 @@ fn the_base_directory_is_traygents_own_and_holds_the_shared_part_only() {
     let default = world.dir("default");
     // Not "foreign content": a directory holding nothing but the base stays the agent's.
     write(&base(&world, "left"), "{}");
-    assert!(!refuses_sign_in(CLAUDE, &world.dir("left"), &default));
+    assert!(!refuses_sign_in(
+        CLAUDE,
+        &world.dir("left"),
+        &default,
+        &Default::default()
+    ));
     write(&world.dir("left").join("notes.md"), "someone else's");
-    assert!(refuses_sign_in(CLAUDE, &world.dir("left"), &default));
+    assert!(refuses_sign_in(
+        CLAUDE,
+        &world.dir("left"),
+        &default,
+        &Default::default()
+    ));
     // The base lives in profile directories only: never in the default home, a shared
     // directory or a backup.
     write(&settings(&world, "default"), r#"{"theme":"dark"}"#);

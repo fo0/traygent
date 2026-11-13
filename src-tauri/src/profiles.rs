@@ -8,6 +8,7 @@ use crate::detect::{host::is_search_dir, Host};
 use crate::models::{AgentId, DEFAULT_PROFILE};
 
 pub mod files;
+pub mod foreign;
 pub mod history;
 pub mod json;
 pub mod links;
@@ -15,6 +16,7 @@ pub mod marker;
 pub mod merge;
 pub mod node;
 pub mod settings;
+pub mod share;
 pub mod status;
 pub mod sync;
 

@@ -128,6 +128,7 @@ fn parse_settings(object: &Map<String, Value>) -> AppSettings {
     let images = docker.and_then(|docker| docker.get("images")?.as_object().cloned());
     let profiles = object.get("profiles").and_then(Value::as_object);
     let agent_profile = object.get("agentProfile").and_then(Value::as_object);
+    let share = object.get("profileShare").and_then(Value::as_object);
     let mut settings = AppSettings {
         default_agent: field(object, "defaultAgent", defaults.default_agent),
         default_env: field(object, "defaultEnv", defaults.default_env),
@@ -149,6 +150,12 @@ fn parse_settings(object: &Map<String, Value>) -> AppSettings {
         if let Some(list) = profiles.and_then(|profiles| profiles.get(agent.id())?.as_array()) {
             *settings.profiles.get_mut(agent) = list.iter().filter_map(parse_profile).collect();
         }
+        // Absent (a file from before the setting): nothing extra is shared.
+        if let Some(share) = share.and_then(|share| share.get(agent.id())?.as_object()) {
+            let shared = settings.profile_share.get_mut(agent);
+            shared.dirs = names(share.get("dirs"));
+            shared.files = names(share.get("files"));
+        }
         if let Some(chosen) = agent_profile {
             *settings.agent_profile.get_mut(agent) =
                 field(chosen, agent.id(), DEFAULT_PROFILE.to_string());
@@ -162,6 +169,13 @@ fn parse_settings(object: &Map<String, Value>) -> AppSettings {
         settings.github.clone_root = field(github, "cloneRoot", String::new());
     }
     settings
+}
+
+/// The strings of a list; anything else in it is dropped. [`settings::sanitize`] validates.
+fn names(value: Option<&Value>) -> Vec<String> {
+    let list = value.and_then(Value::as_array).into_iter().flatten();
+    list.filter_map(|name| name.as_str().map(str::to_string))
+        .collect()
 }
 
 /// One malformed entry is dropped, the other profiles kept; [`settings::sanitize`] validates.

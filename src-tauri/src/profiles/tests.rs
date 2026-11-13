@@ -4,7 +4,7 @@ use super::links::Link;
 use super::status::{self, Facts};
 use super::sync::{read_marker, sync_agent, MARKER};
 use super::*;
-use crate::models::{AgentProfile, AppSettings};
+use crate::models::{AgentProfile, AppSettings, ProfileShare};
 use crate::testing::TempDir;
 use chrono::{DateTime, TimeZone, Utc};
 use std::path::{Path, PathBuf};
@@ -14,6 +14,7 @@ mod files;
 mod links;
 mod projects;
 mod settings;
+mod share;
 mod state;
 
 const CLAUDE: AgentId = AgentId::Claude;
@@ -85,11 +86,22 @@ impl World {
     }
 
     pub fn sync(&self, ids: &[&str], minute: u32) -> Vec<ProfileReport> {
+        self.sync_sharing(ids, &ProfileShare::default(), minute)
+    }
+
+    /// Syncs with the user's extra shared directories and files.
+    pub fn sync_sharing(
+        &self,
+        ids: &[&str],
+        share: &ProfileShare,
+        minute: u32,
+    ) -> Vec<ProfileReport> {
         let profiles: Vec<_> = ids.iter().map(|id| profile(id)).collect();
         sync_agent(
             &self.homes,
             CLAUDE,
             &profiles,
+            share,
             linker().as_ref(),
             at(minute),
         )

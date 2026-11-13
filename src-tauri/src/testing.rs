@@ -50,7 +50,13 @@ impl Fs for FakeFs {
         self.created.lock().unwrap().push(path.into());
         Ok(())
     }
-    fn refuses_sign_in(&self, _: crate::models::AgentId, dir: &str, _: &str) -> bool {
+    fn refuses_sign_in(
+        &self,
+        _: crate::models::AgentId,
+        dir: &str,
+        _: &str,
+        _: &crate::models::ProfileShare,
+    ) -> bool {
         self.foreign.contains(dir)
     }
 }

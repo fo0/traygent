@@ -361,6 +361,9 @@ pub struct AppSettings {
     pub profiles: PerAgent<Vec<AgentProfile>>,
     /// The profile a new session starts with: `default` or one of `profiles`' ids.
     pub agent_profile: PerAgent<String>,
+    /// Extra shared directories and files per agent; empty for an agent whose catalog
+    /// entry has `profiles: false`.
+    pub profile_share: PerAgent<ProfileShare>,
 }
 
 /// Mirrors `Snapshot` in `src/lib/types.ts`; replaced wholesale on every change.

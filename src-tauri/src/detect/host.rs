@@ -1,7 +1,7 @@
 //! Where CLIs live: the host's search dirs and the known install locations per tool
 //! (docs/AGENT_RECIPES.md §0–§3). Paths are plain strings joined with the host's separator,
 //! so the Windows rules are testable on any platform with a fake [`Fs`].
-use crate::models::AgentId;
+use crate::models::{AgentId, ProfileShare};
 
 /// File-system questions the resolver asks, and the one directory a repository start creates;
 /// tests answer them from a fixed set.
@@ -13,7 +13,13 @@ pub trait Fs: Sync {
     /// Whether the agent's profile directory `dir` exists and is someone else's (or that
     /// cannot be told): no sign-in may write into it
     /// ([`crate::profiles::sync::refuses_sign_in`]).
-    fn refuses_sign_in(&self, agent: AgentId, dir: &str, default_dir: &str) -> bool;
+    fn refuses_sign_in(
+        &self,
+        agent: AgentId,
+        dir: &str,
+        default_dir: &str,
+        share: &ProfileShare,
+    ) -> bool;
 }
 
 /// The real file system.
@@ -37,9 +43,16 @@ impl Fs for RealFs {
         std::fs::create_dir_all(path)
     }
 
-    fn refuses_sign_in(&self, agent: AgentId, dir: &str, default_dir: &str) -> bool {
+    fn refuses_sign_in(
+        &self,
+        agent: AgentId,
+        dir: &str,
+        default_dir: &str,
+        share: &ProfileShare,
+    ) -> bool {
         use std::path::Path;
-        crate::profiles::sync::refuses_sign_in(agent, Path::new(dir), Path::new(default_dir))
+        let (dir, default_dir) = (Path::new(dir), Path::new(default_dir));
+        crate::profiles::sync::refuses_sign_in(agent, dir, default_dir, share)
     }
 }
 
