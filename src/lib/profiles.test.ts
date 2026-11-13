@@ -13,6 +13,7 @@ import {
   profileInitial,
   profileLabel,
   profilesProblem,
+  renameProblem,
 } from './profiles';
 import type { AgentProfile } from './types';
 import { settingsProblems } from './validation';
@@ -108,6 +109,20 @@ describe('a saved profile list', () => {
     expect(profilesProblem([{ id: 's', label: ' S' }], 'default')).toBe(
       ' S: Ungültiger Name.',
     );
+  });
+
+  it('checks a rename in place by the same rules, unprefixed', () => {
+    const list = [team, { id: 'kunde', label: 'Kunde' }];
+    expect(renameProblem(list, 0)).toBe('');
+    expect(renameProblem([{ id: 'team', label: 'Kunde B' }], 0)).toBe('');
+    expect(renameProblem([{ id: 'team', label: '' }], 0)).toBe('Name fehlt.');
+    expect(renameProblem([{ id: 'team', label: 'STANDARD' }], 0)).toBe(
+      '„STANDARD“ ist reserviert.',
+    );
+    expect(renameProblem([team, { id: 'kunde', label: 'TEAM' }], 1)).toBe(
+      'Profil gibt es schon.',
+    );
+    expect(renameProblem(list, 5)).toBe('');
   });
 
   it('marks the field in the settings problems', () => {

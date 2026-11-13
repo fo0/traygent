@@ -74,6 +74,7 @@ export class Panel {
     this.profiles = new ProfileActions({
       bridge,
       accept: (value) => this.accept(value),
+      saveSettings: (value) => this.saveSettings(value),
     });
   }
 

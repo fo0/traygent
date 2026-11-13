@@ -35,15 +35,23 @@ fn is_device(name: &str) -> bool {
     numbered || DEVICES.contains(&stem.as_str())
 }
 
-/// The names the recipe shares or syncs itself.
+/// The files the recipe syncs itself.
+fn handled_files(recipe: &Recipe) -> impl Iterator<Item = &'static str> + '_ {
+    recipe
+        .synced_files
+        .iter()
+        .copied()
+        .chain(recipe.history)
+        .chain(recipe.settings.as_ref().map(|rule| rule.file))
+}
+
+/// The names the recipe shares or syncs itself: its linked folders, then its files.
 fn handled(recipe: &Recipe) -> impl Iterator<Item = &'static str> + '_ {
     recipe
         .shared_dirs
         .iter()
-        .chain(recipe.synced_files)
         .copied()
-        .chain(recipe.history)
-        .chain(recipe.settings.as_ref().map(|rule| rule.file))
+        .chain(handled_files(recipe))
 }
 
 /// The state file's and the sign-in's name: no shared name may start with either
@@ -57,8 +65,10 @@ fn protected(recipe: &Recipe) -> [&'static str; 2] {
 #[derive(Clone, Debug, PartialEq, Eq, serde::Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct NameLists {
-    /// „wird bereits abgeglichen“: the recipe shares or syncs these.
-    pub handled: Vec<&'static str>,
+    /// „wird bereits abgeglichen“: the folders the recipe links.
+    pub handled_dirs: Vec<&'static str>,
+    /// „wird bereits abgeglichen“: the files the recipe syncs.
+    pub handled_files: Vec<&'static str>,
     /// „ist ungültig“: a name that starts with one of these.
     pub protected_prefixes: Vec<&'static str>,
     /// „ist ungültig“: these names.
@@ -76,7 +86,8 @@ pub struct NameLists {
 /// Every comparison in it ignores ASCII case.
 pub fn name_lists(recipe: &Recipe) -> NameLists {
     NameLists {
-        handled: handled(recipe).collect(),
+        handled_dirs: recipe.shared_dirs.to_vec(),
+        handled_files: handled_files(recipe).collect(),
         protected_prefixes: protected(recipe).to_vec(),
         never_shared: recipe.never_shared.to_vec(),
         own_prefix: OWN_PREFIX,
