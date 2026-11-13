@@ -36,16 +36,18 @@ fn every_kind_of_sync_restarts_the_interval_and_a_read_does_not() {
     let mut service = hosted(&state, &home);
     let linker = crate::testing::TestLinker;
     let started = Instant::now();
-    let late = started + 2 * PROFILE_SYNC_INTERVAL;
     // Not due again until a full interval after the sync that just finished.
     let restarted = |service: &Service| {
         let now = Instant::now();
         !service.profile_sync_due(started, now + PROFILE_SYNC_INTERVAL - 60 * SECOND)
             && service.profile_sync_due(started, now + PROFILE_SYNC_INTERVAL + SECOND)
     };
-    // Reading the statuses (every later detection) is no sync.
+    // Reading the statuses (every later detection) is no sync: still due one interval after
+    // a sync's end although a read came later.
+    service.sync_profiles(&linker, at(1));
+    let synced = Instant::now();
     service.refresh_profiles();
-    assert!(service.profile_sync_due(started, late));
+    assert!(service.profile_sync_due(started, synced + PROFILE_SYNC_INTERVAL));
     // The startup sync, one after a save and the background sync all commit a plan's run.
     let outcome = service.profile_plan().run(&linker, at(1));
     service.apply_profiles(outcome);

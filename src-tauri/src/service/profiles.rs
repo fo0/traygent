@@ -16,6 +16,8 @@ const MAX_ERROR_CHARS: usize = 400;
 /// How long after the last sync of any kind the background schedule syncs the profiles
 /// again (#37); before the first one the interval runs from the app's start.
 pub const PROFILE_SYNC_INTERVAL: Duration = Duration::from_secs(15 * 60);
+/// How often the background schedule asks whether a sync is due.
+pub const PROFILE_SYNC_TICK: Duration = Duration::from_secs(60);
 
 /// In memory only; read again at every detection, sync and settings save.
 #[derive(Default)]
@@ -26,7 +28,10 @@ pub(super) struct ProfileState {
     errors: HashMap<Key, String>,
     /// The sync after the first detection has run.
     synced_at_startup: bool,
-    /// When the last sync of any kind finished (or a background one broke down).
+    /// When the last sync of any kind finished (or a background one broke down). One clock
+    /// for all agents: a start's sync of one agent restarts it for every agent, which is
+    /// right only while Claude Code is the one agent with a recipe — revisit (one clock per
+    /// agent) when a second recipe arrives.
     last_sync: Option<Instant>,
 }
 

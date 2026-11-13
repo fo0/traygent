@@ -13,6 +13,7 @@ use std::time::{Duration, SystemTime};
 mod files;
 mod links;
 mod projects;
+mod running;
 mod settings;
 mod share;
 mod state;

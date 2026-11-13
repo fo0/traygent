@@ -5,9 +5,9 @@ use crate::desktop::{work, NativeState, FAILED};
 use crate::desktop_agents::SNAPSHOT_EVENT;
 use std::time::Instant;
 use tauri::{AppHandle, Emitter, Manager};
-use traygent_core::agent_updates::TICK;
 use traygent_core::detect::{Host, RealFs};
 use traygent_core::profiles::{system_linker, SyncOutcome, SyncPlan};
+use traygent_core::service::PROFILE_SYNC_TICK;
 use traygent_core::{AgentId, Snapshot};
 
 /// The profile step of a detection: every profile's status is read anew, and the first
@@ -18,14 +18,7 @@ pub(crate) fn read_or_sync(state: &NativeState) {
         let mut service = state.lock();
         (service.profile_plan(), service.take_startup_profile_sync())
     };
-    let outcome = std::panic::catch_unwind(|| {
-        if sync {
-            let linker = system_linker(&Host::current());
-            plan.run(linker.as_ref(), chrono::Utc::now())
-        } else {
-            plan.read()
-        }
-    });
+    let outcome = std::panic::catch_unwind(|| if sync { run(&plan) } else { plan.read() });
     if let Ok(outcome) = outcome {
         state.lock().apply_profiles(outcome);
     }
@@ -48,19 +41,20 @@ pub(crate) fn start_schedule(app: &AppHandle) {
 fn schedule(app: &AppHandle) {
     let started = Instant::now();
     loop {
-        std::thread::sleep(TICK);
+        std::thread::sleep(PROFILE_SYNC_TICK);
         let state = app.state::<NativeState>();
         let plan = {
             let service = state.lock();
-            if !service.profile_sync_due(started, Instant::now()) {
+            // Another sync in flight would leave this plan stale behind it, then repeat its
+            // work: skip the tick; that sync's commit restarts the interval.
+            if !service.profile_sync_due(started, Instant::now())
+                || traygent_core::profiles::sync::busy()
+            {
                 continue;
             }
             service.profile_plan()
         };
-        let outcome = std::panic::catch_unwind(|| {
-            let linker = system_linker(&Host::current());
-            plan.run(linker.as_ref(), chrono::Utc::now())
-        });
+        let outcome = std::panic::catch_unwind(|| run(&plan));
         let mut service = state.lock();
         // Silent: what could not be done shows only in each profile's `syncError`. A panic
         // keeps the previous statuses and still waits the full interval.
@@ -78,20 +72,19 @@ fn schedule(app: &AppHandle) {
     }
 }
 
+/// Syncs a plan's profiles with the system linker, stamped with the current time.
+fn run(plan: &SyncPlan) -> SyncOutcome {
+    let linker = system_linker(&Host::current());
+    plan.run(linker.as_ref(), chrono::Utc::now())
+}
+
 /// Runs a profile plan on a blocking worker thread without the service lock: a sync (the
 /// hidden linker call, a first adoption of large directories) or only the status read.
 /// Sync runs still take turns among themselves.
 pub(crate) async fn run_plan(plan: SyncPlan, sync: bool) -> Result<SyncOutcome, String> {
-    tauri::async_runtime::spawn_blocking(move || {
-        if sync {
-            let linker = system_linker(&Host::current());
-            plan.run(linker.as_ref(), chrono::Utc::now())
-        } else {
-            plan.read()
-        }
-    })
-    .await
-    .map_err(|_| FAILED.to_string())
+    tauri::async_runtime::spawn_blocking(move || if sync { run(&plan) } else { plan.read() })
+        .await
+        .map_err(|_| FAILED.to_string())
 }
 
 /// Syncs every profile of every agent now and returns the snapshot with their statuses.
