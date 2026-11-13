@@ -1,7 +1,6 @@
 <script lang="ts">
   import Icon from './Icon.svelte';
   import ModelBadge from './ModelBadge.svelte';
-  import ProfileMark from './ProfileMark.svelte';
   import { PERMISSION_ICONS, type EnvInfo } from './agents';
   import { relativeTime } from './format';
   import { effortLevel } from './optionMarks';
@@ -9,8 +8,7 @@
 
   /*
    * A recent row's fixed-size parts in fixed columns (owner request, #20):
-   * ports · repo · environment · profile · model · thinking · permission ·
-   * time; the profile column only while some row has a profile. An
+   * ports · repo · environment · model · thinking · permission · time. An
    * absent part keeps its column as an empty, hidden slot, so every icon
    * sits in the same column from row to row. The ports chip is the only
    * part of variable width: it goes first, so it never moves the others.
@@ -18,8 +16,6 @@
   let {
     repo,
     env,
-    profile,
-    profileColumn,
     model,
     modelLabel,
     thinks,
@@ -35,9 +31,6 @@
     /** The repository's accessible name, or `''`. */
     repo: string;
     env: EnvInfo;
-    /** The profile's label, `''` for „Standard“. */
-    profile: string;
-    profileColumn: boolean;
     model: string;
     modelLabel: string;
     /** Whether the agent sends a thinking level with this model. */
@@ -55,7 +48,7 @@
   } = $props();
 </script>
 
-<span class="recent-meta" data-profiles={profileColumn ? 'true' : undefined}>
+<span class="recent-meta">
   {#if portsText}<span
       class="chip chip-static recent-ports"
       data-warn={exposed ? 'true' : undefined}
@@ -69,13 +62,6 @@
   <span class="recent-env" role="img" aria-label={env.label}
     ><Icon name={env.icon} size={13} /></span
   >
-  {#if profile}<ProfileMark
-      label={profile}
-      name={`Profil ${profile}`}
-    />{:else if profileColumn}<span
-      class="recent-slot recent-profile-slot"
-      aria-hidden="true"
-    ></span>{/if}
   {#if model !== 'default'}<ModelBadge {model} label={modelLabel} />{:else}<span
       class="recent-slot"
       aria-hidden="true"

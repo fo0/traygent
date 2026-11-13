@@ -40,6 +40,7 @@ Every start lands in **Zuletzt** (recent), so the next one is a single click.
 | 🕘 **Recent sessions**                | Up to 20 folder · agent · environment combinations as compact rows; a click restarts one with exactly the same settings.      |
 | 🐳 **Local or Docker**                | Run the agent on the host or in a container with named volumes for its state and optional port publishing.                    |
 | 🐙 **Start from a GitHub repository** | Paste a URL, type `owner/name` or search your repositories; Traygent clones it on first use and reuses the folder afterwards. |
+| 👥 **Several Claude accounts**        | One profile per sign-in; skills, plugins, settings, MCP servers and history stay the same in all of them.                     |
 | 🔍 **Detects what is installed**      | Agent CLIs, their versions and Docker are detected; a missing CLI offers its install command instead of a dead start.         |
 | 🔄 **Updates in the app**             | Check, read the changelog and install without leaving the app.                                                                |
 | 🌗 **Small and native**               | Rust + Tauri, light and dark theme, starts with Windows if you want it to.                                                    |
@@ -80,6 +81,7 @@ Open http://127.0.0.1:1420. The preview is labelled **Demo**.
 ## Privacy and security
 
 - **Your GitHub token stays in the Windows Credential Manager.** It only checks your account and reads your repository list; it never reaches a clone, a command line, an environment variable or the state file. Cloning uses your own Git credentials. Exception, off by default: **GitHub-Token weitergeben** forwards `gh auth token` to Docker sessions as `GH_TOKEN`, by name only ([details](docs/USAGE.md#docker-sessions)).
+- **Profiles never touch your sign-in.** Traygent only checks that a profile's `.credentials.json` exists; it never reads or copies it ([details](docs/USAGE.md#several-accounts--profile)).
 - **No shell strings.** Every launch is an argument list of quoted literals ([ADR-0003](docs/adr/0003-launch-through-a-powershell-argv.md)).
 - **Docker ports bind to `127.0.0.1`** unless you type an IP.
 - **Network access:** Traygent itself contacts only the GitHub API (update check, account check, your repository list) and GitHub release downloads. `git clone`, agent installers and container image pulls run visibly in the terminal Traygent opens for the session or install.

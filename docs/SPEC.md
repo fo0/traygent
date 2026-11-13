@@ -25,6 +25,10 @@ Brand top left: icon + „Traygent“. Window ~480×760, frameless, tray popup l
   of that folder), `resume` (agent's session picker). Agents without support omit the option.
 - **Terminal** (`TerminalId`): `windowsTerminal` (wt.exe, default when found) or `console`
   (a new PowerShell console window). The session runs in that window; Traygent does not embed it.
+- **Profile** (`AgentProfile`, per agent, local starts only): a sign-in of one CLI in a config
+  directory of its own; everything else stays identical to the CLI's own home, the profile
+  „Standard“ (id `default`) every agent with `catalog.profiles` has. Claude Code only so far;
+  see _Profiles_ below.
 
 ## Dashboard (single panel, compact — `agent_docs/ux_rules.md` is binding)
 
@@ -58,13 +62,22 @@ Brand top left: icon + „Traygent“. Window ~480×760, frameless, tray popup l
      Agenten and „Bearbeiten …“ — opens the one app-styled list (check mark on the chosen
      value), never the WebView's native select popup. Every agent's chips, Docker's „Ports“ included, keep one row beside
      „Starten“ in the default 480 px window.
+   - „Profil“ (last chip before „Starten“, its list opens to the left): only for an agent with
+     `profiles`, environment Lokal and at least one extra profile. A 28 px mark only — the
+     person icon for „Standard“, else the profile's initial on a round tile; the label is its
+     accessible name and tooltip (`Profil: <label> · <account>`). The chosen profile not signed
+     in → warning colour and „Nicht angemeldet“ (tooltip and list). Starts at the agent's saved
+     „Standard-Profil“, back to it after every start and agent change; a removed profile falls
+     back to it. Sent only when it applies and is not `default`.
    - Primary button „Starten“ bottom right; Enter starts. Missing CLI → button becomes
      „Installieren …“ (opens Settings → Agenten for that agent) — never a dead start.
    - Options start from the agent's saved defaults; changing them on the dashboard affects the
      next start only (not the defaults).
 3. **Zuletzt** (recent sessions — where RepoWatch lists repositories): one single-line row per
    (folder, agent, env), newest first, max 20 kept, in one bordered list card with dividers
-   (RepoWatch's list card). Row: agent mark on a tile, folder name (primary) + parent path
+   (RepoWatch's list card). Row: agent mark on a tile — a profile other than „Standard“ sits on
+   its corner as its initial on a small round accent tile („Profil <label>“, also in the row's
+   tooltip), so it takes no width from the folder name — folder name (primary) + parent path
    (secondary, ellipsized), then fixed columns at the right edge so every icon lines up from
    row to row (`RecentMeta.svelte`; an absent part leaves an empty, `aria-hidden` slot): ports
    chip (the one variable width, first), GitHub mark, env icon (Lokal/Docker), the options as
@@ -85,6 +98,9 @@ Brand top left: icon + „Traygent“. Window ~480×760, frameless, tray popup l
    arguments and (Docker) ports; „Speichern“ stores them on the entry without a start
    (`update_recent`, validated like a start; the dialog also applies the npm-shim argument rule) — place, start time and count stay, the next ▶
    sends them. The agent, environment and folder define the entry and are not editable.
+   A row's profile: ▶ restarts with it (one removed since is refused natively, „Profil nicht
+   gefunden.“); „In Composer übernehmen“ takes it over, or the saved „Standard-Profil“ when it
+   is gone. A start of the same folder with another profile updates the row's profile.
 4. Footer: Docker state („Docker 27.5 bereit“ / „Docker nicht erreichbar“, only while Docker is
    shown) · „Stand hh:mm“.
 
@@ -93,7 +109,17 @@ Brand top left: icon + „Traygent“. Window ~480×760, frameless, tray popup l
 - **Agenten**: per agent a section: local status (version or „Nicht installiert“), Docker
   readiness (only while Docker is shown), best-practice Windows install command (copy button + „Installieren“ = opens a
   terminal running it, then re-detects on demand), update command; defaults: model, effort,
-  permission, extra CLI args (free text, validated).
+  permission, extra CLI args (free text, validated). For an agent with `profiles` a „Profile“
+  block (info tip „Eigene Anmeldung je Profil, alles andere wird abgeglichen“): „Jetzt
+  synchronisieren“ beside the heading (immediate, `sync_profiles`), „Standard-Profil“ (staged),
+  one row per profile — „Standard“ first — with its name, the account or „Nicht angemeldet“
+  (tooltip: account, organisation, folder, „Abgeglichen <time>“, the sync error), a warning
+  icon after a failed sync, „Anmelden“ (immediate, `profile_login`; „Erst speichern“ while the
+  profile is only staged) and a remove button (staged; none for „Standard“); then „Neues
+  Profil“ + „+“ / Enter, whose tooltip shows the folder the name gives. Inline errors: „Name
+  fehlt.“, „Höchstens 24 Zeichen.“, „Keine Steuerzeichen.“, „„<Name>“ ist reserviert.“,
+  „Mindestens ein Buchstabe oder eine Ziffer.“, „Profil gibt es schon.“, „Höchstens 8
+  Profile.“
 - **Umgebung**: „Umgebungen“ — one checkbox per environment the composer shows (Lokal / Docker /
   WSL, all on by default; the last of Lokal and Docker cannot be turned off and says why in its
   tooltip), default environment (one of the shown ones, WSL disabled; it moves to the first shown
@@ -133,6 +159,14 @@ Detection runs off the UI thread at startup and on `refresh_detection`; while it
 snapshot has `detecting: true`, and the shell emits `traygent:snapshot` with the finished
 snapshot. `refresh_detection` returns at once with `detecting: true`.
 
+Profiles in the contract (`profileTypes.ts` ↔ `models/profiles.rs`): `AgentCatalogEntry.profiles`
+(Claude Code only), `AppSettings.profiles` (`Record<AgentId, AgentProfile[]>`, `{ id, label }`)
+and `AppSettings.agentProfile` (`Record<AgentId, string>`, `default` or a listed id),
+`LaunchRequest.profile` and `RecentSession.profile` (optional, absent for `default`),
+`Snapshot.profiles` (`ProfileStatus[]`: `agent`, `id`, `label`, `dir`, `signedIn`, optional
+`account`, `organization`, `syncedAt`, `syncError`) and `LaunchOutcome.warning` (optional,
+German: the session started, the profile sync before it was incomplete).
+
 Commands (Rust `#[tauri::command]`, German `Err` strings; panel calls only via `src/lib/ipc.ts`):
 
 | command                            | args                                                                                             | result                                                        |
@@ -153,6 +187,8 @@ Commands (Rust `#[tauri::command]`, German `Err` strings; panel calls only via `
 | `github_import_local`              | `{ login }`                                                                                      | `Snapshot` (explicit consent: reads that gh token, as above)  |
 | `github_disconnect`                | –                                                                                                | `Snapshot` (deletes the vault copy; gh stays signed in)       |
 | `github_refresh_repos`             | –                                                                                                | `Snapshot` (returns with `github.loading`, event follows)     |
+| `sync_profiles`                    | –                                                                                                | `Snapshot` (syncs every profile now, statuses in `profiles`)  |
+| `profile_login`                    | `{ agent, profile }`                                                                             | `void` (opens the terminal that signs that profile in)        |
 | shell commands kept from RepoWatch | autostart_status, set_autostart, open_startup_settings, check_update, install_update, hide_panel | unchanged                                                     |
 
 ## Repositories (GitHub, [ADR-0005](adr/0005-start-from-a-github-repository.md))
@@ -225,6 +261,100 @@ Commands (Rust `#[tauri::command]`, German `Err` strings; panel calls only via `
   aktualisiert.“); Docker starts are not affected, and the CLI in a container keeps its own
   update path.
 
+## Profiles ([ADR-0009](adr/0009-agent-profiles-with-linked-config-directories.md))
+
+- **Recipe** (`profiles.rs → Recipe`, data per agent): Claude Code only — variable
+  `CLAUDE_CONFIG_DIR`, login `<cli> auth login`. OpenCode and Codex have none: any extra profile
+  for them is refused („<Agent> unterstützt keine Profile.“).
+- **Directories** (`profiles.rs → Homes`, the only path builder; from the user profile, which
+  must be absolute and fully expanded): „Standard“ = `%USERPROFILE%\.claude` with its state file
+  beside it (`%USERPROFILE%\.claude.json`); profile `<id>` = `%USERPROFILE%\.claude-<id>` with
+  `.claude.json` inside. A name „Team“ gives id `team`, so an existing `.claude-team` is adopted
+  with its login.
+- **Rules** (Rust authoritative, panel mirrors them): id `^[a-z0-9][a-z0-9-]{0,23}$`, not
+  `default` (the panel derives it from the name: lower case, ä ö ü ß spelled out as ae oe ue
+  ss, other diacritics dropped, every other run of characters one `-`, trimmed, at most 24 —
+  „Büro“ gives `buero`); label trimmed, 1–24 characters, no control characters, not
+  „Standard“; ids and labels (ignoring case) unique per agent; at most 8 extra profiles per
+  agent. Errors: „Profil-ID für <Agent> ist ungültig: nur a–z, 0–9 und „-“, höchstens 24
+  Zeichen, nicht „default“.“, „Profilname für <Agent> fehlt.“, „Profilname für <Agent> ist zu
+  lang (höchstens 24 Zeichen).“, „Profilname für <Agent> enthält Steuerzeichen.“, „Profilname
+  „Standard“ ist für das Standard-Profil reserviert.“, „Profil-ID „<id>“ für <Agent> ist doppelt
+  vergeben.“, „Profilname „<Name>“ für <Agent> ist doppelt vergeben.“, „Höchstens 8 Profile für
+  <Agent> möglich.“. An `agentProfile` that is not listed becomes `default`, so removing a
+  profile never blocks the save; on load every entry that would not validate is dropped, the
+  rest kept. Removing a profile leaves its directory, login included, on disk.
+- **Start** (local only; Docker normalizes `profile` away and keeps its one volume, ADR-0004):
+  absent, blank or `default` = „Standard“; any other id must be listed („Profil nicht
+  gefunden.“). No user profile → „Der Profilordner ist nicht verfügbar: kein Benutzerordner
+  gefunden.“. The script sets, after `Set-Location` and before the agent call,
+  `$env:CLAUDE_CONFIG_DIR='<profile dir>'` (Windows-absolute, else „Der Profilordner ist kein
+  absoluter Windows-Pfad.“); for „Standard“ it emits
+  `Remove-Item Env:CLAUDE_CONFIG_DIR -ErrorAction SilentlyContinue` while the agent has at
+  least one extra profile, so an inherited value cannot move the default home; without extra
+  profiles there is no line. Before the spawn every profile of that agent is synced; a failed
+  sync starts the session anyway with `LaunchOutcome.warning` („Profile konnten nicht
+  vollständig synchronisiert werden: <Label>: <error> · <error>; <Label>: …“, at most 400
+  characters, shown after „<Agent> gestartet.“ in the warning tone), except that the requested
+  profile's directory cannot be created („Der Profilordner konnte nicht angelegt werden.“).
+- **Triggers:** the first detection after the app started (later detections only read the
+  statuses), `save_settings` when `profiles` changed (otherwise a re-read), `sync_profiles` and
+  a local start (that agent only). An agent without an extra profile is never touched. One sync
+  runs at a time; its file system work runs without the service lock.
+- **Sync** of each profile with „Standard“, in this order:
+  1. Shared directories `skills`, `agents`, `commands`, `rules`, `output-styles`, `workflows`,
+     `agent-memory`, `themes`, `plugins`, `projects`, `file-history`, `plans`, `tasks`,
+     `paste-cache` become directory links into „Standard“'s directory of that name (created
+     there when missing): a junction on Windows — all missing ones in one hidden Windows
+     PowerShell call (`New-Item -ItemType Junction`, link/target lines Base64 in the env var
+     `TRAYGENT_LINKS`, never on the command line, 20 s timeout) — a symbolic link elsewhere.
+     In the profile: a link to the target stays; an empty directory is removed and linked; a
+     non-empty one first hands every entry „Standard“ lacks over (recursively, no file
+     overwritten, links not followed, file times kept), then moves to the backup and is
+     linked. Each new link is checked. Errors: „<name>: Verknüpfung zeigt auf ein anderes
+     Ziel“, „<name>: ist kein Ordner“, „<name>: ist im Standard-Profil kein Ordner“, „<name>:
+     Verknüpfung konnte nicht angelegt werden“, „<name>: Inhalt konnte nicht übernommen
+     werden“.
+  2. `settings.json`, `CLAUDE.md`, `keybindings.json`: equal content writes nothing; a file on
+     one side is copied to the other; differing files — on the first sync „Standard“ wins (the
+     profile's file goes to the backup first), later the newer modification time (a tie:
+     „Standard“). A copy keeps its source's file time; writes are temp file + rename; a link
+     as source is followed, a link as target never replaced; errors as `<name>: …` — „ist
+     eine Verknüpfung und wird nicht überschrieben“, „ist zu groß“ (over 8 MiB), „ist keine
+     Datei“, „Zugriff fehlgeschlagen“.
+  3. `history.jsonl`: both sides become the union of their lines (exact duplicates dropped,
+     „Standard“'s order kept, the profile's other lines placed by their numeric `timestamp`);
+     over 64 MiB left alone.
+  4. `.claude.json`: the keys `mcpServers` and `projects` from the newer file (first sync and
+     tie: „Standard“) into the other, compared as values; a key the source lacks stays; every
+     other key keeps its bytes and place, the layout (indent, line ends) is kept. Unparsable →
+     „.claude.json: ist kein lesbares JSON und bleibt unverändert“; rewritten since the read →
+     „.claude.json: wurde gerade geändert, nächster Versuch beim nächsten Abgleich“; over
+     64 MiB left alone.
+  5. When one profile changed „Standard“ and there are several, steps 2–4 run once more
+     (newest wins), so the change reaches the others in the same run.
+- **Marker** `<profile>\.traygent-sync.json` (`{ "version": 1, "syncedAt": "<RFC 3339>" }`):
+  absent = first sync. Written after the first sync even with errors (so „Standard“ wins only
+  once); `syncedAt` only after a sync without errors. An unreadable marker counts as present.
+- **Backup** `<profile>\.traygent-backup\<UTC yyyymmddThhmmssZ>[-<n>]\<name>`, one folder per
+  run, created on first use; Traygent never deletes it.
+- **Never touched:** `.credentials.json` (only its existence and size make `signedIn`), every
+  other key of `.claude.json` (`oauthAccount.emailAddress` / `organizationName` are read for
+  `account` / `organization` only, control characters dropped, at most 128 characters), any
+  other file of either directory. Nothing is deleted but an empty directory that makes room for
+  a link. A profile directory that resolves to „Standard“'s syncs nothing („Profilordner ist der
+  Ordner des Standard-Profils“); others: „Profilordner konnte nicht angelegt werden“,
+  „Benutzerordner nicht verfügbar“, „.traygent-sync.json: Zugriff fehlgeschlagen“.
+- **Statuses:** `Snapshot.profiles` per agent with `profiles`, „Standard“ first, then the
+  settings' order; `syncError` = the last sync's errors joined by `·` (at most 400
+  characters). In memory only; read at every detection, after a sync and a settings save.
+- **Sign-in:** `profile_login { agent, profile }` („Standard“ included, only on a click) creates
+  the profile directory and opens a terminal in `%USERPROFILE%` (else `C:\`) titled „<Agent> ·
+  <Label> anmelden“ running the env line (for „Standard“ always the `Remove-Item`) and
+  `& '<cli>' 'auth' 'login'`; it stays open like the install terminal. Refused: „<Agent> wird
+  gerade aktualisiert.“, „<Agent> ist nicht installiert.“, „Profil nicht gefunden.“. The status
+  follows with the next detection or sync.
+
 ## Ports (Docker sessions)
 
 - A Docker session can publish ports (`docker run -p`). The composer shows a „Ports“ chip only
@@ -257,6 +387,9 @@ script>`; inside the script every argument is a PowerShell single-quoted literal
   start's folder name is the repository name). Windows Terminal tabs get `--title` plus
   `--suppressApplicationTitle`; Claude Code also gets `CLAUDE_CODE_DISABLE_TERMINAL_TITLE=1`
   (locally and in the container), so the CLI cannot replace it.
+- Profiles (local, an agent with a recipe): one `CLAUDE_CONFIG_DIR` line — set to the profile's
+  directory, or removed for „Standard“ while extra profiles exist — before the agent call; see
+  _Profiles_.
 - Closing: `-NoExit` keeps errors before or at the start visible (missing folder, failed clone, a
   CLI that cannot start). After the agent call a normal end (exit code 0, 130, `0xC000013A`, or
   the call stopped by Ctrl+C) closes the terminal with `[Environment]::Exit(0)`, after the Docker

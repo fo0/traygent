@@ -28,7 +28,6 @@
     snapshot,
     now,
     profile,
-    profileColumn,
     launching,
     onRestart,
     onAdopt,
@@ -44,8 +43,6 @@
     now: number;
     /** The label of the row's profile, `''` for „Standard“. */
     profile: string;
-    /** Some row has a profile: every row keeps its column. */
-    profileColumn: boolean;
     /** A start runs; the row's start waits for it. */
     launching: boolean;
     /** Starts exactly these options again, as a new session. */
@@ -189,7 +186,7 @@
 </script>
 
 <li class="recent-row">
-  <AgentBadge agent={recent.agent} {label} />
+  <AgentBadge agent={recent.agent} {label} {profile} />
   <span class="recent-text"
     ><span class="recent-name">{name}</span>{#if parent}<span
         class="recent-parent"><bdi>{parent}</bdi></span
@@ -198,8 +195,6 @@
   <RecentMeta
     {repo}
     {env}
-    {profile}
-    {profileColumn}
     model={options.model}
     {modelLabel}
     {thinks}

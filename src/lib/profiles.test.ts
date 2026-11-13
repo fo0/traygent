@@ -22,11 +22,20 @@ describe('profile ids', () => {
     expect(profileId('Team')).toBe('team');
     expect(profileId('  Kunde A / Projekt  ')).toBe('kunde-a-projekt');
     expect(profileId('--Max__Muster--')).toBe('max-muster');
-    expect(profileId('Büro 2')).toBe('b-ro-2');
+    expect(profileId('Büro 2')).toBe('buero-2');
     expect(profileId('a'.repeat(30))).toBe('a'.repeat(24));
     // A cut never leaves a trailing -.
     expect(profileId(`${'a'.repeat(23)} b`)).toBe('a'.repeat(23));
-    expect(profileId('äöü')).toBe('');
+    expect(profileId('日本')).toBe('');
+  });
+
+  it('spell out ä ö ü ß and drop other diacritics before the slug', () => {
+    expect(profileId('Büro')).toBe('buero');
+    expect(profileId('ÄRGER Öl Übung')).toBe('aerger-oel-uebung');
+    expect(profileId('Straße')).toBe('strasse');
+    expect(profileId('Café Señor')).toBe('cafe-senor');
+    // A decomposed ü (u + combining diaeresis) is the same letter.
+    expect(profileId('Bu\u0308ro')).toBe('buero');
   });
 
   it('name the folder Rust derives, for the tooltip', () => {
@@ -46,7 +55,7 @@ describe('a new profile', () => {
     expect(newProfileProblem('   ', [])).toBe('Name fehlt.');
     expect(newProfileProblem('x'.repeat(25), [])).toBe('Höchstens 24 Zeichen.');
     expect(newProfileProblem('a\tb', [])).toBe('Keine Steuerzeichen.');
-    expect(newProfileProblem('äöü', [])).toBe(
+    expect(newProfileProblem('日本', [])).toBe(
       'Mindestens ein Buchstabe oder eine Ziffer.',
     );
   });

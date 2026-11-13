@@ -1,11 +1,12 @@
 /*
  * Agent profiles (#33): the composer's mark-only „Profil“ chip, the round
- * profile mark in „Zuletzt“ and Settings → Agenten → „Profile“. Tokens from
+ * profile mark on a „Zuletzt“ row's agent tile and Settings → Agenten →
+ * „Profile“. Tokens from
  * 00-tokens.css only.
  */
 
 /* The profile as its initial on a round tile, like an account avatar (the
-   model's letter sits on a square one); as narrow as the icon columns. */
+   model's letter sits on a square one). */
 .profile-mark {
   display: inline-grid;
   flex-shrink: 0;
@@ -25,21 +26,26 @@
   color: inherit;
 }
 
-/* „Zuletzt“: one more fixed column after the environment, only while some
-   row has a profile. */
-.recent-meta[data-profiles='true'] {
-  grid-template-columns: auto 14px 14px 14px 18px 14px 14px 6em;
+/* „Zuletzt“: the profile on the agent tile's corner, so it takes no width
+   from the folder name; the ring separates it from the tile. */
+.agent-tile {
+  position: relative;
+  display: grid;
+  flex-shrink: 0;
 }
-
-/* The 360 px minimum keeps the folder name: the column goes, the start's
-   tooltip still names the profile. */
-@media (max-width: 400px) {
-  .recent-meta[data-profiles='true'] {
-    grid-template-columns: auto 14px 14px 18px 14px 14px 6em;
-  }
-  .recent-meta :is(.profile-mark, .recent-profile-slot) {
-    display: none;
-  }
+.agent-tile .profile-mark {
+  position: absolute;
+  right: -5px;
+  bottom: -5px;
+  width: 13px;
+  height: 13px;
+  background: var(--accent);
+  box-shadow: 0 0 0 1.5px var(--surface);
+  color: var(--on-accent);
+  font-size: 9px;
+}
+.recent-row:hover .agent-tile .profile-mark {
+  box-shadow: 0 0 0 1.5px var(--hover);
 }
 
 /* The chip is the last before „Starten“: its list opens to the left. */
@@ -135,4 +141,10 @@
 }
 .profiles .field-error {
   margin: 4px 0 0;
+}
+
+@media (forced-colors: active) {
+  .agent-tile .profile-mark {
+    border: 1px solid CanvasText;
+  }
 }

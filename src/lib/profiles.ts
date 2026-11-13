@@ -24,13 +24,21 @@ const ID = /^[a-z0-9][a-z0-9-]{0,23}$/;
 // eslint-disable-next-line no-control-regex
 const CONTROL = /[\u0000-\u001f\u007f-\u009f]/;
 
+/** German letters spelled out before the slug: „Büro“ gives `buero`. */
+const GERMAN: Record<string, string> = { ä: 'ae', ö: 'oe', ü: 'ue', ß: 'ss' };
+
 /**
- * The id (and folder suffix) a typed name gives: lowercased, every run of
- * other characters than `a-z 0-9` one `-`, trimmed of `-`, at most 24.
+ * The id (and folder suffix) a typed name gives: lowercased, ä ö ü ß spelled
+ * out (ae oe ue ss), other diacritics dropped, every run of other characters
+ * than `a-z 0-9` one `-`, trimmed of `-`, at most 24.
  */
 export function profileId(name: string) {
   return name
+    .normalize('NFC')
     .toLowerCase()
+    .replace(/[äöüß]/g, (letter) => GERMAN[letter] ?? letter)
+    .normalize('NFD')
+    .replace(/\p{M}+/gu, '')
     .replace(/[^a-z0-9]+/g, '-')
     .replace(/^-+|-+$/g, '')
     .slice(0, 24)

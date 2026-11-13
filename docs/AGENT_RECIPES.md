@@ -95,6 +95,21 @@ Versions seen: Claude Code npm `2.1.317`; OpenCode `@opencode/cli` `2.2.5` (`lat
 - **Extra args:** appended last (starter `CLAUDE_EXTRA_ARGS`). Order: perm · model · effort · session · extra.
 - **Environments:** `local`, `docker`.
 
+### Claude profiles (several accounts, local only — Traygent [ADR-0009](adr/0009-agent-profiles-with-linked-config-directories.md))
+
+- **Config dir:** `%USERPROFILE%\.claude` by default; the state file `.claude.json` sits _beside_ it
+  (`%USERPROFILE%\.claude.json`) for the default home and _inside_ any directory named by `CLAUDE_CONFIG_DIR`.
+- **Credentials:** `.credentials.json` inside the config dir on Windows (docs _Credential management_); the
+  account shown is `.claude.json → oauthAccount.emailAddress` / `organizationName`. Traygent checks only that the
+  credentials file exists and is non-empty, never reads it.
+- **One account per dir:** `CLAUDE_CONFIG_DIR=<dir>` (docs _Authentication → Log in with multiple accounts_);
+  Traygent sets it in the session script (`$env:CLAUDE_CONFIG_DIR='%USERPROFILE%\.claude-<id>'`) and removes it for
+  the default profile while extra ones exist. Sign-in: `claude auth login` in that env, in a terminal the user
+  opens („Anmelden“). Shared directories, synced files and keys: `docs/SPEC.md → Profiles`.
+- **UNVERIFIED on Windows:** `claude auth login` honouring `CLAUDE_CONFIG_DIR`, the CLI following directory
+  junctions in its config dir, and how it rewrites `settings.json` / `.claude.json` under a running session
+  (BACKLOG #52).
+
 ### Claude in Docker (must match the starter — existing login keeps working)
 
 Volumes (ADR-0007/0009, starter `KONFIGURATION`): `claude-code-tools` → `/home/node/.local` (CLI binary),
@@ -205,6 +220,8 @@ no newline) · `leaf` = part after the last `\` or `/` · `n` = every byte of `l
 - **Extra args:** after the built flags. Order: `--standalone` · `--auto` · `--continue` · extra.
 - **Auth:** `opencode auth login` (interactive) — storage path not documented; it lives under the data/config dirs
   (`opencode debug paths`: data `~/.local/share/opencode`, config `~/.config/opencode`, state `~/.local/state/opencode`).
+- **Profiles:** not implemented (no recipe, `catalog.profiles: false`). Sign-in, config and sessions are spread over
+  three XDG-style dirs, so one variable per account is not known — UNVERIFIED (BACKLOG #53).
 
 ### OpenCode in Docker
 
@@ -287,6 +304,9 @@ default_reasoning_level,supported_reasoning_levels[{effort}],visibility,priority
 - **Login:** `codex login` (browser, localhost:1455 callback), `codex login --device-auth` (beta, headless),
   `printenv OPENAI_API_KEY | codex login --with-api-key`. Stored in `~/.codex/auth.json` or OS keyring
   (`cli_auth_credentials_store = file|keyring|auto|ephemeral`); treat `auth.json` like a password.
+- **Profiles:** not implemented (no recipe, `catalog.profiles: false`). Candidate: `CODEX_HOME=%USERPROFILE%\.codex-<id>`
+  per account with `config.toml`, sessions and history shared — UNVERIFIED, keyring storage would bypass the
+  directory (BACKLOG #53).
 
 ### Codex in Docker (no starter — proposal consistent with the other two)
 

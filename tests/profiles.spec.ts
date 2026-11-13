@@ -78,21 +78,29 @@ for (const font of LAYOUT_FONTS)
     expect(new Set(tops).size, tops.join(', ')).toBe(1);
   });
 
-test('„Zuletzt“ shows a profile in its own column only while a row has one', async ({
+test('„Zuletzt“ shows a profile on the agent tile, taking no width from the row', async ({
   page,
 }) => {
+  await page.setViewportSize({ width: 480, height: 760 });
   await page.goto('/');
-  await expect(
-    row(page, 'Notizen').getByRole('img', { name: 'Profil Team' }),
-  ).toHaveText('T');
-  // Every other row keeps the column as an empty, hidden slot.
-  const columns = page.locator('.recent-meta[data-profiles="true"]');
-  await expect(columns).toHaveCount(6);
-  await row(page, 'Notizen')
-    .getByRole('button', { name: /^Aktionen/ })
-    .click();
-  await page.getByRole('menuitem', { name: 'Entfernen' }).click();
-  await expect(columns).toHaveCount(0);
+  const notes = row(page, 'Notizen');
+  const mark = notes.getByRole('img', { name: 'Profil Team' });
+  await expect(mark).toHaveText('T');
+  await expect(page.locator('.recent-row .profile-mark')).toHaveCount(1);
+  // On the tile's corner: inside the row, overlapping the 22 px tile.
+  const tile = await notes.locator('.agent-badge').boundingBox();
+  const box = await mark.boundingBox();
+  expect(box!.x).toBeGreaterThan(tile!.x);
+  expect(box!.x).toBeLessThan(tile!.x + tile!.width);
+  expect(box!.y).toBeLessThan(tile!.y + tile!.height);
+  // The tile keeps its width; the start's tooltip names the profile.
+  expect(
+    await notes.locator('.agent-tile').evaluate((n) => n.clientWidth),
+  ).toBe(22);
+  await expect(notes.getByRole('button', { name: /starten$/ })).toHaveAttribute(
+    'title',
+    /· Lokal · Profil: Team ·/,
+  );
 });
 
 test('Settings → Agenten → „Profile“: staged list, immediate sign-in and sync', async ({

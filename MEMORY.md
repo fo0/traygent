@@ -31,6 +31,11 @@ Stable project knowledge. **Read at session start.**
 - **Date:** 2026-11-04
 - **Decision:** `settings.environments` lists what the composer shows (default all three); display only — recents of a hidden environment still restart, Docker is still probed. Lokal or Docker must stay on, the default must be shown; unticking Docker resets its invalid fields. Detail: [ADR-0007](docs/adr/0007-persisted-environment-visibility.md).
 
+### Agent profiles share everything but the sign-in
+
+- **Date:** 2026-11-13
+- **Decision:** One config dir per sign-in (`CLAUDE_CONFIG_DIR=%USERPROFILE%\.claude-<id>`, „Standard“ = `.claude`); shared dirs are junctions into the default home, loose files synced (newest wins, the default home on the first sync). Claude Code, local only. Detail: [ADR-0009](docs/adr/0009-agent-profiles-with-linked-config-directories.md), `docs/SPEC.md → Profiles`.
+
 ## Gotchas & Pitfalls
 
 - **Releases are manual only** — _Actions → Release → Run workflow_ on `main` runs `ci.yml` for that commit, then builds and publishes; merges never release. Never start one unprompted. (2026-11-03)
@@ -52,6 +57,8 @@ Stable project knowledge. **Read at session start.**
 - **App icons come from geometry** in `scripts/generate-icons.mjs` (writes `src-tauri/icons/*`, `source.svg` included); `pnpm icons:check` fails on drift. The tray icon embeds `icons/32x32.png`. (2026-11-03)
 
 - **Agent CLI updates fail closed** — the in-use check (`agent_updates.rs → LIST_SCRIPT`) needs its end marker and only known lines; a new line kind in the script must be added to `line_agent`, or every agent reads as in use. `store.rs → parse_settings` reads settings field by field: a new setting needs its line there or a saved value is dropped on load. (2026-11-10)
+
+- **Profiles: `profiles.rs → Homes` is the only path builder** — every directory the sync touches comes from it (user profile + recipe names + validated id); never hand the engine a path from settings or the panel. `.credentials.json` and every `.claude.json` key but `recipe.shared_keys` are never read into another profile — keep it that way when adding a recipe. The Windows CI job's core tests create real junctions through Windows PowerShell (`system_linker`), Linux uses symlinks — a link change can pass on Linux and fail there. (2026-11-13)
 
 ## External Dependencies
 

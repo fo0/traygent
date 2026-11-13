@@ -1,9 +1,13 @@
 import type { NoticeTone } from './StatusBanners.svelte';
-import { agentLabel } from './agents';
 import type { Bridge, ObserveSnapshots } from './bridgeTypes';
 import { errorMessage } from './format';
 import { GithubActions } from './githubActions.svelte';
-import { Notices, PANEL_NOTICE } from './notices.svelte';
+import {
+  LAUNCH_NOTICE,
+  Notices,
+  PANEL_NOTICE,
+  startedNotice,
+} from './notices.svelte';
 import { ProfileActions } from './profileActions.svelte';
 import type {
   AgentId,
@@ -20,8 +24,7 @@ export interface PanelDeps {
   observe: ObserveSnapshots;
 }
 
-/** Key of the start notice: one per panel, a newer start replaces it. */
-export const LAUNCH_NOTICE = 'launch';
+export { LAUNCH_NOTICE } from './notices.svelte';
 /** An undo offer stays this long (`agent_docs/ux_rules.md` rule 7). */
 export const UNDO_TIMEOUT = 8000;
 /** After an install the CLI is detected on demand: the install runs on. */
@@ -181,16 +184,7 @@ export class Panel {
     try {
       const outcome = await this.#bridge.launchSession(request);
       this.accept(outcome.snapshot);
-      const label = agentLabel(outcome.snapshot, request.agent);
-      const text = outcome.snapshot.demo
-        ? `${label} gestartet (Demo).`
-        : `${label} gestartet.`;
-      const { warning } = outcome;
-      this.notices.show({
-        key: LAUNCH_NOTICE,
-        text: warning ? `${text} ${warning}` : text,
-        tone: warning ? 'warning' : 'subtle',
-      });
+      this.notices.show(startedNotice(outcome, request.agent));
       return true;
     } catch (cause) {
       this.notices.show({

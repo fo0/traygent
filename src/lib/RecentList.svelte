@@ -27,8 +27,6 @@
     onRemove: (recent: RecentSession) => Promise<void>;
     onInstall: (agent: AgentId) => void;
   } = $props();
-  /** The profile column exists only while a row started with a profile. */
-  const profileColumn = $derived(snapshot.recents.some((r) => r.profile));
 </script>
 
 {#if snapshot.recents.length}
@@ -41,7 +39,6 @@
         profile={recent.profile
           ? profileLabel(snapshot, recent.agent, recent.profile)
           : ''}
-        {profileColumn}
         {launching}
         {onRestart}
         {onAdopt}
