@@ -112,19 +112,31 @@ Brand top left: icon + „Traygent“. Window ~480×760, frameless, tray popup l
   permission, extra CLI args (free text, validated). For an agent with `profiles` a „Profile“
   block (info tip „Eigene Anmeldung je Profil, alles andere wird abgeglichen. Weitere Ordner und
   Dateien werden wie die eingebauten abgeglichen.“): „Jetzt
-  synchronisieren“ beside the heading (immediate, `sync_profiles`), „Standard-Profil“ (staged),
-  one row per profile — „Standard“ first — with its name, the account or „Nicht angemeldet“
-  (tooltip: account, organisation, folder, „Abgeglichen <time>“, the sync error), a warning
-  icon after a failed sync, „Anmelden“ (immediate, `profile_login`; „Erst speichern“ while the
-  profile is only staged) and a remove button (staged; none for „Standard“); then „Neues
-  Profil“ + „+“ / Enter, whose tooltip shows the folder the name gives. Inline errors: „Name
-  fehlt.“, „Höchstens 24 Zeichen.“, „Keine Steuerzeichen.“, „„<Name>“ ist reserviert.“,
-  „Mindestens ein Buchstabe oder eine Ziffer.“, „Profil gibt es schon.“, „Höchstens 8
-  Profile.“ With at least one extra profile staged, „Weitere Ordner“ and „Weitere Dateien“
-  (`profileShare`, staged; names split at commas and whitespace, repeats once, tooltip „Durch
-  Komma oder Leerzeichen getrennt“, placeholders `.caveman-sessions` / `orca-state.json`) with
-  the native errors of _Profiles → Extra entries_ inline, the first problem per field. Removing
-  the last extra profile hides them; a list that is then invalid goes back to its saved value.
+  synchronisieren“ beside the heading (immediate, `sync_profiles`, tooltip „Automatisch alle 15
+  Minuten“), „Standard-Profil“ (staged), one single-line row per profile — „Standard“ first —
+  with a chevron toggle and its name, the account or „Nicht angemeldet“ (tooltip: the account),
+  a warning icon after a failed sync, „Anmelden“ (immediate, `profile_login`) and a remove
+  button (staged, undone by „Abbrechen“; none for „Standard“). The toggle (`aria-expanded`) opens
+  the row's details in place, one row at a time: „Name“ (for an extra profile a field holding a
+  staged rename — the id and folder never change — checked by the list rules; read-only for
+  „Standard“), „Konto“, „Organisation“ (when reported), „Ordner“ (the folder, mono, with a copy
+  button), „Abgeglichen <time>“ and „Abgleich“ with the sync error when present. Then „Neues
+  Profil“ + „+“ / Enter, whose tooltip shows the folder the name gives: adding is an explicit
+  immediate action (#37) — it sends `save_settings` with the saved settings plus the new profile,
+  never the other staged edits, takes the answer as the new baseline and keeps every staged edit
+  staged, so the row signs in at once; the field is busy meanwhile, and „Speichern“ and an add
+  wait for each other. A name whose id the saved list still holds (a staged removal) brings that
+  profile back without a save. Inline errors: „Name fehlt.“, „Höchstens 24 Zeichen.“, „Keine
+  Steuerzeichen.“, „„<Name>“ ist reserviert.“, „Mindestens ein Buchstabe oder eine Ziffer.“,
+  „Profil gibt es schon.“, „Höchstens 8 Profile.“ (with „ Erst speichern.“ appended when only
+  a staged removal or rename frees the name or the place), and a native refusal verbatim; the
+  name stays typed. With at least one extra profile staged, „Weitere Ordner“ and „Weitere
+  Dateien“ (`profileShare`, staged; names split at commas and whitespace, repeats once, tooltip
+  „Durch Komma oder Leerzeichen getrennt“, placeholders `.caveman-sessions` / `orca-state.json`)
+  with the native errors of _Profiles → Extra entries_ inline, the first problem per field, and
+  below them „Bereits abgeglichen“, collapsed by default: the built-in folders and files, mono
+  (`profileShare.ts → BUILT_IN_SHARE`; a name with an extension is a file). Removing the last
+  extra profile hides them; a list that is then invalid goes back to its saved value.
 - **Umgebung**: „Umgebungen“ — one checkbox per environment the composer shows (Lokal / Docker /
   WSL, all on by default; the last of Lokal and Docker cannot be turned off and says why in its
   tooltip), default environment (one of the shown ones, WSL disabled; it moves to the first shown

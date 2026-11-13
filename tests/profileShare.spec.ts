@@ -79,6 +79,33 @@ test('the fields hide with the last extra profile and come back with a new one',
   await expect(dirs(dialog)).toHaveValue('notes');
 });
 
+test('„Bereits abgeglichen“ lists the built-in folders and files, collapsed', async ({
+  page,
+}) => {
+  await page.goto('/');
+  const dialog = await openAgents(page);
+  const builtIn = dialog.locator('details.profile-builtin');
+  const summary = builtIn.getByText('Bereits abgeglichen');
+  await expect(summary).toBeVisible();
+  await expect(builtIn).not.toHaveAttribute('open');
+  await expect(
+    builtIn.getByText('settings.json', { exact: false }),
+  ).toBeHidden();
+  await summary.click();
+  await expect(builtIn).toHaveAttribute('open');
+  const [dirsLine, filesLine] = (
+    await builtIn.locator('dd').allTextContents()
+  ).map((text) => text.replace(/\s+/g, ' ').trim());
+  expect(dirsLine).toMatch(/^skills, agents, .*, session-env$/);
+  expect(filesLine).toBe(
+    'settings.json, CLAUDE.md, keybindings.json, history.jsonl',
+  );
+  await expect(builtIn.locator('dt')).toHaveText(['Ordner', 'Dateien']);
+  // Keyboard: the summary toggles it back.
+  await builtIn.locator('summary').press('Enter');
+  await expect(builtIn).not.toHaveAttribute('open');
+});
+
 test('natively „Speichern“ sends the parsed names in `profileShare`', async ({
   page,
 }) => {

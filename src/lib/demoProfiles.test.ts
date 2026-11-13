@@ -1,5 +1,6 @@
 import { describe, expect, it, vi } from 'vitest';
 import { createDemoBridge, demoSnapshot } from './demo';
+import { SettingsDraft } from './settingsDraft.svelte';
 import type { LaunchRequest } from './types';
 
 const start: LaunchRequest = {
@@ -112,5 +113,43 @@ describe('demo profiles', () => {
     await expect(bridge.profileLogin('codex', 'default')).rejects.toThrow(
       'Dieses Profil gibt es nicht.',
     );
+  });
+
+  it('adds a profile at once through the draft: it signs in before „Speichern“', async () => {
+    const bridge = createDemoBridge(0, 10);
+    const draft = new SettingsDraft((await bridge.snapshot()).settings);
+    draft.value.sharedWindow = true;
+    const save = async (value: typeof draft.saved) =>
+      (await bridge.saveSettings(value)).settings;
+    expect(await draft.addProfile('claude', 'Kunde', save)).toBe('');
+    const shown = await bridge.snapshot();
+    expect(shown.settings.profiles.claude.map((p) => p.id)).toEqual([
+      'team',
+      'kunde',
+    ]);
+    // The staged edit was not sent and stays staged.
+    expect(shown.settings.sharedWindow).toBe(false);
+    expect(draft.current().sharedWindow).toBe(true);
+    expect(shown.profiles.map((p) => [p.id, p.signedIn])).toEqual([
+      ['default', true],
+      ['team', true],
+      ['kunde', false],
+    ]);
+    await expect(
+      bridge.profileLogin('claude', 'kunde'),
+    ).resolves.toBeUndefined();
+  });
+
+  it('renames a profile on „Speichern“: id, folder and sign-in stay', async () => {
+    const bridge = createDemoBridge(0);
+    const { settings } = await bridge.snapshot();
+    settings.profiles.claude[0]!.label = 'Kunde B';
+    const saved = await bridge.saveSettings(settings);
+    expect(saved.profiles[1]).toMatchObject({
+      id: 'team',
+      label: 'Kunde B',
+      dir: 'C:\\Users\\demo\\.claude-team',
+      signedIn: true,
+    });
   });
 });

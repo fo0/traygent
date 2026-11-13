@@ -3,6 +3,7 @@ import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
 import { demoSettings } from './demoData';
 import {
+  BUILT_IN_SHARE,
   HANDLED_NAMES,
   MAX_SHARED,
   NEVER_SHARED,
@@ -167,6 +168,24 @@ describe('shared names: the rules', () => {
     expect(native.ownPrefix).toBe('.traygent');
     expect(native.maxPerList).toBe(MAX_SHARED);
     expect(native.maxNameChars).toBe(64);
+    // „Bereits abgeglichen“ shows the native list as spelled, split in two.
+    expect([...BUILT_IN_SHARE.dirs, ...BUILT_IN_SHARE.files].sort()).toEqual(
+      [...native.handled].sort(),
+    );
+  });
+
+  it('split the built-in names: a name with an extension is a file', () => {
+    expect(BUILT_IN_SHARE.files).toEqual([
+      'settings.json',
+      'CLAUDE.md',
+      'keybindings.json',
+      'history.jsonl',
+    ]);
+    // The 17 linked folders of docs/USAGE.md, none with an extension.
+    expect(BUILT_IN_SHARE.dirs).toHaveLength(17);
+    expect(BUILT_IN_SHARE.dirs.filter((name) => name.includes('.'))).toEqual(
+      [],
+    );
   });
 
   it('refuse a name twice, ignoring case, within and across both lists', () => {

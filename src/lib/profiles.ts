@@ -79,6 +79,25 @@ export function newProfileProblem(name: string, list: readonly AgentProfile[]) {
   return '';
 }
 
+/**
+ * Why the label of `list[index]` is refused, for a rename in place (the id
+ * and folder stay); the same rules as `profilesProblem`, without the prefix.
+ */
+export function renameProblem(list: readonly AgentProfile[], index: number) {
+  const label = list[index]?.label;
+  if (label === undefined) return '';
+  return (
+    (label !== label.trim() && 'Ungültiger Name.') ||
+    labelProblem(label) ||
+    (list.some(
+      (p, other) =>
+        other !== index && p.label.toLowerCase() === label.toLowerCase(),
+    ) &&
+      'Profil gibt es schon.') ||
+    ''
+  );
+}
+
 /** Why a saved list and its default are refused, as natively; `''` when valid. */
 export function profilesProblem(list: readonly AgentProfile[], chosen: string) {
   if (list.length > MAX_PROFILES) return `Höchstens ${MAX_PROFILES} Profile.`;

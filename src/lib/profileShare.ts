@@ -13,32 +13,35 @@ const NAME = /^[A-Za-z0-9._-]{1,64}$/;
 const DEVICE = /^(?:con|prn|aux|nul|com[0-9]|lpt[0-9])(?:\.|$)/i;
 /** Traygent's own files in a profile folder start with this. */
 const OWN_PREFIX = '.traygent';
-/** What the sync already shares, copies or keeps per profile. */
-const HANDLED = new Set(
-  [
-    'skills',
-    'agents',
-    'commands',
-    'rules',
-    'output-styles',
-    'workflows',
-    'agent-memory',
-    'themes',
-    'plugins',
-    'projects',
-    'file-history',
-    'plans',
-    'tasks',
-    'paste-cache',
-    'hooks',
-    'todos',
-    'session-env',
-    'settings.json',
-    'CLAUDE.md',
-    'keybindings.json',
-    'history.jsonl',
-  ].map((name) => name.toLowerCase()),
-);
+/**
+ * What the sync already shares, copies or keeps per profile, as the native
+ * side spells them. Rust lists them in one list (the fixture); a name with an
+ * extension is a file, the rest are folders (`BUILT_IN_SHARE`).
+ */
+const BUILT_IN = [
+  'skills',
+  'agents',
+  'commands',
+  'rules',
+  'output-styles',
+  'workflows',
+  'agent-memory',
+  'themes',
+  'plugins',
+  'projects',
+  'file-history',
+  'plans',
+  'tasks',
+  'paste-cache',
+  'hooks',
+  'todos',
+  'session-env',
+  'settings.json',
+  'CLAUDE.md',
+  'keybindings.json',
+  'history.jsonl',
+] as const;
+const HANDLED = new Set<string>(BUILT_IN.map((name) => name.toLowerCase()));
 /** The state and sign-in files and anything named after them, e.g. a backup copy. */
 export const PROTECTED_PREFIXES = ['.claude.json', '.credentials.json'];
 /** Account caches and logs: they belong to one sign-in and are never shared. */
@@ -60,6 +63,11 @@ export const NEVER_SHARED = new Set([
 ]);
 /** The names the sync handles itself, as the native side lists them. */
 export const HANDLED_NAMES: ReadonlySet<string> = HANDLED;
+/** The built-in names split for „Bereits abgeglichen“: folders, then files. */
+export const BUILT_IN_SHARE: Readonly<ProfileShare> = {
+  dirs: BUILT_IN.filter((name) => !name.includes('.')),
+  files: BUILT_IN.filter((name) => name.includes('.')),
+};
 const NOUNS: Record<ShareKind, string> = { dirs: 'Ordner', files: 'Dateien' };
 
 export const emptyShare = (): ProfileShare => ({ dirs: [], files: [] });
