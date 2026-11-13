@@ -37,6 +37,9 @@ pub struct SystemRunner {
     /// On a timeout, end the child's whole process tree first (Windows): an npm `.cmd` shim
     /// would otherwise leave its `node` grandchild running.
     pub kill_tree: bool,
+    /// Extra environment variables of the child: values that must not appear in its command
+    /// line (docs/adr/0003).
+    pub env: Vec<(String, String)>,
 }
 
 impl Default for SystemRunner {
@@ -44,6 +47,7 @@ impl Default for SystemRunner {
         Self {
             timeout: TIMEOUT,
             kill_tree: false,
+            env: Vec::new(),
         }
     }
 }
@@ -53,6 +57,7 @@ impl Runner for SystemRunner {
         let mut command = Command::new(program);
         command
             .args(args)
+            .envs(self.env.iter().map(|(name, value)| (name, value)))
             .stdin(Stdio::null())
             .stdout(Stdio::piped())
             .stderr(Stdio::null());

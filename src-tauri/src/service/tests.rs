@@ -79,6 +79,7 @@ fn request(agent: AgentId, env: EnvId, folder: &str) -> LaunchRequest {
         repo: None,
         options: LaunchOptions::default(),
         session: SessionMode::New,
+        profile: None,
         ports: Vec::new(),
     }
 }

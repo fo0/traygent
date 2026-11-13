@@ -28,7 +28,9 @@ vault = ["dep:keyring"]
 
 [dependencies]
 serde = { version = "1", features = ["derive"] }
-serde_json = "1"
+# raw_value: the profile sync rewrites two keys of `.claude.json` and keeps every other value
+# byte for byte, in file order (no extra crate).
+serde_json = { version = "1", features = ["raw_value"] }
 chrono = { version = "0.4", features = ["clock", "serde"] }
 # SHA-256 for recent-session ids, the Docker project dir name and update verification.
 sha2 = "0.11"

@@ -5,18 +5,25 @@
 use super::Service;
 use crate::detect::{host, Detection, Fs, Host};
 use crate::launch::{self, LaunchPlan, Resolved};
-use crate::models::{AgentId, AgentStatus, EnvId, LaunchRequest, ProbeState, TerminalId};
+use crate::models::{
+    AgentId, AgentStatus, EnvId, LaunchRequest, ProbeState, TerminalId, DEFAULT_PROFILE,
+};
+use crate::profiles::Homes;
 use crate::{repo, settings};
 
 const FOLDER_MISSING: &str = "Ordner nicht gefunden.";
 const NO_CLONE_ROOT: &str =
     "Kein Klon-Ordner verfügbar. Bitte in den Einstellungen unter GitHub einen Klon-Ordner wählen.";
 const CLONE_ROOT_FAILED: &str = "Der Klon-Ordner konnte nicht angelegt werden.";
+pub const PROFILE_MISSING: &str = "Profil nicht gefunden.";
+const NO_PROFILE_HOME: &str = "Der Profilordner ist nicht verfügbar: kein Benutzerordner gefunden.";
+const PROFILE_DIR_FAILED: &str = "Der Profilordner konnte nicht angelegt werden.";
 
 /// A launch ready to spawn; `fallback` is the console plan when wt.exe fails to start.
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct Prepared {
-    /// Normalized: the folder (derived for a repository start), options, ports and repo.
+    /// Normalized: the folder (derived for a repository start), options, ports, repo and
+    /// profile (none for the default one and outside the local environment).
     pub request: LaunchRequest,
     pub plan: LaunchPlan,
     pub fallback: Option<LaunchPlan>,
@@ -60,15 +67,19 @@ impl Service {
                 }
             }
         };
+        let profile =
+            self.launch_profile(request.agent, request.env, request.profile.as_deref())?;
         let request = LaunchRequest {
             folder: target.folder,
             repo,
             options: settings::normalize_options(request.options.clone()),
             ports: launch::request_ports(request)?,
+            profile,
             ..request.clone()
         };
         let clone = target.clone_root.is_some();
-        let resolved = self.resolve(request.agent, request.env, clone, host, fs, nonce);
+        let mut resolved = self.resolve(request.agent, request.env, clone, host, fs, nonce);
+        resolved.profile_dir = profile_dir(request.agent, request.profile.as_deref(), host)?;
         let settings = &self.state.settings;
         let build = |resolved: &Resolved| match &target.clone_root {
             Some(root) => launch::clone_plan(&request, settings, resolved, root),
@@ -119,6 +130,81 @@ impl Service {
         let folder = repo::clone_folder(&root, repo)?;
         let clone_root = (!fs.is_dir(&folder)).then_some(root);
         Ok(Target { folder, clone_root })
+    }
+
+    /// The profile a start uses: none for the default one and for every environment but the
+    /// local one (a container has its own home). Any other must be one of the agent's
+    /// profiles — a recent whose profile was removed does not start.
+    fn launch_profile(
+        &self,
+        agent: AgentId,
+        env: EnvId,
+        profile: Option<&str>,
+    ) -> Result<Option<String>, String> {
+        let wanted = profile
+            .map(str::trim)
+            .filter(|id| !id.is_empty() && *id != DEFAULT_PROFILE);
+        let Some(id) = wanted.filter(|_| env == EnvId::Local) else {
+            return Ok(None);
+        };
+        let listed = self.state.settings.profiles.get(agent);
+        if !listed.iter().any(|profile| profile.id == id) {
+            return Err(PROFILE_MISSING.into());
+        }
+        Ok(Some(id.to_string()))
+    }
+
+    /// The terminal that signs the agent's profile in (`<cli> auth login`), with its console
+    /// fallback. The profile's directory is created, so the CLI finds its home.
+    pub fn prepare_login(
+        &self,
+        agent: AgentId,
+        profile: &str,
+        host: &Host,
+        fs: &dyn Fs,
+    ) -> Result<(LaunchPlan, Option<LaunchPlan>), String> {
+        let name = agent.label();
+        if crate::profiles::recipe(agent).is_none() {
+            return Err(format!("{name} unterstützt keine Profile."));
+        }
+        if self.agent_updating(agent) {
+            return Err(format!("{name} wird gerade aktualisiert."));
+        }
+        let listed = self.state.settings.profiles.get(agent);
+        let label = match listed.iter().find(|listed| listed.id == profile) {
+            Some(listed) => listed.label.as_str(),
+            None if profile == DEFAULT_PROFILE => crate::models::DEFAULT_PROFILE_LABEL,
+            None => return Err(PROFILE_MISSING.into()),
+        };
+        let mut resolved = self.resolve(agent, EnvId::Local, false, host, fs, "");
+        if resolved.cli.is_none() {
+            return Err(format!("{name} ist nicht installiert."));
+        }
+        let id = (profile != DEFAULT_PROFILE).then_some(profile);
+        resolved.profile_dir = profile_dir(agent, id, host)?;
+        let home = host
+            .user_profile
+            .clone()
+            .filter(|dir| fs.is_dir(dir))
+            .unwrap_or_else(|| "C:\\".into());
+        let settings = &self.state.settings;
+        let plan = launch::login_plan(agent, label, settings, &resolved, &home)?;
+        let fallback = (plan.terminal == TerminalId::WindowsTerminal)
+            .then(|| {
+                launch::login_plan(
+                    agent,
+                    label,
+                    settings,
+                    &console_only(resolved.clone()),
+                    &home,
+                )
+                .ok()
+            })
+            .flatten();
+        if let Some(dir) = &resolved.profile_dir {
+            fs.create_dir_all(dir).map_err(|_| PROFILE_DIR_FAILED)?;
+        }
+        Ok((plan, fallback))
     }
 
     /// The install terminal for `agent`, with its console fallback.
@@ -190,8 +276,18 @@ impl Service {
             powershell: host.powershell(),
             wt: wt.flatten(),
             nonce: nonce.into(),
+            profile_dir: None,
         }
     }
+}
+
+/// The directory of an extra profile (`None`: the default one, the CLI's own home).
+fn profile_dir(agent: AgentId, id: Option<&str>, host: &Host) -> Result<Option<String>, String> {
+    let Some(id) = id else {
+        return Ok(None);
+    };
+    let dir = Homes::of(host).and_then(|homes| homes.dir(agent, id));
+    dir.map(Some).ok_or_else(|| NO_PROFILE_HOME.into())
 }
 
 fn console_only(resolved: Resolved) -> Resolved {

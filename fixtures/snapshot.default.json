@@ -38,7 +38,17 @@
     "github": {
       "cloneRoot": ""
     },
-    "agentUpdates": false
+    "agentUpdates": false,
+    "profiles": {
+      "claude": [],
+      "opencode": [],
+      "codex": []
+    },
+    "agentProfile": {
+      "claude": "default",
+      "opencode": "default",
+      "codex": "default"
+    }
   },
   "catalog": [
     {
@@ -129,7 +139,8 @@
         "docsUrl": "https://code.claude.com/docs/en/setup",
         "update": "claude update",
         "requires": "Git for Windows empfohlen"
-      }
+      },
+      "profiles": true
     },
     {
       "id": "opencode",
@@ -196,7 +207,8 @@
         "docsUrl": "https://opencode.ai/v2/docs/",
         "update": "opencode upgrade",
         "requires": "Node.js + npm"
-      }
+      },
+      "profiles": false
     },
     {
       "id": "codex",
@@ -299,7 +311,8 @@
         "docsUrl": "https://github.com/openai/codex",
         "update": "codex update",
         "requires": "Windows 10 1809+ mit winget"
-      }
+      },
+      "profiles": false
     }
   ],
   "portPresets": [
@@ -391,6 +404,15 @@
   },
   "agentUpdates": [],
   "agentUpdatesRunning": false,
+  "profiles": [
+    {
+      "agent": "claude",
+      "id": "default",
+      "label": "Standard",
+      "dir": "",
+      "signedIn": false
+    }
+  ],
   "detecting": false,
   "revision": 0
 }

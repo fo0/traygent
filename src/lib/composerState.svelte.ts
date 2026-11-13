@@ -1,5 +1,12 @@
 import { catalogEntry, nextPermission, sentOptions } from './agents';
 import { shownEnv, shownEnvs } from './environments';
+import {
+  DEFAULT_PROFILE,
+  agentProfiles,
+  defaultProfile,
+  knownProfile,
+  profilesApply,
+} from './profiles';
 import { classifyTarget, repoLabel, type Target } from './target';
 import type {
   AgentId,
@@ -46,6 +53,11 @@ export class Composer {
    * defaults, back to them after every start.
    */
   ports = $state<string[]>([]);
+  /**
+   * The agent's profile (Lokal only); from its saved default, back to it
+   * after every start and agent change.
+   */
+  profile = $state(DEFAULT_PROFILE);
   /** The snapshot the form follows; null until the first one. */
   #snapshot = $state.raw<Snapshot | null>(null);
 
@@ -81,6 +93,13 @@ export class Composer {
     )
       this.resetOptions();
     if (!same(settings.docker.ports, previous.docker.ports)) this.resetPorts();
+    // A changed default, or the chosen profile removed meanwhile.
+    if (
+      settings.agentProfile?.[this.agent] !==
+        previous.agentProfile?.[this.agent] ||
+      !knownProfile(settings, this.agent, this.profile)
+    )
+      this.profile = defaultProfile(settings, this.agent);
   }
 
   /** The environments the form offers, in display order. */
@@ -97,9 +116,13 @@ export class Composer {
     return { ...(settings?.agents[this.agent] ?? FALLBACK) };
   }
 
-  /** The agent's saved defaults and a new session. */
+  /** The agent's saved defaults (its profile too) and a new session. */
   resetOptions() {
-    this.options = this.#defaults(this.#snapshot?.settings);
+    const settings = this.#snapshot?.settings;
+    this.options = this.#defaults(settings);
+    this.profile = settings
+      ? defaultProfile(settings, this.agent)
+      : DEFAULT_PROFILE;
     this.session = 'new';
   }
 
@@ -135,11 +158,35 @@ export class Composer {
     this.env = shownEnv(recent.env, this.#snapshot?.settings.environments);
     this.folder = recentTarget(recent);
     this.options = { ...recent.options };
+    const settings = this.#snapshot?.settings;
+    const profile = recent.profile ?? DEFAULT_PROFILE;
+    this.profile =
+      !settings || knownProfile(settings, recent.agent, profile)
+        ? profile
+        : defaultProfile(settings, recent.agent);
     this.session = 'new';
     // A Lokal or WSL session published none; Docker then starts from the defaults.
     if (recent.env === 'docker' && this.env === 'docker')
       this.ports = [...recent.ports];
     else this.resetPorts();
+  }
+
+  /** Whether a start sends the profile: an agent with profiles, Lokal. */
+  get profileApplies() {
+    return (
+      !!this.#snapshot && profilesApply(this.#snapshot, this.agent, this.env)
+    );
+  }
+
+  /**
+   * The profiles the „Profil“ chip offers, „Standard“ first; empty (no chip)
+   * where the profile does not apply or the agent has no extra profile.
+   */
+  get profiles() {
+    const snapshot = this.#snapshot;
+    if (!snapshot || !this.profileApplies) return [];
+    const list = agentProfiles(snapshot, this.agent);
+    return list.length > 1 ? list : [];
   }
 
   /** The session modes the selected agent supports; `new` always. */
@@ -166,6 +213,8 @@ export class Composer {
       options: sentOptions(entry, $state.snapshot(this.options)),
       session,
       ports: this.env === 'docker' ? $state.snapshot(this.ports) : [],
+      ...(this.profileApplies &&
+        this.profile !== DEFAULT_PROFILE && { profile: this.profile }),
     };
   }
 

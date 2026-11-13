@@ -14,6 +14,7 @@ fn request(folder: &str, agent: AgentId, env: EnvId) -> LaunchRequest {
         repo: None,
         options: LaunchOptions::default(),
         session: SessionMode::New,
+        profile: None,
         ports: Vec::new(),
     }
 }
@@ -228,4 +229,37 @@ fn a_start_by_path_keeps_the_repository_of_the_same_folder() {
         at(3),
     );
     assert_eq!(other.repo, None);
+}
+
+#[test]
+fn the_profile_follows_the_latest_start_and_the_id_ignores_it() {
+    let mut list = Vec::new();
+    let with = |profile: Option<&str>, env: EnvId| LaunchRequest {
+        profile: profile.map(Into::into),
+        ..request("C:\\a", AgentId::Claude, env)
+    };
+    let team = upsert(&mut list, &with(Some("team"), EnvId::Local), at(1));
+    assert_eq!(team.profile.as_deref(), Some("team"));
+    assert_eq!(team.id, recent_id("C:\\a", AgentId::Claude, EnvId::Local));
+    let solo = upsert(&mut list, &with(Some("solo"), EnvId::Local), at(2));
+    assert_eq!((solo.id.as_str(), solo.starts), (team.id.as_str(), 2));
+    assert_eq!(solo.profile.as_deref(), Some("solo"));
+    // Unlike the repository, the profile is replaced like the options: none is the default.
+    let plain = upsert(&mut list, &with(None, EnvId::Local), at(3));
+    assert_eq!(
+        (plain.profile.as_deref(), plain.starts, list.len()),
+        (None, 3, 1)
+    );
+    // Only a local session has one; the default and a malformed id are stored as none.
+    assert_eq!(
+        upsert(&mut list, &with(Some("team"), EnvId::Docker), at(4)).profile,
+        None
+    );
+    for id in ["default", "", "Team", "..\\x", "a b"] {
+        assert_eq!(stored_profile(EnvId::Local, Some(id)), None, "{id}");
+    }
+    assert_eq!(stored_profile(EnvId::Wsl, Some("team")), None);
+    let mut tampered = team;
+    tampered.profile = Some("..\\..\\evil".into());
+    assert_eq!(tidy(vec![tampered]).remove(0).profile, None);
 }

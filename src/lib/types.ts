@@ -7,6 +7,7 @@
  */
 import type { AgentUpdateStatus } from './agentUpdateTypes';
 import type { GithubState } from './githubTypes';
+import type { AgentProfile, ProfileStatus } from './profileTypes';
 
 export type { AgentUpdateState, AgentUpdateStatus } from './agentUpdateTypes';
 export type {
@@ -17,6 +18,7 @@ export type {
   LocalAccounts,
   RepoSummary,
 } from './githubTypes';
+export type { AgentProfile, ProfileStatus } from './profileTypes';
 
 /** The coding agents Traygent starts. */
 export type AgentId = 'claude' | 'opencode' | 'codex';
@@ -73,6 +75,8 @@ export interface AgentCatalogEntry {
   /** Environments it can run in. */
   environments: EnvId[];
   install: InstallInfo;
+  /** Whether it has profiles (`settings.profiles`): Claude Code only. */
+  profiles: boolean;
 }
 
 /** What a start uses; agent defaults and recent sessions store this. */
@@ -114,6 +118,8 @@ export interface LaunchRequest {
    * Port spec rules: docs/SPEC.md → Ports.
    */
   ports: string[];
+  /** A profile of the agent (`local` only); omitted for `default`. */
+  profile?: string;
 }
 
 export interface RecentSession {
@@ -130,6 +136,8 @@ export interface RecentSession {
   /** RFC 3339. */
   lastStartedAt: string;
   starts: number;
+  /** The profile it started with; absent for `default`. */
+  profile?: string;
 }
 
 export interface AgentStatus {
@@ -197,6 +205,10 @@ export interface AppSettings {
   github: GithubSettings;
   /** Update the local agent CLIs every 4 hours while no session uses them. */
   agentUpdates: boolean;
+  /** Extra profiles per agent; `[]` for an agent without `profiles`. */
+  profiles: Record<AgentId, AgentProfile[]>;
+  /** The profile a start begins with: `default` or one of `profiles`. */
+  agentProfile: Record<AgentId, string>;
 }
 
 /** Mirrors `Snapshot` in src-tauri/src/models.rs; replaced wholesale on every change. */
@@ -229,6 +241,11 @@ export interface Snapshot {
    */
   agentUpdatesRunning: boolean;
   /**
+   * Per agent with `profiles`: `default` („Standard“) first, then the
+   * settings' order.
+   */
+  profiles: ProfileStatus[];
+  /**
    * Increases with every native state change and every finished detection;
    * the panel drops a snapshot older than the one it shows. The demo counts
    * too.
@@ -246,6 +263,8 @@ export interface Snapshot {
 export interface LaunchOutcome {
   recent: RecentSession;
   snapshot: Snapshot;
+  /** German, not fatal: the session did start. */
+  warning?: string;
 }
 
 /** Mirrors `StartupStatus` and its `Status` in src-tauri/src/startup.rs. */

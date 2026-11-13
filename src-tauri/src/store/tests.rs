@@ -1,6 +1,7 @@
 use super::*;
 use crate::models::{
-    EnvId, GithubSource, LaunchRequest, PermissionId, RepoRef, SessionMode, TerminalId,
+    AgentProfile, EnvId, GithubSource, LaunchRequest, PermissionId, RepoRef, SessionMode,
+    TerminalId,
 };
 use crate::testing::TempDir;
 use serde_json::json;
@@ -26,6 +27,17 @@ fn sample() -> Persisted {
     settings.docker.ports = vec!["127.0.0.1:5173:5173".into()];
     settings.agents.get_mut(AgentId::Codex).permission = PermissionId::Bypass;
     settings.github.clone_root = r"D:\src".into();
+    settings.profiles.claude = vec![
+        AgentProfile {
+            id: "team".into(),
+            label: "Team".into(),
+        },
+        AgentProfile {
+            id: "max-2".into(),
+            label: "Max 2".into(),
+        },
+    ];
+    settings.agent_profile.claude = "team".into();
     let mut recents = Vec::new();
     let request = LaunchRequest {
         agent: AgentId::Claude,
@@ -37,6 +49,7 @@ fn sample() -> Persisted {
         }),
         options: Default::default(),
         session: SessionMode::Continue,
+        profile: None,
         ports: vec!["3000".into(), "0.0.0.0:8080:80/udp".into()],
     };
     recents::upsert(&mut recents, &request, chrono::Utc::now());
@@ -80,6 +93,18 @@ fn save_then_load_round_trips_with_a_version() {
     assert_eq!(value["settings"]["terminal"], "console");
     assert_eq!(value["settings"]["sharedWindow"], true);
     assert_eq!(value["settings"]["agentUpdates"], true);
+    assert_eq!(
+        value["settings"]["profiles"],
+        json!({
+            "claude": [{ "id": "team", "label": "Team" }, { "id": "max-2", "label": "Max 2" }],
+            "opencode": [],
+            "codex": []
+        })
+    );
+    assert_eq!(
+        value["settings"]["agentProfile"],
+        json!({ "claude": "team", "opencode": "default", "codex": "default" })
+    );
     assert_eq!(
         value["github"],
         json!({ "login": "octo-cat", "id": 42, "source": "gh" })
@@ -408,3 +433,5 @@ fn the_github_account_loads_leniently_and_is_left_out_without_one() {
     let value: Value = serde_json::from_str(&text).unwrap();
     assert!(value.get("github").is_none());
 }
+
+mod profiles;

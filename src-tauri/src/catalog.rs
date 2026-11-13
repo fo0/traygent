@@ -107,6 +107,7 @@ fn claude() -> AgentCatalogEntry {
             update: Some("claude update".into()),
             requires: Some("Git for Windows empfohlen".into()),
         },
+        profiles: crate::profiles::recipe(AgentId::Claude).is_some(),
     }
 }
 
@@ -137,6 +138,7 @@ fn opencode() -> AgentCatalogEntry {
             update: Some("opencode upgrade".into()),
             requires: Some("Node.js + npm".into()),
         },
+        profiles: crate::profiles::recipe(AgentId::Opencode).is_some(),
     }
 }
 
@@ -170,6 +172,7 @@ fn codex() -> AgentCatalogEntry {
             update: Some("codex update".into()),
             requires: Some("Windows 10 1809+ mit winget".into()),
         },
+        profiles: crate::profiles::recipe(AgentId::Codex).is_some(),
     }
 }
 

@@ -6,6 +6,7 @@
  */
 import { envsProblem } from './environments';
 import { DOCKER_ONLY, portListProblem } from './ports';
+import { DEFAULT_PROFILE, profilesProblem } from './profiles';
 import type { AgentId, AppSettings, LaunchRequest } from './types';
 
 export { portListProblem } from './ports';
@@ -120,6 +121,7 @@ export function launchPortsProblem(
 export type SettingsField =
   | `agents.${AgentId}.extraArgs`
   | `agents.${AgentId}.model`
+  | `agents.${AgentId}.profiles`
   | `docker.images.${AgentId}`
   | 'docker.ports'
   | 'environments'
@@ -138,6 +140,9 @@ export function settingsProblems(
     if (args) problems[`agents.${agent}.extraArgs`] = args;
     const model = modelProblem(options.model, agent);
     if (model) problems[`agents.${agent}.model`] = model;
+    const chosen = settings.agentProfile[agent] ?? DEFAULT_PROFILE;
+    const profiles = profilesProblem(settings.profiles[agent] ?? [], chosen);
+    if (profiles) problems[`agents.${agent}.profiles`] = profiles;
   }
   for (const agent of Object.keys(settings.docker.images) as AgentId[]) {
     const image = imageProblem(settings.docker.images[agent]);

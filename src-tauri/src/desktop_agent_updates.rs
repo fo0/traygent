@@ -96,6 +96,7 @@ fn update_all(app: &AppHandle, targets: &[(AgentId, Candidate)]) {
     let update = SystemRunner {
         timeout: agent_updates::UPDATE_TIMEOUT,
         kill_tree: true,
+        ..SystemRunner::default()
     };
     let runners = Runners {
         list: &list,

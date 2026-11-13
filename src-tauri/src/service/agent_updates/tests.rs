@@ -53,6 +53,7 @@ fn request(agent: AgentId, env: EnvId) -> LaunchRequest {
         repo: None,
         options: LaunchOptions::default(),
         session: SessionMode::New,
+        profile: None,
         ports: Vec::new(),
     }
 }

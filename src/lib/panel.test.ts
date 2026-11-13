@@ -39,6 +39,8 @@ function bridgeWith(overrides: Partial<Bridge> = {}): Bridge {
     githubDisconnect: async () => snapshot(),
     githubRefreshRepos: async () => snapshot(),
     updateAgents: async () => snapshot(),
+    syncProfiles: async () => snapshot(),
+    profileLogin: async () => {},
     ...overrides,
   };
 }
@@ -218,6 +220,45 @@ describe('Panel', () => {
       tone: 'subtle',
       timeout: 3000,
     });
+  });
+
+  it('shows a start with a warning as a warning that stays: it did start', async () => {
+    const warning = 'Profil „Team“ ist nicht abgeglichen.';
+    const panel = panelWith({
+      launchSession: async () => ({
+        ...(await bridgeWith().launchSession(request)),
+        warning,
+      }),
+    });
+    expect(await panel.launch(request)).toBe(true);
+    expect(panel.notices.get(LAUNCH_NOTICE)).toMatchObject({
+      text: `Claude Code gestartet. ${warning}`,
+      tone: 'warning',
+      timeout: undefined,
+    });
+  });
+
+  it('syncs profiles once at a time and opens a sign-in', async () => {
+    let resolve: (value: Snapshot) => void = () => {};
+    const syncProfiles = vi.fn(
+      () => new Promise<Snapshot>((done) => (resolve = done)),
+    );
+    const profileLogin = vi.fn(async () => {});
+    const panel = panelWith({ syncProfiles, profileLogin });
+    const first = panel.profiles.sync();
+    expect(panel.profiles.syncing).toBe(true);
+    expect(await panel.profiles.sync()).toBe(false);
+    const synced = snapshot({ revision: 7 });
+    resolve(synced);
+    expect(await first).toBe(true);
+    expect(panel.snapshot).toBe(synced);
+    expect(panel.profiles.syncing).toBe(false);
+    expect(syncProfiles).toHaveBeenCalledTimes(1);
+    await panel.profiles.login('claude', 'team');
+    expect(profileLogin).toHaveBeenCalledWith('claude', 'team');
+    syncProfiles.mockRejectedValueOnce('Profil ist gesperrt.');
+    await expect(panel.profiles.sync()).rejects.toBe('Profil ist gesperrt.');
+    expect(panel.profiles.syncing).toBe(false);
   });
 
   it('keeps a failed start as an error notice with the German message', async () => {

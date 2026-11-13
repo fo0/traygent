@@ -4,6 +4,8 @@ use crate::models::{
 };
 use crate::{catalog, launch, ports};
 
+pub mod profiles;
+
 /// Base image for every agent's container (docs/AGENT_RECIPES.md §4).
 pub const DEFAULT_IMAGE: &str = "node:22-trixie";
 const MAX_MODEL_CHARS: usize = 128;
@@ -43,6 +45,8 @@ impl Default for AppSettings {
             docker: DockerSettings::default(),
             github: GithubSettings::default(),
             agent_updates: false,
+            profiles: PerAgent::default(),
+            agent_profile: PerAgent::from_fn(|_| crate::models::DEFAULT_PROFILE.to_string()),
         }
     }
 }
@@ -66,6 +70,7 @@ pub fn normalize(mut settings: AppSettings) -> AppSettings {
     // Canonical when valid, like the ports; `''` means the default clone root.
     let root = settings.github.clone_root.trim();
     settings.github.clone_root = launch::normalize_folder(root).unwrap_or_else(|_| root.into());
+    profiles::normalize(&mut settings);
     settings
 }
 
@@ -136,6 +141,7 @@ pub fn sanitize(settings: AppSettings) -> AppSettings {
     if validate_clone_root(&settings.github.clone_root).is_err() {
         settings.github.clone_root = defaults.github.clone_root;
     }
+    profiles::sanitize(&mut settings);
     settings
 }
 
@@ -149,7 +155,8 @@ pub fn validate(settings: &AppSettings) -> Result<(), String> {
         validate_image(agent, settings.docker.images.get(agent))?;
     }
     ports::normalize_ports(&settings.docker.ports).map(drop)?;
-    validate_clone_root(&settings.github.clone_root)
+    validate_clone_root(&settings.github.clone_root)?;
+    profiles::validate(settings)
 }
 
 /// At least one environment that can start a session, the default among them.

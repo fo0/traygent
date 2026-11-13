@@ -4,6 +4,7 @@ import type { Bridge, ObserveSnapshots } from './bridgeTypes';
 import { errorMessage } from './format';
 import { GithubActions } from './githubActions.svelte';
 import { Notices, PANEL_NOTICE } from './notices.svelte';
+import { ProfileActions } from './profileActions.svelte';
 import type {
   AgentId,
   AppSettings,
@@ -45,6 +46,8 @@ export class Panel {
   readonly notices = new Notices();
   /** Settings → GitHub and the listing refresh. */
   readonly github: GithubActions;
+  /** Settings → Agenten → „Profile“: sync and sign-in. */
+  readonly profiles: ProfileActions;
   #bridge: Bridge;
   #observe: ObserveSnapshots;
   /** Bumped by every load, refresh and cleanup; their stale answers are dropped. */
@@ -64,6 +67,10 @@ export class Panel {
       notices: this.notices,
       accept: (value) => this.accept(value),
       current: () => this.snapshot,
+    });
+    this.profiles = new ProfileActions({
+      bridge,
+      accept: (value) => this.accept(value),
     });
   }
 
@@ -166,7 +173,7 @@ export class Panel {
     }
   }
 
-  /** Starts a session; true when the terminal opened. */
+  /** Starts a session; true when the terminal opened, also with a warning. */
   async launch(request: LaunchRequest): Promise<boolean> {
     if (this.launching) return false;
     this.launching = true;
@@ -175,12 +182,14 @@ export class Panel {
       const outcome = await this.#bridge.launchSession(request);
       this.accept(outcome.snapshot);
       const label = agentLabel(outcome.snapshot, request.agent);
+      const text = outcome.snapshot.demo
+        ? `${label} gestartet (Demo).`
+        : `${label} gestartet.`;
+      const { warning } = outcome;
       this.notices.show({
         key: LAUNCH_NOTICE,
-        text: outcome.snapshot.demo
-          ? `${label} gestartet (Demo).`
-          : `${label} gestartet.`,
-        tone: 'subtle',
+        text: warning ? `${text} ${warning}` : text,
+        tone: warning ? 'warning' : 'subtle',
       });
       return true;
     } catch (cause) {

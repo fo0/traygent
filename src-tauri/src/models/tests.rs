@@ -140,6 +140,7 @@ fn struct_fields_are_camel_case() {
         }),
         options: LaunchOptions::default(),
         ports: vec!["127.0.0.1:3000:3000".into()],
+        profile: None,
         last_started_at: "2026-11-03T09:00:00Z".into(),
         starts: 2,
     };
@@ -339,4 +340,66 @@ fn agent_update_statuses_are_camel_case_and_skip_unknown_versions() {
     native.as_object_mut().unwrap().remove("agentUpdates");
     let old: Snapshot = serde_json::from_value(native).unwrap();
     assert!(old.agent_updates.is_empty());
+}
+
+#[test]
+fn profile_fields_follow_the_contract() {
+    let status = ProfileStatus {
+        agent: AgentId::Claude,
+        id: "team".into(),
+        label: "Team".into(),
+        dir: "C:\\Users\\max\\.claude-team".into(),
+        signed_in: true,
+        account: Some("team@example.test".into()),
+        organization: None,
+        synced_at: Some("2026-11-13T09:00:00Z".into()),
+        sync_error: None,
+    };
+    assert_eq!(
+        serde_json::to_value(&status).unwrap(),
+        json!({
+            "agent": "claude", "id": "team", "label": "Team",
+            "dir": "C:\\Users\\max\\.claude-team", "signedIn": true,
+            "account": "team@example.test", "syncedAt": "2026-11-13T09:00:00Z"
+        })
+    );
+    let request: LaunchRequest = serde_json::from_value(json!({
+        "agent": "claude", "env": "local", "folder": "C:\\x", "options": {},
+        "session": "new", "profile": "team"
+    }))
+    .unwrap();
+    assert_eq!(request.profile.as_deref(), Some("team"));
+    let plain = LaunchRequest {
+        profile: None,
+        ..request
+    };
+    assert!(serde_json::to_value(&plain)
+        .unwrap()
+        .get("profile")
+        .is_none());
+    let settings = serde_json::to_value(AppSettings::default()).unwrap();
+    assert_eq!(settings["profiles"]["claude"], json!([]));
+    assert_eq!(settings["agentProfile"]["codex"], "default");
+    let outcome = LaunchOutcome {
+        recent: serde_json::from_value(json!({
+            "id": "x", "agent": "claude", "env": "local", "folder": "C:\\x", "options": {},
+            "lastStartedAt": "2026-11-13T09:00:00Z", "starts": 1
+        }))
+        .unwrap(),
+        snapshot: Snapshot::native(),
+        warning: None,
+    };
+    let value = serde_json::to_value(&outcome).unwrap();
+    assert!(value.get("warning").is_none());
+    assert!(value["recent"].get("profile").is_none());
+    assert_eq!(value["snapshot"]["profiles"][0]["id"], "default");
+    assert_eq!(value["snapshot"]["catalog"][0]["profiles"], true);
+    let warned = LaunchOutcome {
+        warning: Some("Profile konnten nicht …".into()),
+        ..outcome
+    };
+    assert_eq!(
+        serde_json::to_value(&warned).unwrap()["warning"],
+        "Profile konnten nicht …"
+    );
 }

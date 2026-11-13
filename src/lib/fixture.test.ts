@@ -58,6 +58,7 @@ describe('golden snapshot fixture', () => {
           'detecting',
           'agentUpdates',
           'agentUpdatesRunning',
+          'profiles',
           'revision',
         ],
         optional: ['notice', 'checkedAt'],
@@ -90,10 +91,20 @@ describe('golden snapshot fixture', () => {
           'docker',
           'github',
           'agentUpdates',
+          'profiles',
+          'agentProfile',
         ],
       },
       'settings',
     );
+    // A fresh install has no extra profile and starts every agent with its own.
+    for (const agent of AGENTS) {
+      const id = agent as keyof typeof settings.profiles;
+      expect(settings.profiles[id], `settings.profiles.${agent}`).toEqual([]);
+      expect(settings.agentProfile[id], `agentProfile.${agent}`).toBe(
+        'default',
+      );
+    }
     // Agent CLIs update automatically only after the user opted in.
     expect(settings.agentUpdates).toBe(false);
     expectShape(settings.github, { required: ['cloneRoot'] }, 'github');
@@ -140,9 +151,13 @@ describe('golden snapshot fixture', () => {
             'sessions',
             'environments',
             'install',
+            'profiles',
           ],
         },
         entry.id,
+      );
+      expect(entry.profiles, `${entry.id}: profiles`).toBe(
+        entry.id === 'claude',
       );
       expect(entry.models[0]?.id, `${entry.id}: first model`).toBe('default');
       for (const choice of [...entry.models, ...entry.efforts])
@@ -216,6 +231,26 @@ describe('golden snapshot fixture', () => {
         'environment',
       );
       expect(STATES).toContain(env.state);
+    }
+  });
+
+  it('lists „Standard“ alone for every agent with profiles', () => {
+    const snapshot = fixture as unknown as Snapshot;
+    const agents = snapshot.catalog.filter((entry) => entry.profiles);
+    expect(snapshot.profiles.map((p) => `${p.agent}:${p.id}`)).toEqual(
+      agents.map((entry) => `${entry.id}:default`),
+    );
+    for (const status of snapshot.profiles) {
+      expectShape(
+        status,
+        {
+          required: ['agent', 'id', 'label', 'dir', 'signedIn'],
+          optional: ['account', 'organization', 'syncedAt', 'syncError'],
+        },
+        'profile status',
+      );
+      expect(status.label).toBe('Standard');
+      expect(status.signedIn).toBeTypeOf('boolean');
     }
   });
 

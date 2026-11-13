@@ -48,6 +48,7 @@ fn detection_thread(app: &AppHandle, mut images: PerAgent<String>) {
         })
         .ok();
         let state = app.state::<NativeState>();
+        crate::desktop_profiles::read_or_sync(&state);
         let mut service = state.lock();
         match service.finish_detection(detection) {
             DetectionEnd::Finished(snapshot) => {
@@ -64,7 +65,7 @@ fn detection_thread(app: &AppHandle, mut images: PerAgent<String>) {
 }
 
 /// Spawns the plan; a failed wt.exe start falls back to a console window.
-fn start(plan: &LaunchPlan, fallback: Option<&LaunchPlan>) -> Result<(), String> {
+pub(crate) fn start(plan: &LaunchPlan, fallback: Option<&LaunchPlan>) -> Result<(), String> {
     match (spawn::spawn(plan), fallback) {
         (Ok(()), _) => Ok(()),
         (Err(_), Some(console)) => spawn::spawn(console),
@@ -80,10 +81,16 @@ pub async fn save_settings(
     let handle = app.clone();
     work(app, move |service| {
         let saved = service.save_settings(settings)?;
-        if !saved.start_detection {
-            return Ok(saved.snapshot);
+        // A changed profile list is synced at once; the statuses are read anew either way.
+        if saved.profiles_changed {
+            let linker = traygent_core::profiles::system_linker(&Host::current());
+            service.sync_profiles(linker.as_ref(), chrono::Utc::now());
+        } else {
+            service.refresh_profiles();
         }
-        run_detection(&handle, service);
+        if saved.start_detection {
+            run_detection(&handle, service);
+        }
         Ok(service.snapshot())
     })
     .await
@@ -97,11 +104,16 @@ pub async fn launch_session(
     let outcome = work(app.clone(), move |service| {
         let host = Host::current();
         let prepared = service.prepare_launch(&request, &host, &RealFs, &service::nonce())?;
+        // Every profile of the agent is brought in line before its session starts.
+        let linker = traygent_core::profiles::system_linker(&host);
+        let warning =
+            service.sync_for_launch(&prepared.request, linker.as_ref(), chrono::Utc::now())?;
         start(&prepared.plan, prepared.fallback.as_ref())?;
         let recent = service.record_launch(&prepared.request, chrono::Utc::now());
         Ok(LaunchOutcome {
             recent,
             snapshot: service.snapshot(),
+            warning,
         })
     })
     .await?;

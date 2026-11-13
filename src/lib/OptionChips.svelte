@@ -3,6 +3,7 @@
   import Icon from './Icon.svelte';
   import ModelCombo from './ModelCombo.svelte';
   import PortsChip from './PortsChip.svelte';
+  import ProfileChip from './ProfileChip.svelte';
   import {
     PERMISSION_ICONS,
     SESSION_HINTS,
@@ -43,6 +44,8 @@
   /** Hidden while the model cannot carry a thinking level (nothing is sent). */
   const efforts = $derived(effortChoices(entry, options.model));
   const sessions = $derived(composer.sessions);
+  /** Lokal and an agent with an extra profile only. */
+  const profiles = $derived(composer.profiles);
   const modelTitle = $derived(
     invalidModel || choiceTitle('Modell', entry.models, options.model),
   );
@@ -114,6 +117,14 @@
       {onEnter}
       >{#snippet lead()}<Icon name="history" size={13} />{/snippet}</Dropdown
     >
+  {/if}
+  {#if profiles.length}
+    <ProfileChip
+      {profiles}
+      value={composer.profile}
+      onChange={(id) => (composer.profile = id)}
+      {onEnter}
+    />
   {/if}
   {#if composer.env === 'docker'}
     <PortsChip

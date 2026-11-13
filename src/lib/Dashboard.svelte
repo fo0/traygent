@@ -49,7 +49,8 @@
    * once per press (`rowStart.ts`). A session started from a repository
    * sends its folder with the repository: Rust reuses the folder while it
    * exists and clones into the current Klon-Ordner only when it is gone, so a
-   * clone that failed is tried again (#40).
+   * clone that failed is tried again (#40). Its profile goes as stored; one
+   * removed since is refused natively with a German message.
    */
   function restart(recent: RecentSession) {
     const entry = snapshot ? catalogEntry(snapshot, recent.agent) : undefined;
@@ -62,6 +63,7 @@
         options: sentOptions(entry, recent.options),
         session: 'new',
         ports: [...recent.ports],
+        ...(recent.profile && { profile: recent.profile }),
       }),
     );
   }

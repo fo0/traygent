@@ -36,8 +36,8 @@ fn sort(list: &mut [RecentSession]) {
     list.sort_by_key(|recent| std::cmp::Reverse(started(recent)));
 }
 
-/// Records a start: bumps `starts` and `lastStartedAt`, replaces the options and ports (stored
-/// normalized), moves it first. A start of the same folder by path keeps the repository the
+/// Records a start: bumps `starts` and `lastStartedAt`, replaces the options, ports and
+/// profile (stored normalized), moves it first. A start of the same folder by path keeps the repository the
 /// entry was cloned from.
 pub fn upsert(
     list: &mut Vec<RecentSession>,
@@ -60,6 +60,7 @@ pub fn upsert(
         repo,
         options: request.options.clone(),
         ports: stored_ports(request.env, &request.ports),
+        profile: stored_profile(request.env, request.profile.as_deref()),
         last_started_at: timestamp(now),
         starts: starts.saturating_add(1),
     };
@@ -100,18 +101,29 @@ pub fn stored_ports(env: EnvId, list: &[String]) -> Vec<String> {
         .unwrap_or_default()
 }
 
+/// The profile as a recent keeps it: an id of an extra profile, local sessions only; the
+/// default profile, another environment and a malformed id are stored as none. Whether the
+/// profile still exists is checked at the start.
+pub fn stored_profile(env: EnvId, profile: Option<&str>) -> Option<String> {
+    profile
+        .filter(|id| env == EnvId::Local && crate::profiles::is_valid_id(id))
+        .map(str::to_string)
+}
+
 /// The repository as a recent keeps it: validated, an invalid one dropped (the folder still
 /// starts).
 pub fn stored_repo(repo: Option<&RepoRef>) -> Option<RepoRef> {
     repo.and_then(|repo| crate::repo::validate(repo).ok())
 }
 
-/// Loaded lists: ports ([`stored_ports`]) and repositories ([`stored_repo`]) sanitized,
+/// Loaded lists: ports ([`stored_ports`]), repositories ([`stored_repo`]) and profiles
+/// ([`stored_profile`]) sanitized,
 /// duplicates dropped (first wins after sorting) and the cap kept.
 pub fn tidy(mut list: Vec<RecentSession>) -> Vec<RecentSession> {
     for recent in &mut list {
         recent.ports = stored_ports(recent.env, &recent.ports);
         recent.repo = stored_repo(recent.repo.as_ref());
+        recent.profile = stored_profile(recent.env, recent.profile.as_deref());
     }
     sort(&mut list);
     let mut seen = std::collections::HashSet::new();

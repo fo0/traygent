@@ -30,6 +30,7 @@ pub const WSL_SOON: &str = "WSL ist noch nicht verfügbar.";
 const DOCKER_MISSING: &str = "Docker ist nicht installiert.";
 pub const GIT_MISSING: &str = "Git ist nicht installiert.";
 const NO_REPO: &str = "Kein Repository angegeben.";
+const PROFILE_UNRESOLVED: &str = "Der Profilordner wurde nicht ermittelt.";
 pub const CLONE_FAILED: &str =
     "[traygent] Das Repository konnte nicht geklont werden. Bitte die Meldungen oben prüfen.";
 const DOCKER_NETWORK_PATH: &str =
@@ -68,6 +69,9 @@ pub struct Resolved {
     pub wt: Option<String>,
     /// Short random suffix for the container name.
     pub nonce: String,
+    /// The config directory of the requested profile (local starts); `None` = the default
+    /// profile, the CLI's own home.
+    pub profile_dir: Option<String>,
 }
 
 /// The agent's mark in a tab title: Claude Code's own title mark, OpenCode's square logo,
@@ -166,6 +170,13 @@ fn build(
             if let Some(config) = &config {
                 script.push(set_env_base64("OPENCODE_CONFIG_CONTENT", config));
             }
+            let profiled = !settings.profiles.get(agent).is_empty();
+            let wanted = request.profile.as_deref();
+            let extra = wanted.is_some_and(|id| id != crate::models::DEFAULT_PROFILE);
+            if extra != resolved.profile_dir.is_some() {
+                return Err(PROFILE_UNRESOLVED.into());
+            }
+            script.extend(profile_env(agent, resolved, profiled)?);
             if agent == AgentId::Claude {
                 // Claude Code would replace the title with its own.
                 script.push("$env:CLAUDE_CODE_DISABLE_TERMINAL_TITLE='1'".into());
@@ -226,6 +237,68 @@ fn run_agent(label: &str, call: &[String], cleanup: &[String]) -> String {
         finally.join("; "),
         ps_literal(&format!("[traygent] {label} wurde mit Code ")),
         ps_literal(" beendet."),
+    )
+}
+
+/// Points the CLI at its profile: the recipe's variable set to the profile's directory, or —
+/// for the default profile of an agent that has extra ones (`clear`) — removed, so a stray
+/// value of the terminal's environment cannot move the default home. An agent without
+/// profiles, or without an extra one, gets no line.
+fn profile_env(agent: AgentId, resolved: &Resolved, clear: bool) -> Result<Option<String>, String> {
+    let Some(recipe) = crate::profiles::recipe(agent) else {
+        return Ok(None);
+    };
+    let name = recipe.env_var;
+    match &resolved.profile_dir {
+        Some(dir) if !is_windows_absolute(dir) => {
+            Err("Der Profilordner ist kein absoluter Windows-Pfad.".into())
+        }
+        Some(dir) => Ok(Some(format!("$env:{name}={}", ps_literal(dir)))),
+        None if clear => Ok(Some(format!(
+            "Remove-Item Env:{name} -ErrorAction SilentlyContinue"
+        ))),
+        None => Ok(None),
+    }
+}
+
+/// Opens a terminal in `home` that signs the agent's profile in: the CLI by absolute path
+/// with the recipe's login arguments, in the profile's environment. Stays open like the
+/// install terminal.
+pub fn login_plan(
+    agent: AgentId,
+    profile_label: &str,
+    settings: &AppSettings,
+    resolved: &Resolved,
+    home: &str,
+) -> Result<LaunchPlan, String> {
+    let label = agent.label();
+    let recipe = crate::profiles::recipe(agent)
+        .ok_or_else(|| format!("{label} unterstützt keine Profile."))?;
+    let cli = resolved
+        .cli
+        .as_ref()
+        .ok_or_else(|| format!("{label} ist nicht installiert."))?;
+    if !is_windows_absolute(&cli.path) {
+        return Err(format!(
+            "Der Pfad zu {label} ist kein absoluter Windows-Pfad."
+        ));
+    }
+    let title = format!("{label} · {profile_label} anmelden");
+    let args: Vec<String> = recipe
+        .login_args
+        .iter()
+        .map(|arg| arg.to_string())
+        .collect();
+    let mut script = vec![format!("$Host.UI.RawUI.WindowTitle={}", ps_literal(&title))];
+    script.extend(profile_env(agent, resolved, true)?);
+    script.push(invoke(&cli.path, &args));
+    wrap(
+        &title,
+        home,
+        &script.join("; "),
+        &resolved.powershell,
+        tab(settings, resolved),
+        false,
     )
 }
 

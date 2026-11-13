@@ -27,6 +27,8 @@
     recent,
     snapshot,
     now,
+    profile,
+    profileColumn,
     launching,
     onRestart,
     onAdopt,
@@ -40,6 +42,10 @@
     snapshot: Snapshot;
     /** The shared minute clock, for the relative time. */
     now: number;
+    /** The label of the row's profile, `''` for „Standard“. */
+    profile: string;
+    /** Some row has a profile: every row keeps its column. */
+    profileColumn: boolean;
     /** A start runs; the row's start waits for it. */
     launching: boolean;
     /** Starts exactly these options again, as a new session. */
@@ -120,6 +126,7 @@
       recent.folder,
       repo,
       env.label,
+      profile && `Profil: ${profile}`,
       optionTitle,
       `Freigabe: ${permission.label}`,
       ports.length && portsTitle,
@@ -191,6 +198,8 @@
   <RecentMeta
     {repo}
     {env}
+    {profile}
+    {profileColumn}
     model={options.model}
     {modelLabel}
     {thinks}

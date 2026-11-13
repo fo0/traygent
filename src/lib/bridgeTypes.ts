@@ -54,6 +54,10 @@ export interface Bridge {
    * agents are still being detected, or without a ready local CLI.
    */
   updateAgents(): Promise<Snapshot>;
+  /** Syncs every profile now; rejects with a German message. */
+  syncProfiles(): Promise<Snapshot>;
+  /** Opens the sign-in of one profile; rejects with a German message. */
+  profileLogin(agent: AgentId, profile: string): Promise<void>;
 }
 
 /** Pushed snapshots, e.g. a finished detection; resolves to the unsubscribe. */

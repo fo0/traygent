@@ -26,6 +26,8 @@ const nativeBridge: Bridge = {
   githubDisconnect: () => call('github_disconnect'),
   githubRefreshRepos: () => call('github_refresh_repos'),
   updateAgents: () => call('update_agents'),
+  syncProfiles: () => call('sync_profiles'),
+  profileLogin: (agent, profile) => call('profile_login', { agent, profile }),
 };
 
 /** Snapshots the native shell pushes (`traygent:snapshot`). */

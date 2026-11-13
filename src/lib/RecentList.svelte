@@ -1,6 +1,7 @@
 <script lang="ts">
   import RecentRow from './RecentRow.svelte';
   import { minuteClock } from './clock';
+  import { profileLabel } from './profiles';
   import type { AgentId, RecentSession, Snapshot } from './types';
 
   // „Zuletzt“: one single-line row per (folder, agent, env), newest first.
@@ -26,6 +27,8 @@
     onRemove: (recent: RecentSession) => Promise<void>;
     onInstall: (agent: AgentId) => void;
   } = $props();
+  /** The profile column exists only while a row started with a profile. */
+  const profileColumn = $derived(snapshot.recents.some((r) => r.profile));
 </script>
 
 {#if snapshot.recents.length}
@@ -35,6 +38,10 @@
         {recent}
         {snapshot}
         now={$minuteClock}
+        profile={recent.profile
+          ? profileLabel(snapshot, recent.agent, recent.profile)
+          : ''}
+        {profileColumn}
         {launching}
         {onRestart}
         {onAdopt}

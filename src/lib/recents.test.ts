@@ -139,4 +139,25 @@ describe('recents', () => {
       effort: 'default',
     });
   });
+
+  it('records a start’s profile, never `default`', () => {
+    const start: LaunchRequest = {
+      agent: 'claude',
+      env: 'local',
+      folder: 'C:\\a',
+      options,
+      session: 'new',
+      ports: [],
+    };
+    expect(recordStart([], { ...start, profile: 'team' }).profile).toBe('team');
+    expect(
+      recordStart([], { ...start, profile: 'default' }),
+    ).not.toHaveProperty('profile');
+    expect(recordStart([], start)).not.toHaveProperty('profile');
+    // „Bearbeiten …“ keeps it.
+    const entry = recordStart([], { ...start, profile: 'team' });
+    expect(editRecent([entry], entry.id, options, [])?.[0]?.profile).toBe(
+      'team',
+    );
+  });
 });

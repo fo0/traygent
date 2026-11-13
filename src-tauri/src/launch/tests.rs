@@ -64,6 +64,7 @@ pub(crate) fn resolved(cli: Option<(&str, bool)>) -> Resolved {
         powershell: PS.into(),
         wt: Some(WT.into()),
         nonce: "a1b2c3".into(),
+        profile_dir: None,
     }
 }
 
@@ -75,6 +76,7 @@ pub(crate) fn request(agent: AgentId, env: EnvId, folder: &str) -> LaunchRequest
         repo: None,
         options: LaunchOptions::default(),
         session: SessionMode::New,
+        profile: None,
         ports: Vec::new(),
     }
 }
@@ -443,4 +445,5 @@ fn no_plan_ever_contains_powershell_51_pitfalls() {
 }
 
 mod clone;
+mod profiles;
 mod terminal;

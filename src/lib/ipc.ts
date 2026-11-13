@@ -68,6 +68,13 @@ export interface Commands {
    * being detected, or without a ready local CLI.
    */
   update_agents: { args: undefined; result: Snapshot };
+  /**
+   * Copies everything but the sign-in from the agent's own folder into each
+   * profile now; the answer carries every profile's `syncedAt` / `syncError`.
+   */
+  sync_profiles: { args: undefined; result: Snapshot };
+  /** Opens a terminal that signs the profile in (`default` included). */
+  profile_login: { args: { agent: AgentId; profile: string }; result: void };
   autostart_status: { args: undefined; result: StartupStatus };
   set_autostart: { args: { enabled: boolean }; result: StartupStatus };
   open_startup_settings: { args: undefined; result: void };
@@ -103,6 +110,8 @@ const REGISTERED: Record<Command, true> = {
   github_disconnect: true,
   github_refresh_repos: true,
   update_agents: true,
+  sync_profiles: true,
+  profile_login: true,
   autostart_status: true,
   set_autostart: true,
   open_startup_settings: true,
