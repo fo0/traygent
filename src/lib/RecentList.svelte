@@ -11,6 +11,7 @@
     onAdopt,
     onEdit,
     onOpenFolder,
+    onCopyFolder,
     onRemove,
     onInstall,
   }: {
@@ -21,6 +22,7 @@
     onAdopt: (recent: RecentSession) => void;
     onEdit: (recent: RecentSession) => void;
     onOpenFolder: (path: string) => void;
+    onCopyFolder: (path: string) => void;
     onRemove: (recent: RecentSession) => Promise<void>;
     onInstall: (agent: AgentId) => void;
   } = $props();
@@ -38,6 +40,7 @@
         {onAdopt}
         {onEdit}
         {onOpenFolder}
+        {onCopyFolder}
         {onRemove}
         {onInstall}
       />

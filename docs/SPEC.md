@@ -75,7 +75,7 @@ Brand top left: icon + „Traygent“. Window ~480×760, frameless, tray popup l
    thinking level as five signal bars (Niedrig 1 … Maximal 5, „Standard“ all dim) wherever the
    agent sends one, the permission icon (bypass a bolt in the warning colour) — each with its German label as
    accessible name, relative time (right-aligned, fixed width), „⋯“ menu (In Composer übernehmen, Bearbeiten …, Ordner öffnen,
-   Entfernen with 8 s „Rückgängig“) and ▶ at the far right. A click anywhere on the row (or Enter / Space on
+   Pfad kopieren, Entfernen with 8 s „Rückgängig“) and ▶ at the far right. A click anywhere on the row (or Enter / Space on
    ▶) restarts with exactly those settings — once per press: the rest of a double-click, a
    held key and a second start of the same row within 1.5 s after it started are ignored;
    „⋯“ and its menu never start, nor does a press that only closes a popup (a row menu, the

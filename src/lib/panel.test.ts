@@ -249,6 +249,32 @@ describe('Panel', () => {
     expect(panel.notices.get(`recent:${removed.id}`)).toBeUndefined();
   });
 
+  it('copies a folder path and says so, or says the copy failed', async () => {
+    const writeText = vi.fn<(text: string) => Promise<void>>(async () => {});
+    vi.stubGlobal('navigator', { clipboard: { writeText } });
+    try {
+      const panel = panelWith();
+      await panel.copyFolder('C:\\Users\\demo\\Projekte\\traygent');
+      expect(writeText).toHaveBeenCalledWith(
+        'C:\\Users\\demo\\Projekte\\traygent',
+      );
+      expect(panel.notices.get('panel')).toMatchObject({
+        text: 'Pfad kopiert.',
+        tone: 'subtle',
+        timeout: 3000,
+      });
+      writeText.mockRejectedValueOnce(new Error('NotAllowedError'));
+      await panel.copyFolder('C:\\x');
+      expect(panel.notices.get('panel')).toMatchObject({
+        text: 'Pfad konnte nicht kopiert werden.',
+        tone: 'danger',
+        timeout: undefined,
+      });
+    } finally {
+      vi.unstubAllGlobals();
+    }
+  });
+
   it('stores an edited recent and rejects with the German message', async () => {
     const edited = snapshot({ revision: 7 });
     const updateRecent = vi.fn(async () => edited);

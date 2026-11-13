@@ -137,6 +137,7 @@ test('„Entfernen“ offers „Rückgängig“, which puts the row back', async
     'In Composer übernehmen',
     'Bearbeiten …',
     'Ordner öffnen',
+    'Pfad kopieren',
     'Entfernen',
   ]);
   await menu.getByRole('menuitem', { name: 'Entfernen' }).click();
@@ -157,6 +158,27 @@ test('„Entfernen“ offers „Rückgängig“, which puts the row back', async
     'kunden-portal',
   );
   await expect(notice).toHaveCount(0);
+});
+
+test('„Pfad kopieren“ puts the folder on the clipboard', async ({ page }) => {
+  await page.context().grantPermissions(['clipboard-read', 'clipboard-write']);
+  await page.goto('/');
+  await row(page, 'agent-tools')
+    .getByRole('button', { name: 'Aktionen für agent-tools' })
+    .click();
+  await page.getByRole('menuitem', { name: 'Pfad kopieren' }).click();
+  await expect(
+    page.getByRole('status').filter({ hasText: 'Pfad kopiert.' }),
+  ).toBeVisible();
+  expect(await page.evaluate(() => navigator.clipboard.readText())).toBe(
+    'C:\\Users\\demo\\Projekte\\agent-tools',
+  );
+  // The menu closed and handed focus back to its „⋯“.
+  await expect(
+    row(page, 'agent-tools').getByRole('button', {
+      name: 'Aktionen für agent-tools',
+    }),
+  ).toBeFocused();
 });
 
 test('„In Composer übernehmen“ loads the row and focuses „Starten“', async ({

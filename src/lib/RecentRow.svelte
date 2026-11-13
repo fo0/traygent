@@ -32,6 +32,7 @@
     onAdopt,
     onEdit,
     onOpenFolder,
+    onCopyFolder,
     onRemove,
     onInstall,
   }: {
@@ -47,6 +48,8 @@
     /** „Bearbeiten …“: the options and ports the start sends. */
     onEdit: (recent: RecentSession) => void;
     onOpenFolder: (path: string) => void;
+    /** „Pfad kopieren“: the folder path on the clipboard. */
+    onCopyFolder: (path: string) => void;
     onRemove: (recent: RecentSession) => Promise<void>;
     onInstall: (agent: AgentId) => void;
   } = $props();
@@ -139,8 +142,8 @@
   let initial = $state<MenuFocus>('first');
   let trigger = $state<HTMLButtonElement>();
 
-  /** Height of the row menu's four items, for the direction it opens. */
-  const MENU_HEIGHT = 165;
+  /** Height of the row menu's five items, for the direction it opens. */
+  const MENU_HEIGHT = 197;
   /** Opens upwards when the menu would run past the bottom of the list. */
   function openMenu(focus: MenuFocus) {
     const bottom = trigger?.closest('.content')?.getBoundingClientRect().bottom;
@@ -264,6 +267,13 @@
           class="menu-item"
           onclick={() => choose(() => onOpenFolder(recent.folder))}
           ><Icon name="external" size={14} />Ordner öffnen</button
+        >
+        <button
+          type="button"
+          role="menuitem"
+          class="menu-item"
+          onclick={() => choose(() => onCopyFolder(recent.folder))}
+          ><Icon name="copy" size={14} />Pfad kopieren</button
         >
         <button
           type="button"

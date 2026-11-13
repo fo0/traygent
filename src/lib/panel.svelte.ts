@@ -280,4 +280,14 @@ export class Panel {
       this.showNotice(errorMessage(cause), 'danger');
     }
   }
+
+  /** „Pfad kopieren“ of a „Zuletzt“ row: the folder path on the clipboard. */
+  async copyFolder(path: string) {
+    try {
+      await navigator.clipboard.writeText(path);
+      this.showNotice('Pfad kopiert.');
+    } catch {
+      this.showNotice('Pfad konnte nicht kopiert werden.', 'danger');
+    }
+  }
 }
