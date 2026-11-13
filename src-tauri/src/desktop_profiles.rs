@@ -1,8 +1,11 @@
-//! Agent profiles (#33): the `sync_profiles` and `profile_login` commands and the profile
-//! step of a detection. Names and arguments are the contract with `src/lib/ipc.ts`
-//! (docs/SPEC.md → IPC contract).
+//! Agent profiles (#33): the `sync_profiles` and `profile_login` commands, the profile
+//! step of a detection and the background sync thread. Names and arguments are the contract
+//! with `src/lib/ipc.ts` (docs/SPEC.md → IPC contract).
 use crate::desktop::{work, NativeState, FAILED};
-use tauri::AppHandle;
+use crate::desktop_agents::SNAPSHOT_EVENT;
+use std::time::Instant;
+use tauri::{AppHandle, Emitter, Manager};
+use traygent_core::agent_updates::TICK;
 use traygent_core::detect::{Host, RealFs};
 use traygent_core::profiles::{system_linker, SyncOutcome, SyncPlan};
 use traygent_core::{AgentId, Snapshot};
@@ -25,6 +28,53 @@ pub(crate) fn read_or_sync(state: &NativeState) {
     });
     if let Ok(outcome) = outcome {
         state.lock().apply_profiles(outcome);
+    }
+}
+
+/// Starts the background sync thread (#37): once a minute it asks the service whether a
+/// sync is due ([`PROFILE_SYNC_INTERVAL`](traygent_core::service::PROFILE_SYNC_INTERVAL)
+/// after the last one) and runs it like the others: the plan under the lock, the file
+/// system work without it, then the commit and a snapshot event for an open panel.
+pub(crate) fn start_schedule(app: &AppHandle) {
+    let app = app.clone();
+    let spawned = std::thread::Builder::new()
+        .name("traygent-profile-sync".into())
+        .spawn(move || schedule(&app));
+    if let Err(error) = spawned {
+        eprintln!("Traygent: {error}");
+    }
+}
+
+fn schedule(app: &AppHandle) {
+    let started = Instant::now();
+    loop {
+        std::thread::sleep(TICK);
+        let state = app.state::<NativeState>();
+        let plan = {
+            let service = state.lock();
+            if !service.profile_sync_due(started, Instant::now()) {
+                continue;
+            }
+            service.profile_plan()
+        };
+        let outcome = std::panic::catch_unwind(|| {
+            let linker = system_linker(&Host::current());
+            plan.run(linker.as_ref(), chrono::Utc::now())
+        });
+        let mut service = state.lock();
+        // Silent: what could not be done shows only in each profile's `syncError`. A panic
+        // keeps the previous statuses and still waits the full interval.
+        match outcome {
+            Ok(outcome) => {
+                service.apply_profiles(outcome);
+            }
+            Err(_) => service.skip_profile_sync(Instant::now()),
+        }
+        let snapshot = service.snapshot();
+        drop(service);
+        if let Err(error) = app.emit(SNAPSHOT_EVENT, &snapshot) {
+            eprintln!("Traygent: {error}");
+        }
     }
 }
 

@@ -6,12 +6,16 @@ use crate::profiles::status::{self, Facts, Key};
 use crate::profiles::{recipe, Homes, Linker, ProfileReport, SyncOutcome, SyncPlan};
 use chrono::{DateTime, Utc};
 use std::collections::HashMap;
+use std::time::{Duration, Instant};
 
 /// `LaunchOutcome.warning`: one sentence, the session started all the same. What could not
 /// be done stays in each profile's `syncError`.
 pub const SYNC_WARNING: &str = "Profile konnten nicht vollständig synchronisiert werden.";
 const PROFILE_DIR_FAILED: &str = "Der Profilordner konnte nicht angelegt werden.";
 const MAX_ERROR_CHARS: usize = 400;
+/// How long after the last sync of any kind the background schedule syncs the profiles
+/// again (#37); before the first one the interval runs from the app's start.
+pub const PROFILE_SYNC_INTERVAL: Duration = Duration::from_secs(15 * 60);
 
 /// In memory only; read again at every detection, sync and settings save.
 #[derive(Default)]
@@ -22,6 +26,8 @@ pub(super) struct ProfileState {
     errors: HashMap<Key, String>,
     /// The sync after the first detection has run.
     synced_at_startup: bool,
+    /// When the last sync of any kind finished (or a background one broke down).
+    last_sync: Option<Instant>,
 }
 
 fn capped(text: String) -> String {
@@ -74,6 +80,9 @@ impl Service {
         state.facts.extend(outcome.facts);
         let mut text = None;
         if let Some(reports) = &outcome.reports {
+            // Every sync — at startup, after a save, on demand, before a start, in the
+            // background — restarts the background schedule's interval.
+            state.last_sync = Some(Instant::now());
             for (agent, reports) in reports {
                 state.errors.retain(|(listed, _), _| listed != agent);
                 for report in reports.iter().filter(|report| !report.errors.is_empty()) {
@@ -93,6 +102,27 @@ impl Service {
         state.errors.retain(|key, _| listed(key));
         self.touch();
         text
+    }
+
+    /// Whether the background schedule syncs the profiles now: some agent has an extra
+    /// profile, the profile homes are known and [`PROFILE_SYNC_INTERVAL`] has passed since
+    /// the last sync finished — before the first one, since `started` (the app's start).
+    /// A running agent update does not hold it back: a sync never runs the agent's CLI.
+    pub fn profile_sync_due(&self, started: Instant, now: Instant) -> bool {
+        let settings = &self.state.settings;
+        let extra = AgentId::ALL
+            .into_iter()
+            .any(|agent| recipe(agent).is_some() && !settings.profiles.get(agent).is_empty());
+        let last = self.profiles.last_sync.unwrap_or(started);
+        extra
+            && self.profiles.homes.is_some()
+            && now.saturating_duration_since(last) >= PROFILE_SYNC_INTERVAL
+    }
+
+    /// A background sync that broke down (its worker panicked) still restarts the interval,
+    /// so the schedule does not retry it every tick.
+    pub fn skip_profile_sync(&mut self, now: Instant) {
+        self.profiles.last_sync = Some(now);
     }
 
     /// Reads every profile's status again, the service borrowed throughout (tests; the

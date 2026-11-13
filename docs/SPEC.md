@@ -335,9 +335,15 @@ Commands (Rust `#[tauri::command]`, German `Err` strings; panel calls only via `
   characters).
 - **Triggers:** the first detection after the app started (later detections only read the
   statuses), `save_settings` when `profiles` or `profileShare` changed (otherwise a re-read),
-  `sync_profiles` and a local start (that agent only). An agent without an extra profile is never
-  touched. One sync runs at a time; every run's file system work happens without the service
-  lock.
+  `sync_profiles`, a local start (that agent only) and a background sync every 15 minutes
+  (`PROFILE_SYNC_INTERVAL`, fixed, no setting): the `traygent-profile-sync` thread checks once a
+  minute and syncs every profile once 15 minutes have passed since the last sync of any kind
+  finished (before the first one, since the app started), only while some agent has an extra
+  profile and the user profile is known, also during an agent update (a sync never runs the CLI).
+  It is silent apart from each profile's `syncedAt` / `syncError`, which reach an open panel as
+  a `traygent:snapshot` event; a run that broke down also waits the full interval. An agent
+  without an extra profile is never touched. One sync runs at a time; every run's file system
+  work happens without the service lock.
 - **Profile directory:** created when missing; a new or empty one gets the initial marker
   `{"version":1,"done":[]}` before anything is linked into it. An existing, non-empty one is
   adopted only when it holds `.claude.json`, `.credentials.json` or the marker, or nothing but

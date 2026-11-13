@@ -19,7 +19,7 @@ mod profiles;
 pub use agent_updates::{NO_LOCAL_AGENT, UPDATE_DETECTING, UPDATE_RUNNING};
 pub use github::Listing;
 pub use launch_prep::{Prepared, PROFILE_MISSING};
-pub use profiles::SYNC_WARNING;
+pub use profiles::{PROFILE_SYNC_INTERVAL, SYNC_WARNING};
 
 pub const RECENT_GONE: &str = "Diese Session steht nicht mehr in „Zuletzt“.";
 pub const SAVE_FAILED: &str = "Einstellungen und Sessions werden nicht gespeichert: state.json konnte nicht geschrieben werden.";
