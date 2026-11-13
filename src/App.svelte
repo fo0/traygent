@@ -157,7 +157,8 @@
       {snapshot}
       {recent}
       returnFocus={modals.returnFocus}
-      onSave={(options, ports) => panel.updateRecent(recent, options, ports)}
+      onSave={(options, ports, profile) =>
+        panel.updateRecent(recent, options, ports, profile)}
       onClose={modals.close}
     />
   {/if}

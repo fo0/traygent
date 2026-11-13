@@ -35,9 +35,15 @@ export interface Commands {
   remove_recent: { args: { id: string }; result: Snapshot };
   /** The undo of `remove_recent`: puts the removed entry back. */
   restore_recent: { args: { recent: RecentSession }; result: Snapshot };
-  /** „Bearbeiten …“: the options and ports the next restart sends. */
+  /** „Bearbeiten …“: the options, ports and profile the next restart sends. */
   update_recent: {
-    args: { id: string; options: LaunchOptions; ports: string[] };
+    args: {
+      id: string;
+      options: LaunchOptions;
+      ports: string[];
+      /** `null` (or `default`) for „Standard“. */
+      profile: string | null;
+    };
     result: Snapshot;
   };
   /** Native folder dialog; `null` when cancelled. */

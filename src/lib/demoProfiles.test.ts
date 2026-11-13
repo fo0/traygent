@@ -113,4 +113,33 @@ describe('demo profiles', () => {
       'Dieses Profil gibt es nicht.',
     );
   });
+
+  it('stores an edited profile as natively', async () => {
+    const bridge = createDemoBridge(0);
+    const before = (await bridge.snapshot()).recents;
+    const local = before.find(
+      (r) => r.agent === 'claude' && r.env === 'local',
+    )!;
+    const docker = before.find((r) => r.env === 'docker')!;
+    const codex = before.find((r) => r.agent === 'codex')!;
+    const stored = async (id: string, profile?: string) => {
+      const { options } = before.find((r) => r.id === id)!;
+      const { recents } = await bridge.updateRecent(id, options, [], profile);
+      return recents.find((r) => r.id === id)!.profile;
+    };
+    expect(local.profile).toBeUndefined();
+    expect(await stored(local.id, ' team ')).toBe('team');
+    expect(await stored(local.id, 'default')).toBeUndefined();
+    await stored(local.id, 'team');
+    expect(await stored(local.id)).toBeUndefined();
+    // A container has its own home: the profile is dropped, not refused.
+    expect(await stored(docker.id, 'team')).toBeUndefined();
+    for (const [recent, profile] of [
+      [local, 'gone'],
+      [codex, 'team'],
+    ] as const)
+      await expect(
+        bridge.updateRecent(recent.id, recent.options, [], profile),
+      ).rejects.toThrow('Profil nicht gefunden.');
+  });
 });

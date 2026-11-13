@@ -80,6 +80,7 @@ const ARGS: { [K in Command]?: Exclude<Commands[K]['args'], undefined> } = {
     id: 'local:claude:c:\\x',
     options: {} as LaunchOptions,
     ports: [],
+    profile: null,
   },
   pick_folder: { initial: null },
   install_agent: { agent: 'claude' as AgentId },

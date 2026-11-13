@@ -19,6 +19,8 @@ export const DEFAULT_PROFILE = 'default';
 /** The label of `default`, reserved for it. */
 export const STANDARD_LABEL = 'Standard';
 export const MAX_PROFILES = 8;
+/** A start or an edit names a profile the agent does not list, as natively. */
+export const PROFILE_MISSING = 'Profil nicht gefunden.';
 const MAX_LABEL_CHARS = 24;
 const ID = /^[a-z0-9][a-z0-9-]{0,23}$/;
 // eslint-disable-next-line no-control-regex
@@ -176,4 +178,38 @@ export function launchProfileProblem(
   return knownProfile(snapshot.settings, agent, profile)
     ? ''
     : `Profil „${profile}“ gibt es nicht mehr.`;
+}
+
+/**
+ * The „Profil“ choices of a recent's „Bearbeiten …“: „Standard“ and the
+ * agent's profiles; none (no field) outside Lokal, or without an extra one
+ * unless the entry still stores a profile (then just „Standard“, so the
+ * change a save makes is visible).
+ */
+export function recentProfileItems(
+  snapshot: Pick<Snapshot, 'catalog' | 'profiles' | 'settings'>,
+  agent: AgentId,
+  env: EnvId,
+  stored: string | undefined,
+): { id: string; label: string }[] {
+  if (!profilesApply(snapshot, agent, env)) return [];
+  const list = agentProfiles(snapshot, agent);
+  const shown = list.length > 1 || (!!stored && stored !== DEFAULT_PROFILE);
+  return shown ? list.map(({ id, label }) => ({ id, label })) : [];
+}
+
+/**
+ * The profile an edited recent stores, as natively (launch_prep.rs →
+ * launch_profile): none for „Standard“ (absent, blank, `default`) and
+ * outside Lokal; `null` for an id the agent does not list.
+ */
+export function editedProfile(
+  settings: Pick<AppSettings, 'profiles'>,
+  agent: AgentId,
+  env: EnvId,
+  profile: string | undefined,
+): string | undefined | null {
+  const id = profile?.trim();
+  if (!id || id === DEFAULT_PROFILE || env !== 'local') return undefined;
+  return knownProfile(settings, agent, id) ? id : null;
 }

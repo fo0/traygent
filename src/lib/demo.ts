@@ -14,7 +14,11 @@ import {
   demoRepos,
 } from './demoGithub';
 import { demoProfiles, signedIn, syncedProfiles } from './demoProfiles';
-import { launchProfileProblem } from './profiles';
+import {
+  PROFILE_MISSING,
+  editedProfile,
+  launchProfileProblem,
+} from './profiles';
 import {
   editRecent,
   recordStart,
@@ -166,7 +170,7 @@ export function createDemoBridge(latency = 150, detection = 600): DemoBridge {
       change({ recents: restored });
       return copy();
     },
-    async updateRecent(id, options, ports) {
+    async updateRecent(id, options, ports, profile) {
       await delay();
       const recent = data.recents.find((item) => item.id === id);
       if (!recent)
@@ -177,11 +181,15 @@ export function createDemoBridge(latency = 150, detection = 600): DemoBridge {
         effortProblem(entry, options) ||
         launchPortsProblem({ env: recent.env, ports });
       if (problem) throw new Error(problem);
+      const { agent, env } = recent;
+      const stored = editedProfile(data.settings, agent, env, profile);
+      if (stored === null) throw new Error(PROFILE_MISSING);
       const edited = editRecent(
         data.recents,
         id,
         structuredClone(options),
         normalizePorts(ports),
+        stored,
       );
       if (edited) change({ recents: edited });
       return copy();
