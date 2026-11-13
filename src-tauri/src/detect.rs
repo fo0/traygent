@@ -116,7 +116,7 @@ pub fn probe_local(
         };
         if agent == AgentId::Opencode {
             if let Some(old) = version.as_ref().filter(|v| major(v).is_some_and(|m| m < 2)) {
-                outdated.get_or_insert((candidate.clone(), old.clone()));
+                outdated.get_or_insert_with(|| (candidate.clone(), old.clone()));
                 continue;
             }
         }

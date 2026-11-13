@@ -1,6 +1,6 @@
 /*
- * Windows High Contrast for the agent-domain controls (19-controls.css): the
- * checked segment, probe dots and the checked switch are fills that forced
+ * Windows High Contrast for 19-segmented.css and 19-controls.css: the checked
+ * segment, probe dots and the checked switch are fills that forced
  * colours would erase, so they are redrawn with system colours. Loaded last,
  * so these win over the base rules of the same specificity.
  */
