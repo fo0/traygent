@@ -51,6 +51,7 @@
       <button
         class="icon-button"
         aria-label="Dialog schließen"
+        title="Dialog schließen"
         aria-disabled={closeDisabled ? 'true' : undefined}
         onclick={() => onClose()}><Icon name="close" size={19} /></button
       >
