@@ -110,7 +110,8 @@ Brand top left: icon + „Traygent“. Window ~480×760, frameless, tray popup l
   readiness (only while Docker is shown), best-practice Windows install command (copy button + „Installieren“ = opens a
   terminal running it, then re-detects on demand), update command; defaults: model, effort,
   permission, extra CLI args (free text, validated). For an agent with `profiles` a „Profile“
-  block (info tip „Eigene Anmeldung je Profil, alles andere wird abgeglichen“): „Jetzt
+  block (info tip „Eigene Anmeldung je Profil, alles andere wird abgeglichen. Weitere Ordner und
+  Dateien werden wie die eingebauten abgeglichen.“): „Jetzt
   synchronisieren“ beside the heading (immediate, `sync_profiles`), „Standard-Profil“ (staged),
   one row per profile — „Standard“ first — with its name, the account or „Nicht angemeldet“
   (tooltip: account, organisation, folder, „Abgeglichen <time>“, the sync error), a warning
@@ -119,7 +120,11 @@ Brand top left: icon + „Traygent“. Window ~480×760, frameless, tray popup l
   Profil“ + „+“ / Enter, whose tooltip shows the folder the name gives. Inline errors: „Name
   fehlt.“, „Höchstens 24 Zeichen.“, „Keine Steuerzeichen.“, „„<Name>“ ist reserviert.“,
   „Mindestens ein Buchstabe oder eine Ziffer.“, „Profil gibt es schon.“, „Höchstens 8
-  Profile.“
+  Profile.“ With at least one extra profile staged, „Weitere Ordner“ and „Weitere Dateien“
+  (`profileShare`, staged; names split at commas and whitespace, repeats once, tooltip „Durch
+  Komma oder Leerzeichen getrennt“, placeholders `.caveman-sessions` / `orca-state.json`) with
+  the native errors of _Profiles → Extra entries_ inline, the first problem per field. Removing
+  the last extra profile hides them; a list that is then invalid goes back to its saved value.
 - **Umgebung**: „Umgebungen“ — one checkbox per environment the composer shows (Lokal / Docker /
   WSL, all on by default; the last of Lokal and Docker cannot be turned off and says why in its
   tooltip), default environment (one of the shown ones, WSL disabled; it moves to the first shown
@@ -160,8 +165,10 @@ snapshot has `detecting: true`, and the shell emits `traygent:snapshot` with the
 snapshot. `refresh_detection` returns at once with `detecting: true`.
 
 Profiles in the contract (`profileTypes.ts` ↔ `models/profiles.rs`): `AgentCatalogEntry.profiles`
-(Claude Code only), `AppSettings.profiles` (`Record<AgentId, AgentProfile[]>`, `{ id, label }`)
-and `AppSettings.agentProfile` (`Record<AgentId, string>`, `default` or a listed id),
+(Claude Code only), `AppSettings.profiles` (`Record<AgentId, AgentProfile[]>`, `{ id, label }`),
+`AppSettings.agentProfile` (`Record<AgentId, string>`, `default` or a listed id),
+`AppSettings.profileShare` (`Record<AgentId, ProfileShare>`, `{ dirs: string[], files: string[] }`,
+empty lists by default and for an agent without `profiles`),
 `LaunchRequest.profile` and `RecentSession.profile` (optional, absent for `default`),
 `Snapshot.profiles` (`ProfileStatus[]`: `agent`, `id`, `label`, `dir`, `signedIn`, optional
 `account`, `organization`, `syncedAt`, `syncError`) and `LaunchOutcome.warning` (optional,
@@ -261,7 +268,7 @@ Commands (Rust `#[tauri::command]`, German `Err` strings; panel calls only via `
   aktualisiert.“); Docker starts are not affected, and the CLI in a container keeps its own
   update path.
 
-## Profiles ([ADR-0009](adr/0009-agent-profiles-with-linked-config-directories.md))
+## Profiles ([ADR-0009](adr/0009-agent-profiles-with-linked-config-directories.md), [ADR-0010](adr/0010-three-way-merge-of-the-profiles-settings-and-state-file.md))
 
 - **Recipe** (`profiles.rs → Recipe`, data per agent): Claude Code only — variable
   `CLAUDE_CONFIG_DIR`, login `<cli> auth login`. OpenCode and Codex have none: any extra profile
@@ -301,100 +308,169 @@ Commands (Rust `#[tauri::command]`, German `Err` strings; panel calls only via `
   stays in each profile's `syncError`). Only the requested profile's directory refuses the
   start: „Der Profilordner konnte nicht angelegt werden.“, or „Der Profilordner gehört nicht zu
   Claude Code.“ for a foreign one (below).
+- **Extra entries** (`settings.profileShare`, `settings/share.rs`, names checked by
+  `profiles/share.rs → check_name`):
+  per agent `dirs` (linked like the recipe's directories) and `files` (whole-file like
+  `CLAUDE.md`), plain names inside the config directory. Name: `^[A-Za-z0-9._-]{1,64}$`, no
+  trailing dot (so not `.` / `..`), no Windows device name with or without an extension (`con`,
+  `prn`, `aux`, `nul`, `com0`–`com9`, `lpt0`–`lpt9`), not starting with `.traygent`, none the
+  recipe handles (its shared directories, `settings.json`, `CLAUDE.md`, `keybindings.json`,
+  `history.jsonl`, `.claude.json`, `.credentials.json`) — all ignoring case; unique ignoring case
+  across both lists; at most 16 per list. Saving trims, drops empty names and exact repeats
+  within a list, then refuses: „<Agent> unterstützt keine Profile.“ (an entry for an agent
+  without a recipe), „Höchstens 16 weitere Ordner für <Agent> möglich.“, „Höchstens 16 weitere
+  Dateien für <Agent> möglich.“, „Name „<name>“ für <Agent> ist ungültig.“, „Name „<name>“ für
+  <Agent> wird bereits abgeglichen.“, „Name „<name>“ für <Agent> ist doppelt vergeben.“. On load
+  every name that would not validate is dropped (folders first), the rest kept; a `state.json`
+  without the field shares nothing extra. The sync checks every name again when it runs: one that
+  fails (also past 16, or a repeat) is never joined into a path and gives each profile the error
+  „<name>: ungültiger Name, wird nicht abgeglichen“ (control characters dropped, at most 64
+  characters).
 - **Triggers:** the first detection after the app started (later detections only read the
-  statuses), `save_settings` when `profiles` changed (otherwise a re-read), `sync_profiles` and
-  a local start (that agent only). An agent without an extra profile is never touched. One sync
-  runs at a time; every run's file system work happens without the service lock.
+  statuses), `save_settings` when `profiles` or `profileShare` changed (otherwise a re-read),
+  `sync_profiles` and a local start (that agent only). An agent without an extra profile is never
+  touched. One sync runs at a time; every run's file system work happens without the service
+  lock.
 - **Profile directory:** created when missing; a new or empty one gets the initial marker
   `{"version":1,"done":[]}` before anything is linked into it. An existing, non-empty one is
-  adopted only when it holds `.claude.json`, `.credentials.json` or the marker, or nothing
-  but links into „Standard“'s shared directories (a sync stopped before its marker);
-  otherwise it belongs to something else (`.claude-mem`, `.claude-backup`) and nothing in it is touched: „Profilordner gehört
-  nicht zu Claude Code“. One that resolves to „Standard“'s: „Profilordner ist der Ordner des
-  Standard-Profils“; a comparison without an answer: „Profilordner konnte nicht geprüft
-  werden“; a file in its place or a failed create: „Profilordner konnte nicht angelegt
-  werden“. No rule runs then.
+  adopted only when it holds `.claude.json`, `.credentials.json` or the marker, or nothing but
+  `.traygent-base` and links into „Standard“'s shared directories, the extra ones included (a sync
+  stopped before its marker); otherwise it belongs to something else (`.claude-mem`,
+  `.claude-backup`) and nothing in it is touched: „Profilordner gehört nicht zu Claude Code“. One
+  that resolves to „Standard“'s: „Profilordner ist der Ordner des Standard-Profils“; a comparison
+  without an answer: „Profilordner konnte nicht geprüft werden“; a file in its place or a failed
+  create: „Profilordner konnte nicht angelegt werden“. No rule runs then.
 - **Sync** of each profile with „Standard“, in this order:
   1. Shared directories `skills`, `agents`, `commands`, `rules`, `output-styles`, `workflows`,
      `agent-memory`, `themes`, `plugins`, `projects`, `file-history`, `plans`, `tasks`,
-     `paste-cache` become directory links into „Standard“'s directory of that name (created
-     there when missing): a junction on Windows — all missing ones in one hidden call of an
-     absolute `powershell.exe` (never a bare name; without one nothing is linked)
-     (`New-Item -ItemType Junction`, link/target lines Base64 in the env var
-     `TRAYGENT_LINKS`, never on the command line, 20 s timeout) — a symbolic link elsewhere.
-     In the profile: a link to the target stays; an empty directory is removed and linked; a
-     non-empty one first hands every entry „Standard“ lacks over (recursively, no file
-     overwritten, links not followed, file times and the read-only flag kept), then moves to
-     the backup and is linked. Each new link is checked; a link that failed gives the profile
-     its directory back (from the backup, or the removed empty one anew). Errors: „<name>:
-     Verknüpfung zeigt auf ein anderes Ziel“ (also a dangling link), „<name>: ist kein
-     Ordner“, „<name>: ist im Standard-Profil kein Ordner“, „<name>: Verknüpfung konnte nicht
-     angelegt werden“, „<name>: Inhalt konnte nicht übernommen werden“, „<name>: Zugriff
+     `paste-cache`, `hooks`, `todos`, `session-env` and the extra `dirs` become directory links
+     into „Standard“'s directory of that name (created there when missing): a junction on
+     Windows — all missing ones in one hidden call of an absolute `powershell.exe` (never a bare
+     name; without one nothing is linked) (`New-Item -ItemType Junction`, link/target lines
+     Base64 in the env var `TRAYGENT_LINKS`, never on the command line, 20 s timeout) — a
+     symbolic link elsewhere. In the profile: a link to the target stays; an empty directory is
+     removed and linked; a non-empty one first hands every entry „Standard“ lacks over
+     (recursively, no file overwritten, links not followed, file times and the read-only flag
+     kept), then moves to the backup and is linked. Each new link is checked; a link that failed
+     gives the profile its directory back (from the backup, or the removed empty one anew).
+     Errors: „<name>: Verknüpfung zeigt auf ein anderes Ziel“ (also a dangling link), „<name>:
+     ist kein Ordner“, „<name>: ist im Standard-Profil kein Ordner“, „<name>: Verknüpfung konnte
+     nicht angelegt werden“, „<name>: Inhalt konnte nicht übernommen werden“, „<name>: Zugriff
      fehlgeschlagen“.
-  2. `settings.json`, `CLAUDE.md`, `keybindings.json` (one rule each): equal content writes
-     nothing; a file on one side is copied to the other; differing files — until the rule's
-     first sync succeeded „Standard“ wins, later the newer modification time (a tie:
+  2. `settings.json`: a three-way merge (below) of its shared part. Shared is the top-level
+     object without the own keys `apiKeyHelper`, `forceLoginOrgUUID`, `forceLoginMethod`,
+     `awsAuthRefresh`, `awsCredentialExport`, `anthropicProfile`, `anthropicProfiles` and without
+     the own variables of `env`: names starting with `ANTHROPIC_`, `CLAUDE_CODE_USE_`, `AWS_`,
+     `GOOGLE_` or `AZURE_`, and `CLAUDE_CONFIG_DIR`, `CLAUDE_CODE_OAUTH_TOKEN` (ASCII case
+     ignored; the recipe's `SettingsRule`). Own keys and variables never leave their file, never
+     reach the base and never make two sides differ; `env` is shared only while it holds a shared
+     variable. Lists of strings below `permissions.` and `autoMode.` merge as sets: an item one
+     side added stays, one a side removed since the base goes; „Standard“'s order, then the
+     profile's new items. Each side becomes the merged shared part plus its own keys and
+     variables, in its own key order at every depth (new keys appended); an `env` object it had
+     stays one, even empty. Written as the CLI writes it — two-space indent, `\n`, a final line
+     break, no byte order mark — and only when its content changes; numbers keep the token the
+     file wrote. A missing file is created with the shared part. A file of only whitespace (the
+     CLI is writing it) skips the rule this run, neither done nor failed. Errors:
+     „settings.json: ist kein lesbares JSON-Objekt und bleibt unverändert“ (also nesting deeper
+     than 128), „settings.json: „env“ ist kein Objekt und bleibt unverändert“ (a shared `env`
+     that is no object while a side has own variables), „settings.json: ist zu groß“ (over 8 MiB)
+     and those of every merged write.
+  3. `CLAUDE.md`, `keybindings.json` and the extra `files` (one rule each, whole file): equal
+     content writes nothing; a file on one side is copied to the other; differing files — until
+     the rule's first sync succeeded „Standard“ wins, later the newer modification time (a tie:
      „Standard“). The losing file is copied to its own side's backup before every overwrite,
-     whichever side it is. A copy keeps its source's file time; writes are temp file +
-     rename; a link as source is followed, a link as target never replaced (checked before
-     the backup); errors as `<name>: …` — „ist eine Verknüpfung und wird nicht
-     überschrieben“, „ist zu groß“ (over 8 MiB), „ist keine Datei“, „Zugriff fehlgeschlagen“.
-  3. `history.jsonl`: both sides become the union of their lines (exact duplicates dropped,
-     „Standard“'s order kept, the profile's other lines placed by their numeric `timestamp`).
-     A side whose size or file time changed since the read is not written („history.jsonl:
-     wurde gerade geändert, nächster Versuch beim nächsten Abgleich“), so a line a session
-     just appended survives; over 64 MiB left alone. No backup: nothing is lost.
-  4. `.claude.json`: the keys `mcpServers` and `projects` are merged entry by entry against
-     the marker's `base` (the entry names both files held after the rule's last successful
-     sync). Per name: in `base` and missing on one side → removed on the other too (the
-     removal wins, whatever the other side changed); not in `base` → an addition, copied to
-     the side that lacks it; on both and different → taken from the winner („Standard“ until
-     the rule's first sync succeeded and on a tie, later the newer file). Without a `base`
-     (first sync, an older marker) the keys are united, nothing removed, and the `base` is
-     recorded. A removal needs both files to exist with the key as an object; a value that is
-     no object counts as one entry; entries are compared as values. A key with more than
-     2000 entries or 256 KiB of names keeps no `base` (united, no removals). Reset guard: a
-     `base` of 2 or more names of which one side holds none counts as a reset — that run
-     unites without removals. Every other key keeps
-     its bytes and place, the layout (indent, line ends) is kept; a missing file is created
-     with the shared keys only. Everything is checked before the first write: unparsable →
-     „.claude.json: ist kein lesbares JSON und bleibt unverändert“; a link →
-     „.claude.json: ist eine Verknüpfung und wird nicht überschrieben“; changed since the read
-     → „.claude.json: wurde gerade geändert, nächster Versuch beim nächsten Abgleich“
-     (neither side written). A side rewritten during the rule's first sync, or one that loses
-     entries through a removal, is copied to its own home's backup first; over 64 MiB left
-     alone.
-  5. When one profile changed „Standard“ and there are several, steps 2–4 run once more, so
-     the change reaches the others in the same run.
+     whichever side it is. A copy keeps its source's file time; writes are temp file + rename; a
+     link as source is followed, a link as target never replaced (checked before the backup);
+     errors as `<name>: …` — „ist eine Verknüpfung und wird nicht überschrieben“, „ist zu groß“
+     (over 8 MiB), „ist keine Datei“, „Zugriff fehlgeschlagen“.
+  4. `history.jsonl`: both sides become the union of their lines (exact duplicates dropped,
+     „Standard“'s order kept, the profile's other lines placed by their numeric `timestamp`). A
+     side whose size or file time changed since the read is not written („history.jsonl: wurde
+     gerade geändert, nächster Versuch beim nächsten Abgleich“), so a line a session just
+     appended survives; over 64 MiB left alone. No backup: nothing is lost.
+  5. `.claude.json`: a three-way merge (below) of the shared subset — `mcpServers` and
+     `projects`, merged entry by entry and, inside an entry, field by field, plus
+     `showSpinnerTree` and `claudeInChromeDefaultEnabled`, one value each. Inside a `projects`
+     entry the fields whose name starts with `last` or is `hasUnseenTeamArtifacts` (ASCII case
+     ignored) stay with their side: they never travel, never reach the base and never make two
+     entries differ; a rewritten entry keeps its side's own. Every other key — identity,
+     onboarding state, caches — keeps its bytes and place and is never read into the base; only a
+     changed key is written anew, an unchanged entry keeps its bytes, the layout (indent, line
+     ends, final line break, a byte order mark) is kept; a missing file is created with the shared
+     subset only. Errors: „.claude.json: ist kein lesbares JSON und bleibt unverändert“,
+     „.claude.json: „<key>“ ist kein Objekt und bleibt unverändert“ (`mcpServers` or `projects`
+     holding anything but an object, e.g. `null`), „.claude.json: ist zu groß“ (over 64 MiB) and
+     those of every merged write. Upgrade: a pair without a value base whose marker still has the
+     name-only `base` of an earlier version uses it once (not on the rule's first sync) — each
+     recorded entry only one side still holds counts as removed on the other side; a key with 2
+     or more recorded names of which one side holds none gets no base (reset).
+  6. When one profile changed „Standard“ and there are several, steps 2–5 run once more, so the
+     change reaches the others in the same run.
+- **Three-way merge** (`settings.json`, `.claude.json`; `profiles/merge.rs`, `pair.rs`): both
+  shared parts are compared as values — key order, formatting and two spellings of one number
+  (`1.5` / `1.50`) never differ — against the pair's base, the shared part both sides held after
+  the rule's last successful sync. Objects merge key by key at every depth: a key only one side
+  has stays, unless the base holds it with that very value (the other side removed it: it goes);
+  a value only one side changed since the base is taken from that side; a value both changed
+  differently is a conflict — decided whole for that value by the newer file (a tie:
+  „Standard“). Without a base of its own — the rule's first sync (until it succeeded the base is
+  ignored), a missing or unreadable base — „Standard“ wins every conflict and nothing is removed,
+  except that a pair takes the base another profile of the agent held at the start of the run as
+  a seed: what the seed knows and „Standard“ no longer has is dropped from the profile, so a new
+  profile does not bring back what „Standard“ removed. Reset guard: in `settings.json`, a base of
+  2 or more keys of which one side holds none merges without base and seed this run; in
+  `.claude.json`, the same per entry key (2 or more entries in the base, none on one side) unites
+  that key this run. While one file is missing nothing is removed; neither present → nothing to
+  do.
+- **Merged writes** (`pair.rs → commit`): everything is checked before the first write — a link
+  is never written through („<file>: ist eine Verknüpfung und wird nicht überschrieben“), a side
+  whose size or file time changed since the read stops the rule („<file>: wurde gerade geändert,
+  nächster Versuch beim nächsten Abgleich“; neither side written, base unchanged, the next sync
+  merges the new content). A side goes to its own home's backup first on the rule's first sync,
+  when the merge takes something from it (a key, list item, entry or field, or an object or list
+  replaced by something else) and when it lost a conflict. Writes are temp file + rename, „Standard“
+  first; a written file gets the newest file time of the two sides read, never the sync's moment.
+  The base is written last, only when it changed: „<file>: Abgleichsstand konnte nicht
+  gespeichert werden“ when that fails.
+- **Base** `<profile>\.traygent-base\settings.json` and `<profile>\.traygent-base\.claude.json`:
+  the merged shared part as values (two-space JSON) — MCP server commands, arguments and `env`
+  included, never an own key, own variable, own project field or anything of the sign-in. It lives
+  in the profile's directory only (never in „Standard“'s), outside every shared directory: nothing
+  links, syncs or backs it up. `.traygent-base` must be a real directory (a link there reads as no
+  base and refuses the write); a base over 8 MiB is not read, and a shared part over 8 MiB is
+  recorded as `{}` (the next sync unites, removes nothing).
 - **Marker** `<profile>\.traygent-sync.json`, compact on one line:
-  `{"version":1,"syncedAt":"<RFC 3339>","done":["settings.json",…,".claude.json"],"base":{"mcpServers":[…],"projects":[…]}}`.
-  `base` holds entry names only (sorted, never values) as of the `.claude.json` rule's last
-  successful sync; it moves only with a successful run of that rule. `done` lists the rules (the synced files and `.claude.json`) whose first sync succeeded; a
-  rule that failed stays a first sync in the next run. `syncedAt` moves only after a sync
-  without errors. Written whenever it changed; an unreadable marker counts as present (all
-  rules first).
-- **Backup** `<home>\.traygent-backup\<UTC yyyymmddThhmmssZ>[-<n>]\<name>[.<n>]`, one folder
-  per run and home, created on first use: a profile's losers in the profile's directory,
-  „Standard“'s in `%USERPROFILE%\.claude` (also for `.claude.json`, which lives beside it), so
-  no identity crosses profiles. Traygent never deletes a backup.
-- **Never touched:** `.credentials.json` (only its existence and size make `signedIn`), every
-  other key of `.claude.json` (`oauthAccount.emailAddress` / `organizationName` are read for
-  `account` / `organization` only, control characters dropped, at most 128 characters), any
-  other file of either directory. Nothing is deleted but an empty directory that makes room
-  for a link. Other errors: „Benutzerordner nicht verfügbar“, „Ordner des Standard-Profils
-  konnte nicht angelegt werden“, „.traygent-sync.json: Zugriff fehlgeschlagen“.
+  `{"version":1,"syncedAt":"<RFC 3339>","done":["settings.json","CLAUDE.md","keybindings.json",…,".claude.json"]}`.
+  `done` lists the rules (`settings.json`, each whole-file rule by name — extra files included —
+  and `.claude.json`) whose first sync succeeded; a rule that failed stays a first sync in the
+  next run. `syncedAt` moves only after a sync without errors. A name-only `base`
+  (`{"mcpServers":[…],"projects":[…]}`) from an earlier version is kept as read until
+  `.claude.json` syncs without an error, then dropped; it is never recorded anew. Written whenever
+  it changed; an unreadable marker counts as present (all rules first).
+- **Backup** `<home>\.traygent-backup\<UTC yyyymmddThhmmssZ>[-<n>]\<name>[.<n>]`, one folder per
+  run and home, created on first use: a profile's losers in the profile's directory, „Standard“'s
+  in `%USERPROFILE%\.claude` (also for `.claude.json`, which lives beside it), so no identity
+  crosses profiles. Traygent never deletes a backup.
+- **Never touched:** `.credentials.json` (only its existence and size make `signedIn`); the own
+  keys and variables of `settings.json` and the own project fields of `.claude.json` stay in their
+  file; every other key of `.claude.json` (`oauthAccount.emailAddress` /
+  `organizationName` are read for `account` / `organization` only, control characters dropped, at
+  most 128 characters, a byte order mark tolerated); any other file of either directory. Nothing
+  is deleted but an empty directory that makes room for a link. Other errors: „Benutzerordner
+  nicht verfügbar“, „Ordner des Standard-Profils konnte nicht angelegt werden“,
+  „.traygent-sync.json: Zugriff fehlgeschlagen“.
 - **Statuses:** `Snapshot.profiles` per agent with `profiles`, „Standard“ first, then the
-  settings' order; `syncError` = the last sync's errors joined by `·` (at most 400
-  characters). In memory only; read at every detection, after a sync and a settings save.
+  settings' order; `syncError` = the last sync's errors joined by `·` (at most 400 characters). In
+  memory only; read at every detection, after a sync and a settings save.
 - **Sign-in:** `profile_login { agent, profile }` („Standard“ included, only on a click) creates
   the profile directory and opens a terminal in `%USERPROFILE%` (else `C:\`) titled „<Agent> ·
   <Label> anmelden“ running the env line (for „Standard“ always the `Remove-Item`) and
   `& '<cli>' 'auth' 'login'`; it stays open like the install terminal. Refused: „<Agent> wird
   gerade aktualisiert.“, „<Agent> ist nicht installiert.“, „Profil nicht gefunden.“, and „Der
-  Profilordner gehört nicht zu Claude Code.“ for an existing foreign directory (the rule
-  above; also when that cannot be checked) — a sign-in never writes credentials into it. The
-  status follows with the next
-  detection, sync or settings save.
+  Profilordner gehört nicht zu Claude Code.“ for an existing foreign directory (the rule above,
+  with the agent's extra directories; also when that cannot be checked) — a sign-in never writes
+  credentials into it. The status follows with the next detection, sync or settings save.
 
 ## Ports (Docker sessions)
 

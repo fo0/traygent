@@ -34,7 +34,7 @@ Stable project knowledge. **Read at session start.**
 ### Agent profiles share everything but the sign-in
 
 - **Date:** 2026-11-13
-- **Decision:** One config dir per sign-in (`CLAUDE_CONFIG_DIR=%USERPROFILE%\.claude-<id>`, „Standard“ = `.claude`); shared dirs are junctions into the default home, loose files synced (newest wins, the default home on the first sync). Claude Code, local only. Detail: [ADR-0009](docs/adr/0009-agent-profiles-with-linked-config-directories.md), `docs/SPEC.md → Profiles`.
+- **Decision:** One config dir per sign-in (`CLAUDE_CONFIG_DIR=%USERPROFILE%\.claude-<id>`, „Standard“ = `.claude`); shared dirs (+ user extras) are junctions into the default home; `settings.json` and the `.claude.json` subset merge three-way against a value base, sign-in keys per profile; other files whole (newest wins). Claude Code, local only. Detail: [ADR-0009](docs/adr/0009-agent-profiles-with-linked-config-directories.md), [ADR-0010](docs/adr/0010-three-way-merge-of-the-profiles-settings-and-state-file.md), `docs/SPEC.md → Profiles`.
 
 ## Gotchas & Pitfalls
 
@@ -56,9 +56,11 @@ Stable project knowledge. **Read at session start.**
 - **Colours live in `src/styles/00-tokens.css` only** (dark set plus two identical light blocks); `tokens.test.ts` rejects literals elsewhere and checks WCAG AA pairs. Playwright runs dark by default (`playwright.config.ts`). (2026-11-03)
 - **App icons come from geometry** in `scripts/generate-icons.mjs` (writes `src-tauri/icons/*`, `source.svg` included); `pnpm icons:check` fails on drift. The tray icon embeds `icons/32x32.png`. (2026-11-03)
 
-- **Agent CLI updates fail closed** — the in-use check (`agent_updates.rs → LIST_SCRIPT`) needs its end marker and only known lines; a new line kind in the script must be added to `line_agent`, or every agent reads as in use. `store.rs → parse_settings` reads settings field by field: a new setting needs its line there or a saved value is dropped on load. (2026-11-10)
+- **Agent CLI updates fail closed** — the in-use check (`agent_updates.rs → LIST_SCRIPT`) needs its end marker and only known lines; a new line kind in the script must be added to `line_agent`, or every agent reads as in use. (2026-11-10)
 
-- **Profiles: `profiles.rs → Homes` is the only path builder** — every directory the sync touches comes from it (user profile + recipe names + validated id); never hand the engine a path from settings or the panel. `.credentials.json` and every `.claude.json` key but `recipe.shared_keys` are never read into another profile — keep it that way when adding a recipe. Engine tests link through `testing::TestLinker` (symlinks; `symlink_dir` on Windows needs Developer Mode or admin), only one Windows-only test runs the real `JunctionLinker` — a junction change is proven there alone. Sync runs never hold the service lock: plan under the lock → `run_plan` → `apply_profiles` / `finish_launch_sync`; keep new sync work on that path. Every overwrite keeps its loser in the backup of its own home, and a non-empty `.claude-<id>` without `.claude.json`, `.credentials.json` or the marker is never touched (sync and sign-in). `.claude.json` removals travel only through the marker's `base` — entry names, never values (the marker must never hold a token or command); without a base, past its caps or on a reset the keys are only united. (2026-11-13)
+- **`store.rs → parse_settings` reads settings field by field** — a new `AppSettings` field needs its line there (plus `sanitize` when it reaches a path) or a saved value is dropped on load. (2026-11-10)
+
+- **Profiles: `profiles.rs → Homes` is the only path builder** — user profile + recipe names + validated id; extras only after `profiles/share.rs → check_name`. Only the recipe's shared part crosses profiles (`settings.json` minus `SettingsRule`, `.claude.json` `shared_keys` + `shared_values` minus `OwnFields`); never `.credentials.json` — keep it so in a new recipe. Bases in `<profile>\.traygent-base\<file>` hold values (`mcpServers` commands and `env` too) and stay in their own profile dir — never link, sync or back them up; the marker's name-only `base` is legacy, read once. Engine tests link via `testing::TestLinker` (symlinks, BACKLOG #60); only one Windows test runs `JunctionLinker`. Sync never holds the service lock (plan → `run_plan` → `apply_profiles` / `finish_launch_sync`). Losers go to the backup of their own home; a foreign `.claude-<id>` is never touched. Detail: `docs/SPEC.md → Profiles`. (2026-11-13)
 
 ## External Dependencies
 

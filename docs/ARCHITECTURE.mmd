@@ -11,8 +11,8 @@ flowchart TD
         AutostartTs["autostart.svelte.ts staged autostart"]
         Components["Composer, RecentList, AppFooter, SettingsDialog, Modal"]
         GithubComponents["FolderField, RepoSuggestions, GithubSettings, GithubConnect, InlineConfirm"]
-        ProfileComponents["ProfileChip, ProfileMark, ProfileSettings"]
-        Helpers["agents.ts, recents.ts, profiles.ts, validation.ts pure rules"]
+        ProfileComponents["ProfileChip, ProfileMark, ProfileSettings, ProfileShareFields"]
+        Helpers["agents.ts, recents.ts, profiles.ts, profileShare.ts, validation.ts pure rules"]
         TargetTs["target.ts folder, repo or search; repo matching"]
         ThemeTs["theme.ts theme preference"]
         Bridge["bridge.ts native or demo, traygent:snapshot listener"]
@@ -39,12 +39,12 @@ flowchart TD
         LaunchPrepRs["service/launch_prep.rs resolve, repo folder, clone or reuse"]
         ServiceGithubRs["service/github.rs account and listing commits"]
         ServiceProfilesRs["service/profiles.rs statuses, sync before a local start"]
-        ProfilesRs["profiles.rs and profiles/* recipe, Homes, links, file sync, status"]
+        ProfilesRs["profiles.rs and profiles/* recipe, Homes, links, three-way merge, file sync, status"]
         AgentUpdatesRs["agent_updates.rs in-use check, update commands, schedule rule"]
         RepoRs["repo.rs classification, clone folder and URL"]
         GithubRs["github.rs and github/* api, http, gh, discover, process, vault, secret"]
         StoreRs["store.rs versioned state.json"]
-        SettingsRs["settings.rs and settings/profiles.rs defaults and validation"]
+        SettingsRs["settings.rs, settings/profiles.rs, settings/share.rs defaults and validation"]
         RecentsRs["recents.rs recent sessions"]
         CatalogRs["catalog.rs agent catalog"]
         DetectRs["detect.rs, host.rs, runner.rs CLI and Docker probes"]
@@ -69,7 +69,7 @@ flowchart TD
         Git(["git.exe clone from github.com, user's Git credentials"])
         GhCli(["gh.exe sign-ins, token read on consent"])
         Vault[("OS credential vault keyring, traygent / github-id")]
-        ConfigDirs[("USERPROFILE .claude and .claude-id, junctions, backups")]
+        ConfigDirs[("USERPROFILE .claude and .claude-id, junctions, merge bases, backups")]
     end
 
     AppSvelte --> PanelTs
