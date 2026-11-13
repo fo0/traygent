@@ -135,7 +135,8 @@
     aria-controls={expanded ? LIST : undefined}
     aria-activedescendant={expanded ? `${LIST}-${current}` : undefined}
     placeholder="C:\Projekte\app oder owner/repo"
-    title={value || FIELD_HINT}
+    title={value || `${FIELD_HINT} (Strg+L)`}
+    aria-keyshortcuts="Control+L"
     spellcheck="false"
     autocomplete="off"
     oninput={() => {
