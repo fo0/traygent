@@ -160,6 +160,31 @@ test('a profile row opens its details in place, one at a time', async ({
   await expect(standard).toHaveAttribute('aria-expanded', 'false');
 });
 
+test('an invalid rename keeps its reason in view when its row closes', async ({
+  page,
+}) => {
+  await page.goto('/');
+  const dialog = await openAgents(page);
+  const list = dialog.getByRole('list', { name: 'Profile' });
+  await list.getByRole('button', { name: 'Team Details' }).click();
+  await list
+    .locator('.profile-detail')
+    .getByRole('textbox', { name: 'Name' })
+    .fill('');
+  await expect(
+    list.locator('.profile-detail').getByText('Name fehlt.'),
+  ).toBeVisible();
+  await list.getByRole('button', { name: 'Standard Details' }).click();
+  // The row is closed: the reason shows under „Neues Profil“ and on its toggle.
+  await expect(dialog.getByText('Team: Name fehlt.')).toBeVisible();
+  await expect(
+    list.getByRole('button', { name: 'Team Details' }),
+  ).toHaveAccessibleDescription('Name fehlt.');
+  await expect(
+    dialog.getByRole('button', { name: 'Speichern', exact: true }),
+  ).toHaveAttribute('aria-disabled', 'true');
+});
+
 test('natively an add sends the saved settings plus the profile; a refusal keeps the name', async ({
   page,
 }) => {

@@ -161,4 +161,23 @@ describe('SettingsDraft profiles', () => {
     team.label = 'Team';
     expect(draft.dirty).toBe(false);
   });
+
+  it('brings the saved default back with the profile whose removal it undoes', async () => {
+    const settings = demoSettings();
+    settings.agentProfile.claude = 'team';
+    const draft = new SettingsDraft(settings);
+    const save = vi.fn(async (value: AppSettings) => value);
+    draft.removeProfile('claude', 'team');
+    expect(draft.value.agentProfile.claude).toBe('default');
+    expect(await draft.addProfile('claude', 'Team', save)).toBe('');
+    expect(draft.value.agentProfile.claude).toBe('team');
+    expect(draft.dirty).toBe(false);
+    expect(save).not.toHaveBeenCalled();
+    // A default chosen anew after the removal stays as chosen.
+    draft.value.profiles.claude.push({ id: 'kunde', label: 'Kunde' });
+    draft.removeProfile('claude', 'team');
+    draft.value.agentProfile.claude = 'kunde';
+    await draft.addProfile('claude', 'Team', save);
+    expect(draft.value.agentProfile.claude).toBe('kunde');
+  });
 });

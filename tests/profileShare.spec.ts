@@ -98,7 +98,7 @@ test('„Bereits abgeglichen“ lists the built-in folders and files, collapsed'
   ).map((text) => text.replace(/\s+/g, ' ').trim());
   expect(dirsLine).toMatch(/^skills, agents, .*, session-env$/);
   expect(filesLine).toBe(
-    'settings.json, CLAUDE.md, keybindings.json, history.jsonl',
+    'CLAUDE.md, keybindings.json, history.jsonl, settings.json',
   );
   await expect(builtIn.locator('dt')).toHaveText(['Ordner', 'Dateien']);
   // Keyboard: the summary toggles it back.

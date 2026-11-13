@@ -84,7 +84,7 @@
     ),
   );
   let error = $state('');
-  // In the draft: a profile added at once (#37) waits for it, and it for one.
+  // In the draft: an add at once (#37) and this save or a close wait for each other.
   const saving = $derived(draft.saving);
   let alive = true;
   // main.ts applied the saved theme; the choice only previews until saved.
@@ -204,8 +204,8 @@
   eyebrow={`TRAYGENT · ${demo ? 'DEMO' : 'LOKAL'}`}
   wide
   {returnFocus}
-  closeDisabled={saving}
-  onClose={() => !saving && onClose()}
+  closeDisabled={draft.busy}
+  onClose={() => !draft.busy && onClose()}
 >
   <div
     class="settings-tabs"
@@ -280,7 +280,7 @@
     <button
       type="button"
       class="secondary-button"
-      disabled={saving}
+      disabled={draft.busy}
       onclick={() => onClose()}>Abbrechen</button
     ><!-- Off via aria-disabled: it keeps focus while saving. --><button
       type="button"
@@ -288,9 +288,11 @@
       aria-disabled={saveBlocked ? 'true' : undefined}
       title={draft.invalid
         ? 'Ungültige Eingabe'
-        : dirty || saving
-          ? undefined
-          : 'Keine Änderungen'}
+        : draft.adding
+          ? 'Profil wird hinzugefügt …'
+          : dirty || saving
+            ? undefined
+            : 'Keine Änderungen'}
       onclick={() => void save()}
       >{saving ? 'Wird gespeichert …' : 'Speichern'}</button
     >

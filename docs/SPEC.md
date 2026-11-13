@@ -118,15 +118,16 @@ Brand top left: icon + „Traygent“. Window ~480×760, frameless, tray popup l
   a warning icon after a failed sync, „Anmelden“ (immediate, `profile_login`) and a remove
   button (staged, undone by „Abbrechen“; none for „Standard“). The toggle (`aria-expanded`) opens
   the row's details in place, one row at a time: „Name“ (for an extra profile a field holding a
-  staged rename — the id and folder never change — checked by the list rules; read-only for
+  staged rename — the id and folder never change — checked by the list rules — a problem shows in the open detail, else under „Neues Profil“ as „<Name>: <problem>“, and in the toggle's description; read-only for
   „Standard“), „Konto“, „Organisation“ (when reported), „Ordner“ (the folder, mono, with a copy
   button), „Abgeglichen <time>“ and „Abgleich“ with the sync error when present. Then „Neues
   Profil“ + „+“ / Enter, whose tooltip shows the folder the name gives: adding is an explicit
   immediate action (#37) — it sends `save_settings` with the saved settings plus the new profile,
   never the other staged edits, takes the answer as the new baseline and keeps every staged edit
-  staged, so the row signs in at once; the field is busy meanwhile, and „Speichern“ and an add
-  wait for each other. A name whose id the saved list still holds (a staged removal) brings that
-  profile back without a save. Inline errors: „Name fehlt.“, „Höchstens 24 Zeichen.“, „Keine
+  staged, so the row signs in at once; meanwhile the field is busy, „+“ turns into a spinning
+  „Wird hinzugefügt …“, and „Speichern“, „Abbrechen“, Escape and the close button wait (the
+  dialog cannot close on a half-applied add). A name whose id the saved list still holds (a staged removal) brings that
+  profile back without a save, and the saved default with it when it was that one. Inline errors: „Name fehlt.“, „Höchstens 24 Zeichen.“, „Keine
   Steuerzeichen.“, „„<Name>“ ist reserviert.“, „Mindestens ein Buchstabe oder eine Ziffer.“,
   „Profil gibt es schon.“, „Höchstens 8 Profile.“ (with „ Erst speichern.“ appended when only
   a staged removal or rename frees the name or the place), and a native refusal verbatim; the
@@ -135,7 +136,7 @@ Brand top left: icon + „Traygent“. Window ~480×760, frameless, tray popup l
   „Durch Komma oder Leerzeichen getrennt“, placeholders `.caveman-sessions` / `orca-state.json`)
   with the native errors of _Profiles → Extra entries_ inline, the first problem per field, and
   below them „Bereits abgeglichen“, collapsed by default: the built-in folders and files, mono
-  (`profileShare.ts → BUILT_IN_SHARE`; a name with an extension is a file). Removing the last
+  (`profileShare.ts → BUILT_IN_SHARE`, as `share.rs → name_lists` splits them). Removing the last
   extra profile hides them; a list that is then invalid goes back to its saved value.
 - **Umgebung**: „Umgebungen“ — one checkbox per environment the composer shows (Lokal / Docker /
   WSL, all on by default; the last of Lokal and Docker cannot be turned off and says why in its

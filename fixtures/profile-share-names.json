@@ -1,7 +1,7 @@
 {
   "claude": {
     "devices": ["con", "prn", "aux", "nul"],
-    "handled": [
+    "handledDirs": [
       "skills",
       "agents",
       "commands",
@@ -18,7 +18,9 @@
       "paste-cache",
       "hooks",
       "todos",
-      "session-env",
+      "session-env"
+    ],
+    "handledFiles": [
       "CLAUDE.md",
       "keybindings.json",
       "history.jsonl",

@@ -61,12 +61,14 @@
       aria-expanded={open}
       aria-controls={open ? detail : undefined}
       aria-label={`${shown} Details`}
-      title={open ? 'Details schließen' : 'Details'}
+      aria-describedby={problem ? `${detail}-why` : undefined}
+      title={problem || (open ? 'Details schließen' : 'Details')}
       onclick={onToggle}
       ><Icon name="down" size={12} /><span
         class="profile-name"
         data-invalid={problem ? 'true' : undefined}>{shown}</span
-      ></button
+      >{#if problem}<span id={`${detail}-why`} class="sr-only">{problem}</span
+        >{/if}</button
     >
     <span
       class="profile-account"

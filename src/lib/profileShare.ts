@@ -15,33 +15,36 @@ const DEVICE = /^(?:con|prn|aux|nul|com[0-9]|lpt[0-9])(?:\.|$)/i;
 const OWN_PREFIX = '.traygent';
 /**
  * What the sync already shares, copies or keeps per profile, as the native
- * side spells them. Rust lists them in one list (the fixture); a name with an
- * extension is a file, the rest are folders (`BUILT_IN_SHARE`).
+ * side spells and splits them (`share.rs → name_lists`): the folders it
+ * links and the files it syncs, shown under „Bereits abgeglichen“.
  */
-const BUILT_IN = [
-  'skills',
-  'agents',
-  'commands',
-  'rules',
-  'output-styles',
-  'workflows',
-  'agent-memory',
-  'themes',
-  'plugins',
-  'projects',
-  'file-history',
-  'plans',
-  'tasks',
-  'paste-cache',
-  'hooks',
-  'todos',
-  'session-env',
-  'settings.json',
-  'CLAUDE.md',
-  'keybindings.json',
-  'history.jsonl',
-] as const;
-const HANDLED = new Set<string>(BUILT_IN.map((name) => name.toLowerCase()));
+export const BUILT_IN_SHARE: Readonly<ProfileShare> = {
+  dirs: [
+    'skills',
+    'agents',
+    'commands',
+    'rules',
+    'output-styles',
+    'workflows',
+    'agent-memory',
+    'themes',
+    'plugins',
+    'projects',
+    'file-history',
+    'plans',
+    'tasks',
+    'paste-cache',
+    'hooks',
+    'todos',
+    'session-env',
+  ],
+  files: ['CLAUDE.md', 'keybindings.json', 'history.jsonl', 'settings.json'],
+};
+const HANDLED = new Set(
+  [...BUILT_IN_SHARE.dirs, ...BUILT_IN_SHARE.files].map((name) =>
+    name.toLowerCase(),
+  ),
+);
 /** The state and sign-in files and anything named after them, e.g. a backup copy. */
 export const PROTECTED_PREFIXES = ['.claude.json', '.credentials.json'];
 /** Account caches and logs: they belong to one sign-in and are never shared. */
@@ -63,11 +66,6 @@ export const NEVER_SHARED = new Set([
 ]);
 /** The names the sync handles itself, as the native side lists them. */
 export const HANDLED_NAMES: ReadonlySet<string> = HANDLED;
-/** The built-in names split for „Bereits abgeglichen“: folders, then files. */
-export const BUILT_IN_SHARE: Readonly<ProfileShare> = {
-  dirs: BUILT_IN.filter((name) => !name.includes('.')),
-  files: BUILT_IN.filter((name) => name.includes('.')),
-};
 const NOUNS: Record<ShareKind, string> = { dirs: 'Ordner', files: 'Dateien' };
 
 export const emptyShare = (): ProfileShare => ({ dirs: [], files: [] });

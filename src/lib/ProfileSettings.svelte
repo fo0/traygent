@@ -43,12 +43,26 @@
     { id: DEFAULT_PROFILE, label: STANDARD_LABEL },
     ...extra,
   ]);
-  // A rename's problem shows in its row's detail; the list's others here.
-  const renaming = $derived(
-    extra.some((_, index) => renameProblem(extra, index)),
+  /** Invalid renames, each named as its row shows it. */
+  const renames = $derived(
+    extra.flatMap((item, index) => {
+      const why = renameProblem(extra, index);
+      const saved = statuses.find((status) => status.id === item.id);
+      return why
+        ? [
+            {
+              id: item.id,
+              text: `${item.label || saved?.label || item.id}: ${why}`,
+            },
+          ]
+        : [];
+    }),
   );
+  // An open row shows its rename problem itself; a closed one's shows here,
+  // so a blocked „Speichern“ always has a visible reason.
   const problem = $derived(
-    renaming ? '' : draft.problem(`agents.${agent}.profiles`),
+    renames.find((rename) => rename.id !== opened)?.text ??
+      (renames.length ? '' : draft.problem(`agents.${agent}.profiles`)),
   );
 
   let name = $state('');
@@ -165,10 +179,14 @@
     /><button
       type="button"
       class="icon-button small"
-      aria-label="Profil hinzufügen"
+      class:spinning={draft.adding}
+      aria-label={draft.adding
+        ? 'Profil wird hinzugefügt'
+        : 'Profil hinzufügen'}
       aria-disabled={draft.busy ? 'true' : undefined}
-      title="Hinzufügen (Enter)"
-      onclick={() => void add()}><Icon name="plus" size={14} /></button
+      title={draft.adding ? 'Wird hinzugefügt …' : 'Hinzufügen (Enter)'}
+      onclick={() => void add()}
+      ><Icon name={draft.adding ? 'refresh' : 'plus'} size={14} /></button
     >
   </div>
   {#if typed || problem}<p id="profile-error" class="field-error">

@@ -160,7 +160,9 @@ describe('shared names: the rules', () => {
     ).claude;
     const lower = (list: string[]) =>
       list.map((name) => name.toLowerCase()).sort();
-    expect([...HANDLED_NAMES].sort()).toEqual(lower(native.handled));
+    expect([...HANDLED_NAMES].sort()).toEqual(
+      lower([...native.handledDirs, ...native.handledFiles]),
+    );
     expect([...NEVER_SHARED].sort()).toEqual(lower(native.neverShared));
     expect([...PROTECTED_PREFIXES].sort()).toEqual(
       lower(native.protectedPrefixes),
@@ -168,24 +170,11 @@ describe('shared names: the rules', () => {
     expect(native.ownPrefix).toBe('.traygent');
     expect(native.maxPerList).toBe(MAX_SHARED);
     expect(native.maxNameChars).toBe(64);
-    // „Bereits abgeglichen“ shows the native list as spelled, split in two.
-    expect([...BUILT_IN_SHARE.dirs, ...BUILT_IN_SHARE.files].sort()).toEqual(
-      [...native.handled].sort(),
-    );
-  });
-
-  it('split the built-in names: a name with an extension is a file', () => {
-    expect(BUILT_IN_SHARE.files).toEqual([
-      'settings.json',
-      'CLAUDE.md',
-      'keybindings.json',
-      'history.jsonl',
-    ]);
-    // The 17 linked folders of docs/USAGE.md, none with an extension.
-    expect(BUILT_IN_SHARE.dirs).toHaveLength(17);
-    expect(BUILT_IN_SHARE.dirs.filter((name) => name.includes('.'))).toEqual(
-      [],
-    );
+    // „Bereits abgeglichen“ shows the native lists as spelled and split.
+    expect(BUILT_IN_SHARE).toEqual({
+      dirs: native.handledDirs,
+      files: native.handledFiles,
+    });
   });
 
   it('refuse a name twice, ignoring case, within and across both lists', () => {

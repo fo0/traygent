@@ -154,7 +154,10 @@ export class SettingsDraft {
     this.value = value;
   }
 
-  /** Undoes a staged removal: back at its saved place, with the typed name. */
+  /**
+   * Undoes a staged removal: back at its saved place, with the typed name,
+   * and the saved default again when it was this one.
+   */
   #restore(agent: AgentId, profile: AgentProfile) {
     const order = (this.saved.profiles?.[agent] ?? []).map((item) => item.id);
     const place = (item: AgentProfile) => {
@@ -163,6 +166,12 @@ export class SettingsDraft {
     };
     const list = [...(this.value.profiles[agent] ?? []), profile];
     this.value.profiles[agent] = list.sort((a, b) => place(a) - place(b));
+    // The removal moved a saved default to „Standard“; it comes back too.
+    if (
+      this.saved.agentProfile?.[agent] === profile.id &&
+      (this.value.agentProfile[agent] ?? DEFAULT_PROFILE) === DEFAULT_PROFILE
+    )
+      this.value.agentProfile[agent] = profile.id;
   }
 
   /**
