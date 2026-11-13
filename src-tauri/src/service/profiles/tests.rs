@@ -375,6 +375,21 @@ fn the_sign_in_terminal_runs_auth_login_in_the_profiles_environment() {
         refused(AgentId::Claude, "team", &FakeFs::default()),
         "Claude Code ist nicht installiert."
     );
+    // A directory that is someone else's gets no sign-in: the credentials would make it
+    // look like Claude Code's own.
+    let mut foreign = self::fs();
+    foreign.foreign.insert(r"C:\Users\max\.claude-team".into());
+    assert_eq!(
+        refused(AgentId::Claude, "team", &foreign),
+        "Der Profilordner gehört nicht zu Claude Code."
+    );
+    assert!(foreign.created().is_empty(), "nothing is created either");
+    assert!(service
+        .prepare_login(AgentId::Claude, "solo", &host, &foreign)
+        .is_ok());
+    assert!(service
+        .prepare_login(AgentId::Claude, "default", &host, &foreign)
+        .is_ok());
     let read_only = FakeFs {
         read_only: true,
         ..self::fs()
@@ -383,6 +398,47 @@ fn the_sign_in_terminal_runs_auth_login_in_the_profiles_environment() {
         refused(AgentId::Claude, "team", &read_only),
         "Der Profilordner konnte nicht angelegt werden."
     );
+}
+
+/// The sync before a start runs without the service lock; what changed meanwhile is caught
+/// before the terminal opens.
+#[test]
+fn a_prepared_start_is_confirmed_before_it_spawns() {
+    let dir = TempDir::new("service-profiles-confirm");
+    let mut service = service(&dir);
+    let host = windows_host();
+    let prepared = service
+        .prepare_launch(
+            &request(AgentId::Claude, EnvId::Local, Some("team")),
+            &host,
+            &fs(),
+            "n",
+        )
+        .unwrap();
+    assert_eq!(service.confirm_launch(&prepared.request), Ok(()));
+    // The profile was removed meanwhile.
+    service
+        .save_settings(with_profiles(&[("solo", "Solo")]))
+        .unwrap();
+    assert_eq!(
+        service.confirm_launch(&prepared.request),
+        Err("Profil nicht gefunden.".into())
+    );
+    // The default profile and a container are not affected by the profile list.
+    let plain = request(AgentId::Claude, EnvId::Local, None);
+    assert_eq!(service.confirm_launch(&plain), Ok(()));
+    // An update of the agent began meanwhile: a local start waits, a container does not.
+    service.set_agent_update(crate::agent_updates::status(
+        AgentId::Claude,
+        crate::models::AgentUpdateState::Running,
+        at(1),
+    ));
+    assert_eq!(
+        service.confirm_launch(&plain),
+        Err("Claude Code wird gerade aktualisiert.".into())
+    );
+    let docker = request(AgentId::Claude, EnvId::Docker, None);
+    assert_eq!(service.confirm_launch(&docker), Ok(()));
 }
 
 mod sync;

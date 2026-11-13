@@ -14,6 +14,8 @@ pub(crate) struct FakeFs {
     pub dirs: HashSet<String>,
     pub created: Mutex<Vec<String>>,
     pub read_only: bool,
+    /// Profile directories that hold someone else's data.
+    pub foreign: HashSet<String>,
 }
 
 impl FakeFs {
@@ -47,6 +49,9 @@ impl Fs for FakeFs {
         }
         self.created.lock().unwrap().push(path.into());
         Ok(())
+    }
+    fn refuses_sign_in(&self, _: crate::models::AgentId, dir: &str, _: &str) -> bool {
+        self.foreign.contains(dir)
     }
 }
 

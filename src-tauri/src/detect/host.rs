@@ -10,6 +10,10 @@ pub trait Fs: Sync {
     fn is_dir(&self, path: &str) -> bool;
     /// Creates `path` and its missing parents (the clone root before a `git clone`).
     fn create_dir_all(&self, path: &str) -> std::io::Result<()>;
+    /// Whether the agent's profile directory `dir` exists and is someone else's (or that
+    /// cannot be told): no sign-in may write into it
+    /// ([`crate::profiles::sync::refuses_sign_in`]).
+    fn refuses_sign_in(&self, agent: AgentId, dir: &str, default_dir: &str) -> bool;
 }
 
 /// The real file system.
@@ -31,6 +35,11 @@ impl Fs for RealFs {
 
     fn create_dir_all(&self, path: &str) -> std::io::Result<()> {
         std::fs::create_dir_all(path)
+    }
+
+    fn refuses_sign_in(&self, agent: AgentId, dir: &str, default_dir: &str) -> bool {
+        use std::path::Path;
+        crate::profiles::sync::refuses_sign_in(agent, Path::new(dir), Path::new(default_dir))
     }
 }
 

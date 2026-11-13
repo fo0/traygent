@@ -154,6 +154,20 @@ impl Service {
         Ok(Some(id.to_string()))
     }
 
+    /// The last look before a prepared start spawns: the profile sync ran without the
+    /// service lock, and meanwhile an update of the agent may have begun or the profile may
+    /// have been removed.
+    pub fn confirm_launch(&self, request: &LaunchRequest) -> Result<(), String> {
+        if request.env == EnvId::Local && self.agent_updating(request.agent) {
+            return Err(format!(
+                "{} wird gerade aktualisiert.",
+                request.agent.label()
+            ));
+        }
+        self.launch_profile(request.agent, request.env, request.profile.as_deref())
+            .map(drop)
+    }
+
     /// The terminal that signs the agent's profile in (`<cli> auth login`), with its console
     /// fallback. The profile's directory is created, so the CLI finds its home.
     pub fn prepare_login(
@@ -182,6 +196,17 @@ impl Service {
         }
         let id = (profile != DEFAULT_PROFILE).then_some(profile);
         resolved.profile_dir = profile_dir(agent, id, host)?;
+        // A sign-in writes the credentials: never into a directory that is someone else's
+        // (it would look like the agent's own from then on and be adopted).
+        if let Some(dir) = &resolved.profile_dir {
+            let default_dir = profile_dir(agent, Some(DEFAULT_PROFILE), host)?.unwrap_or_default();
+            if fs.refuses_sign_in(agent, dir, &default_dir) {
+                return Err(format!(
+                    "Der {}.",
+                    crate::profiles::sync::foreign_dir(agent)
+                ));
+            }
+        }
         let home = host
             .user_profile
             .clone()

@@ -113,13 +113,18 @@ pub async fn launch_session(
     .await?;
     // Every profile of the agent is brought in line before its session starts — without
     // the service lock, so the panel stays responsive during a long first adoption.
+    // A sync that broke down (its worker panicked) is a warning like any other sync
+    // problem: the session still starts.
     let synced = match plan {
-        Some(plan) => Some(crate::desktop_profiles::run_plan(plan, true).await?),
+        Some(plan) => Some(crate::desktop_profiles::run_plan(plan, true).await),
         None => None,
     };
     let outcome = work(app.clone(), move |service| {
+        // The lock was free meanwhile: the agent may be updating now, the profile gone.
+        service.confirm_launch(&prepared.request)?;
         let warning = match synced {
-            Some(synced) => service.finish_launch_sync(&prepared.request, synced)?,
+            Some(Ok(synced)) => service.finish_launch_sync(&prepared.request, synced)?,
+            Some(Err(_)) => Some(service::SYNC_WARNING.to_string()),
             None => None,
         };
         start(&prepared.plan, prepared.fallback.as_ref())?;

@@ -387,3 +387,104 @@ fn junctions_are_created_and_recognized_on_windows() {
     );
     assert!(again[0].errors.is_empty() && !again[0].changed);
 }
+
+/// Records what the profile directory holds at the moment the links are made.
+struct Watching(std::sync::Mutex<Vec<String>>);
+
+impl Linker for Watching {
+    fn link(&self, links: &[Link]) {
+        let dir = links[0].link.parent().unwrap();
+        let mut names: Vec<_> = std::fs::read_dir(dir)
+            .unwrap()
+            .map(|entry| entry.unwrap().file_name().into_string().unwrap())
+            .collect();
+        names.sort();
+        *self.0.lock().unwrap() = names;
+        crate::testing::TestLinker.link(links);
+    }
+}
+
+/// A sync stopped between linking and its marker must not leave a directory that looks
+/// like someone else's: a new directory is marked before anything is linked into it.
+#[test]
+fn a_new_profile_directory_is_marked_before_it_is_linked() {
+    let world = World::new("profiles-initial-marker");
+    let watching = Watching(Default::default());
+    let reports = sync_agent(&world.homes, CLAUDE, &[profile("team")], &watching, at(1));
+    assert_eq!(reports[0].errors, Vec::<String>::new());
+    assert_eq!(
+        *watching.0.lock().unwrap(),
+        [MARKER],
+        "the marker is there first"
+    );
+    // What such a stopped sync leaves — the initial marker and links — is synced on as a
+    // first sync: the default home still wins.
+    let stopped = World::new("profiles-stopped");
+    write(&stopped.dir("default").join("settings.json"), "ours");
+    write(
+        &stopped.dir("team").join(MARKER),
+        r#"{"version":1,"done":[]}"#,
+    );
+    let plans = Link {
+        link: stopped.dir("team").join("plans"),
+        target: stopped.dir("default").join("plans"),
+    };
+    std::fs::create_dir_all(&plans.target).unwrap();
+    linker().link(std::slice::from_ref(&plans));
+    stopped.synced(&["team"], 1);
+    assert_eq!(read(&stopped.dir("team").join("settings.json")), "ours");
+    // Even without the marker a directory of nothing but links to the default home's
+    // shared directories is the agent's own …
+    let links_only = World::new("profiles-links-only");
+    for name in ["plans", "skills"] {
+        let pair = Link {
+            link: links_only.dir("team").join(name),
+            target: links_only.dir("default").join(name),
+        };
+        std::fs::create_dir_all(&pair.target).unwrap();
+        std::fs::create_dir_all(links_only.dir("team")).unwrap();
+        linker().link(std::slice::from_ref(&pair));
+    }
+    links_only.synced(&["team"], 1);
+    // … but not one whose link goes somewhere else, or that holds anything besides.
+    let other = World::new("profiles-links-other");
+    let elsewhere = other.home().join("elsewhere");
+    std::fs::create_dir_all(&elsewhere).unwrap();
+    std::fs::create_dir_all(other.dir("team")).unwrap();
+    let pair = Link {
+        link: other.dir("team").join("plans"),
+        target: elsewhere,
+    };
+    linker().link(std::slice::from_ref(&pair));
+    let reports = other.sync(&["team"], 1);
+    assert!(reports[0].foreign, "{:?}", reports[0].errors);
+    assert!(!other.dir("team").join(MARKER).exists());
+}
+
+#[test]
+fn a_sign_in_is_refused_only_for_a_directory_that_is_someone_elses() {
+    use crate::profiles::sync::refuses_sign_in;
+    let world = World::new("profiles-sign-in");
+    let default = world.dir("default");
+    let refuses = |id: &str| refuses_sign_in(CLAUDE, &world.dir(id), &default);
+    assert!(!refuses("missing"));
+    std::fs::create_dir_all(world.dir("empty")).unwrap();
+    assert!(!refuses("empty"));
+    write(&world.state("own"), "{}");
+    write(&world.dir("own").join("notes.md"), "x");
+    assert!(!refuses("own"));
+    write(&world.dir("mem").join("notes.md"), "someone else's");
+    assert!(refuses("mem"));
+    write(&world.dir("file"), "a file in the way");
+    assert!(refuses("file"));
+    assert!(refuses_sign_in(
+        AgentId::Codex,
+        &world.dir("empty"),
+        &default
+    ));
+    // The real file system answers the launch preparation's question the same way.
+    use crate::detect::{Fs, RealFs};
+    let path = |id: &str| world.dir(id).to_str().unwrap().to_string();
+    assert!(RealFs.refuses_sign_in(CLAUDE, &path("mem"), &path("default")));
+    assert!(!RealFs.refuses_sign_in(CLAUDE, &path("own"), &path("default")));
+}

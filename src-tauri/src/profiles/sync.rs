@@ -1,12 +1,13 @@
 //! The profile sync: after it every profile of an agent differs from the default home only
 //! in its sign-in and its own identity keys.
 //!
-//! Std file system only, over paths [`Homes`] built. Nothing is ever deleted except an empty
-//! directory that makes room for a link; what a rule replaces goes to the profile's backup
-//! folder first. One sync runs at a time.
+//! Std file system only, over paths [`Homes`] built. No file or directory is ever deleted
+//! except an empty directory that makes room for a link; what a rule replaces goes to a
+//! backup folder first — the one of the home it was in (a profile's directory or the default
+//! home), so nothing crosses profiles. One sync runs at a time.
 use super::files::{problem, sync_file, write_atomic, Backup, Backups, Change, ACCESS_FAILED};
 use super::history::sync_history;
-use super::json::sync_state;
+use super::json::{sync_state, Base};
 use super::links::{self, Link, Linker, Pending};
 use super::status::{self, Facts, Key};
 use super::{recipe, Homes, Recipe};
@@ -33,8 +34,11 @@ pub fn foreign_dir(agent: AgentId) -> String {
 static RUNNING: Mutex<()> = Mutex::new(());
 
 /// `<profile dir>\.traygent-sync.json`: `done` names the rules whose first sync succeeded —
-/// until then the default home wins for that rule, afterwards the newest. `syncedAt` is the
-/// last sync without an error.
+/// until then the default home wins for that rule, afterwards the newest. `base` holds the
+/// entry names (never values) of the state file's shared keys as of that rule's last
+/// successful sync, so a removed entry is told from an added one. `syncedAt` is the last
+/// sync without an error. A marker without `done` or `base` (an older one, or the initial
+/// one of a new profile directory) only says the directory is Traygent's.
 #[derive(Clone, Debug, Default, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct Marker {
@@ -43,12 +47,19 @@ pub struct Marker {
     pub synced_at: Option<String>,
     #[serde(default)]
     pub done: Vec<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub base: Option<Base>,
 }
 
 /// `None` without a marker file; an unreadable one still counts as a marker.
 pub fn read_marker(dir: &Path) -> Option<Marker> {
     let bytes = std::fs::read(dir.join(MARKER)).ok()?;
     Some(serde_json::from_slice(&bytes).unwrap_or_default())
+}
+
+fn write_marker(dir: &Path, marker: &Marker) -> Result<(), ()> {
+    let bytes = serde_json::to_vec(marker).map_err(drop)?;
+    write_atomic(&dir.join(MARKER), &bytes).map_err(drop)
 }
 
 /// How the sync of one profile went.
@@ -154,19 +165,54 @@ struct Pair {
     marker: Option<Marker>,
     /// The rules whose first sync succeeded, from the marker plus this run.
     done: Vec<String>,
+    /// The state file's entry names as of its last successful sync; `None`: unite only.
+    base: Option<Base>,
     backup: Backup,
     /// False when the directory is unusable; no rule runs then.
     usable: bool,
 }
 
-/// An existing directory that holds something but none of the agent's own files.
-fn is_foreign(dir: &Path, recipe: &Recipe) -> std::io::Result<bool> {
-    if std::fs::read_dir(dir)?.next().is_none() {
+/// An existing directory that holds something but nothing of the agent's: none of its own
+/// files, and not only links to the default home's shared directories (what a sync leaves
+/// that was stopped before its marker).
+fn is_foreign(dir: &Path, recipe: &Recipe, default_dir: &Path) -> std::io::Result<bool> {
+    let own = [recipe.state_file, recipe.credentials, MARKER];
+    if own
+        .iter()
+        .any(|name| std::fs::symlink_metadata(dir.join(name)).is_ok())
+    {
         return Ok(false);
     }
-    let own = [recipe.state_file, recipe.credentials, MARKER];
-    let known = |name: &&str| std::fs::symlink_metadata(dir.join(name)).is_ok();
-    Ok(!own.iter().any(known))
+    for entry in std::fs::read_dir(dir)? {
+        let entry = entry?;
+        let name = entry.file_name();
+        let shared = recipe
+            .shared_dirs
+            .iter()
+            .find(|shared| name.to_str() == Some(**shared));
+        let ours = match shared {
+            Some(shared) if entry.file_type()?.is_symlink() => {
+                links::same_place(&entry.path(), &default_dir.join(shared)).unwrap_or(false)
+            }
+            _ => false,
+        };
+        if !ours {
+            return Ok(true);
+        }
+    }
+    Ok(false)
+}
+
+/// Whether a session may sign in to `dir`: not when it exists and is someone else's, nor
+/// when that cannot be told. A missing directory is fine.
+pub fn refuses_sign_in(agent: AgentId, dir: &Path, default_dir: &Path) -> bool {
+    let Some(recipe) = recipe(agent) else {
+        return true;
+    };
+    match std::fs::symlink_metadata(dir) {
+        Err(error) => error.kind() != std::io::ErrorKind::NotFound,
+        Ok(_) => is_foreign(dir, recipe, default_dir).unwrap_or(true),
+    }
 }
 
 impl Pair {
@@ -196,7 +242,7 @@ impl Pair {
                 // home's. A check without an answer refuses as well.
                 match (
                     links::same_place(&dir, default_dir),
-                    is_foreign(&dir, recipe),
+                    is_foreign(&dir, recipe, default_dir),
                 ) {
                     (Ok(true), _) => Some((IS_DEFAULT_HOME.to_string(), false)),
                     (Ok(false), Ok(true)) => {
@@ -218,10 +264,25 @@ impl Pair {
             report.dir_failed = *dir_failed;
         }
         let usable = refusal.is_none();
-        let marker = usable.then(|| read_marker(&dir)).flatten();
+        let mut marker = usable.then(|| read_marker(&dir)).flatten();
+        // A directory that is new (or still empty) is marked as Traygent's before anything
+        // is linked into it: a sync stopped halfway must not leave a directory of nothing
+        // but links that looks like someone else's. No rule is done yet.
+        let empty = || std::fs::read_dir(&dir).is_ok_and(|mut entries| entries.next().is_none());
+        if usable && marker.is_none() && empty() {
+            let initial = Marker {
+                version: MARKER_VERSION,
+                ..Marker::default()
+            };
+            if write_marker(&dir, &initial).is_ok() {
+                marker = Some(initial);
+            }
+        }
+        let known = marker.clone().unwrap_or_default();
         Self {
             report,
-            done: marker.clone().unwrap_or_default().done,
+            done: known.done,
+            base: known.base,
             marker,
             backup: Backup::new(&dir, now),
             dir,
@@ -284,8 +345,21 @@ impl Pair {
             default: default_backup,
             profile: &mut self.backup,
         };
-        let keys = recipe.shared_keys;
-        let result = sync_state(name, default_state, &self.state, first, keys, &mut backups);
+        let (keys, base) = (recipe.shared_keys, self.base.as_ref());
+        let result = sync_state(
+            name,
+            default_state,
+            &self.state,
+            first,
+            keys,
+            base,
+            &mut backups,
+        );
+        // The base moves on only with a sync that succeeded.
+        let result = result.map(|(change, base)| {
+            self.base = Some(base);
+            change
+        });
         change.merge(self.note(Some(name), result));
         change.default
     }
@@ -302,14 +376,12 @@ impl Pair {
                 previous.synced_at
             },
             done: self.done.clone(),
+            base: self.base.clone(),
         };
         if self.marker.as_ref() == Some(&marker) {
             return;
         }
-        let written = serde_json::to_vec_pretty(&marker)
-            .map_err(drop)
-            .and_then(|bytes| write_atomic(&self.dir.join(MARKER), &bytes).map_err(drop));
-        if written.is_err() {
+        if write_marker(&self.dir, &marker).is_err() {
             self.report.errors.push(problem(MARKER, ACCESS_FAILED));
         }
     }
