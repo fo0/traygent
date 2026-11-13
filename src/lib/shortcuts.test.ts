@@ -32,6 +32,22 @@ describe('shortcutFor', () => {
     expect(shortcutFor(press('p', { ctrlKey: true, code: 'KeyR' }))).toBeNull();
     expect(shortcutFor(press('r'))).toBeNull();
   });
+  it('maps Ctrl+L (any layout) to the folder field, never with Shift', () => {
+    expect(shortcutFor(press('l', { ctrlKey: true }))).toEqual({
+      kind: 'folder',
+    });
+    expect(shortcutFor(press('l', { metaKey: true }))).toEqual({
+      kind: 'folder',
+    });
+    expect(shortcutFor(press('д', { ctrlKey: true, code: 'KeyL' }))).toEqual({
+      kind: 'folder',
+    });
+    expect(
+      shortcutFor(press('L', { ctrlKey: true, shiftKey: true })),
+    ).toBeNull();
+    expect(shortcutFor(press('l'))).toBeNull();
+    expect(shortcutFor(press('l', { ctrlKey: true, altKey: true }))).toBeNull();
+  });
   it('maps a plain Escape and leaves Alt combinations to the layout', () => {
     expect(shortcutFor(press('Escape'))).toEqual({ kind: 'escape' });
     expect(shortcutFor(press('Escape', { ctrlKey: true }))).toBeNull();
@@ -58,6 +74,7 @@ function actions(overrides: Partial<ShortcutActions> = {}) {
   return {
     blocked: () => false,
     refresh: vi.fn(),
+    folder: vi.fn(() => true),
     escape: vi.fn(() => true),
     ...overrides,
   };
@@ -85,6 +102,20 @@ describe('createShortcuts', () => {
     handle(keydown('Escape'));
     expect(handlers.refresh).not.toHaveBeenCalled();
     expect(handlers.escape).not.toHaveBeenCalled();
+  });
+
+  it('focuses the folder field and prevents Ctrl+L only when it was there', () => {
+    const handlers = actions();
+    const focused = keydown('l', { ctrlKey: true });
+    createShortcuts(handlers)(focused);
+    expect(handlers.folder).toHaveBeenCalledTimes(1);
+    expect(focused.preventDefault).toHaveBeenCalled();
+    const missing = keydown('l', { ctrlKey: true });
+    createShortcuts(actions({ folder: vi.fn(() => false) }))(missing);
+    expect(missing.preventDefault).not.toHaveBeenCalled();
+    const inDialog = actions({ blocked: () => true });
+    createShortcuts(inDialog)(keydown('l', { ctrlKey: true }));
+    expect(inDialog.folder).not.toHaveBeenCalled();
   });
 
   it('prevents Escape only when something handled it', () => {

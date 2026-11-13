@@ -59,6 +59,12 @@
   const shortcuts = createShortcuts({
     blocked: () => modals.kind !== null,
     refresh: () => void (canRefresh && refreshPanel()),
+    folder: () => {
+      const field = document.querySelector<HTMLInputElement>('.folder-input');
+      field?.focus();
+      field?.select();
+      return !!field;
+    },
     // Menus handle their own Escape; the dashboard has nothing else to close.
     escape: () => false,
   });

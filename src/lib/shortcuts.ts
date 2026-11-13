@@ -1,4 +1,5 @@
-export type Shortcut = { kind: 'refresh' } | { kind: 'escape' };
+export type Shortcut =
+  { kind: 'refresh' } | { kind: 'folder' } | { kind: 'escape' };
 
 type KeyPress = Pick<
   KeyboardEvent,
@@ -10,6 +11,11 @@ export interface ShortcutActions {
   blocked: () => boolean;
   /** Refreshes when the panel's refresh button would be enabled. */
   refresh: () => void;
+  /**
+   * Ctrl+L: focuses the composer's folder field, like a browser's address
+   * bar; returns whether the field was there to take focus.
+   */
+  folder: () => boolean;
   /**
    * Escape on `target`; returns whether something handled it. Menus and
    * dialogs handle their own Escape before this runs.
@@ -32,6 +38,8 @@ export function shortcutFor(event: KeyPress): Shortcut | null {
   if (event.altKey) return null;
   if (event.key === 'F5' || (command && isLetter(event, 'r')))
     return { kind: 'refresh' };
+  if (command && !event.shiftKey && isLetter(event, 'l'))
+    return { kind: 'folder' };
   if (!command && event.key === 'Escape') return { kind: 'escape' };
   return null;
 }
@@ -53,6 +61,8 @@ export function createShortcuts(actions: ShortcutActions) {
     }
     if (handled || event.isComposing || actions.blocked()) return;
     if (shortcut.kind === 'refresh') actions.refresh();
-    else if (actions.escape(event.target)) event.preventDefault();
+    else if (shortcut.kind === 'folder') {
+      if (actions.folder()) event.preventDefault();
+    } else if (actions.escape(event.target)) event.preventDefault();
   };
 }

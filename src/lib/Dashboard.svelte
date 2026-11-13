@@ -108,6 +108,7 @@
         onAdopt={adopt}
         {onEdit}
         onOpenFolder={(path) => void panel.openFolder(path)}
+        onCopyFolder={(path) => void panel.copyFolder(path)}
         onRemove={(recent) => panel.removeRecent(recent)}
         {onInstall}
       />

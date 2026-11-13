@@ -57,6 +57,26 @@ test('F5 refreshes once without reloading; the footer shows the time', async ({
   ).toBeVisible();
 });
 
+test('Ctrl+L focuses the folder field and selects its text', async ({
+  page,
+}) => {
+  await page.goto('/');
+  const field = page.getByRole('combobox', { name: 'Ordner oder Repo' });
+  await field.fill('C:\\Users\\demo\\Projekte\\traygent');
+  await page
+    .getByRole('button', { name: 'Einstellungen', exact: true })
+    .focus();
+  await page.keyboard.press('Control+l');
+  await expect(field).toBeFocused();
+  expect(
+    await field.evaluate(
+      (input: HTMLInputElement) =>
+        input.selectionEnd! - input.selectionStart! === input.value.length,
+    ),
+  ).toBe(true);
+  await expect(field).toHaveAttribute('aria-keyshortcuts', 'Control+L');
+});
+
 test('settings open on „Agenten“ and „Abbrechen“ closes without saving', async ({
   page,
 }) => {
