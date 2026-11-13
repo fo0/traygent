@@ -35,3 +35,17 @@ export interface ProfileStatus {
   /** German reason the last sync into this profile failed. */
   syncError?: string;
 }
+
+/**
+ * What the profiles of an agent share on top of the built-in lists (#35):
+ * extra directory and file names in the agent's config folder, linked or
+ * copied like the built-in ones. Each name `^[A-Za-z0-9._-]{1,64}$`, no
+ * trailing dot, no Windows device name, nothing starting with `.traygent`,
+ * no name the sync already handles; unique (ignoring case) across both
+ * lists, at most 16 per list. `{ dirs: [], files: [] }` by default and for
+ * an agent without `profiles`.
+ */
+export interface ProfileShare {
+  dirs: string[];
+  files: string[];
+}

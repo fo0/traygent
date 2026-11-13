@@ -17,6 +17,17 @@ pub struct AgentProfile {
     pub label: String,
 }
 
+/// What an agent's profiles share on top of its recipe: plain names inside the config
+/// directory ([`crate::profiles::share::check_name`]), at most 16 each, unique together.
+#[derive(Clone, Debug, Default, PartialEq, Eq, Hash, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase", default)]
+pub struct ProfileShare {
+    /// Directories linked into the default home.
+    pub dirs: Vec<String>,
+    /// Files synced whole, the newest winning.
+    pub files: Vec<String>,
+}
+
 /// What Traygent knows about one profile on this host; read at detection, after a sync and
 /// after a settings save.
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]

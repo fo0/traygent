@@ -121,6 +121,20 @@ fn saving_validates_profiles_and_a_removed_default_falls_back() {
     // Saving the same list again is no profile change.
     let again = service.save_settings(service.settings().clone()).unwrap();
     assert!(!again.profiles_changed);
+    // What the profiles share on top of the recipe is a profile change too: it is synced.
+    let mut sharing = service.settings().clone();
+    sharing.profile_share.claude.dirs = vec![" notes ".into()];
+    let saved = service.save_settings(sharing.clone()).unwrap();
+    assert!(saved.profiles_changed);
+    assert_eq!(saved.snapshot.settings.profile_share.claude.dirs, ["notes"]);
+    assert_eq!(service.profile_plan().share.claude.dirs, ["notes"]);
+    assert!(!service.save_settings(sharing).unwrap().profiles_changed);
+    let mut refused = service.settings().clone();
+    refused.profile_share.claude.files = vec![".credentials.json".into()];
+    assert_eq!(
+        service.save_settings(refused).unwrap_err(),
+        "Name „.credentials.json“ für Claude Code ist ungültig."
+    );
     let invalid = service.save_settings(with_profiles(&[("Team", "Team")]));
     assert!(invalid
         .unwrap_err()

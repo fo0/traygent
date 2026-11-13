@@ -216,7 +216,8 @@ impl Service {
         };
         self.persist(&next)?;
         let images_changed = next.settings.docker.images != self.state.settings.docker.images;
-        let profiles_changed = next.settings.profiles != self.state.settings.profiles;
+        let profiles_changed = next.settings.profiles != self.state.settings.profiles
+            || next.settings.profile_share != self.state.settings.profile_share;
         self.state = next;
         self.touch();
         // The Docker statuses depend on the images; a detection with the old ones is stale.

@@ -1,7 +1,8 @@
 /*
  * Synthetic profiles of the browser preview (#33): Claude Code's „Standard“
- * and „Team“, both signed in with invented `example.com` accounts. Folders
- * and times are invented and never read from the machine.
+ * and „Team“, both signed in with invented `example.com` accounts, and the
+ * extra names they share (#35). Folders and times are invented and never
+ * read from the machine.
  */
 import { DEMO_HOME } from './demoRecents';
 import { DEFAULT_PROFILE, STANDARD_LABEL } from './profiles';
@@ -10,12 +11,22 @@ import type {
   AgentId,
   AgentProfile,
   AppSettings,
+  ProfileShare,
   ProfileStatus,
 } from './types';
 
 /** The demo's extra profiles per agent. */
 export function demoProfileSettings(): Record<AgentId, AgentProfile[]> {
   return { claude: [{ id: 'team', label: 'Team' }], opencode: [], codex: [] };
+}
+
+/** The demo's extra shared names: Claude Code shares one of each. */
+export function demoProfileShare(): Record<AgentId, ProfileShare> {
+  return {
+    claude: { dirs: ['.caveman-sessions'], files: ['orca-state.json'] },
+    opencode: { dirs: [], files: [] },
+    codex: { dirs: [], files: [] },
+  };
 }
 
 /** The invented account a demo sign-in of `id` reports. */

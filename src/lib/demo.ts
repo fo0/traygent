@@ -103,7 +103,10 @@ export function createDemoBridge(latency = 150, detection = 600): DemoBridge {
     },
     async saveSettings(settings) {
       await delay();
-      const problems = settingsProblems(settings);
+      const labels = Object.fromEntries(
+        data.catalog.map((item) => [item.id, item.label]),
+      );
+      const problems = settingsProblems(settings, labels);
       const root = problems['github.cloneRoot'];
       // Natively the clone root's message names its field.
       const problem = Object.values(problems)[0];

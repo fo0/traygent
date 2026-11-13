@@ -105,10 +105,28 @@ Versions seen: Claude Code npm `2.1.317`; OpenCode `@opencode/cli` `2.2.5` (`lat
 - **One account per dir:** `CLAUDE_CONFIG_DIR=<dir>` (docs _Authentication → Log in with multiple accounts_);
   Traygent sets it in the session script (`$env:CLAUDE_CONFIG_DIR='%USERPROFILE%\.claude-<id>'`) and removes it for
   the default profile while extra ones exist. Sign-in: `claude auth login` in that env, in a terminal the user
-  opens („Anmelden“). Shared directories, synced files and keys: `docs/SPEC.md → Profiles`.
+  opens („Anmelden“). Sync steps, merge rules, marker and base formats: `docs/SPEC.md → Profiles`.
+- **Traygent's recipe** (`profiles.rs → CLAUDE`, [ADR-0010](adr/0010-three-way-merge-of-the-profiles-settings-and-state-file.md)):
+  - linked dirs: `skills`, `agents`, `commands`, `rules`, `output-styles`, `workflows`, `agent-memory`, `themes`,
+    `plugins`, `projects`, `file-history`, `plans`, `tasks`, `paste-cache`, `hooks`, `todos`, `session-env`;
+  - whole-file (newest wins): `CLAUDE.md`, `keybindings.json`; line union: `history.jsonl`;
+  - `settings.json`, three-way merged — own keys `apiKeyHelper`, `forceLoginOrgUUID`, `forceLoginMethod`,
+    `awsAuthRefresh`, `awsCredentialExport`, `anthropicProfile`, `anthropicProfiles`, `otelHeadersHelper`; own `env`
+    names by prefix `ANTHROPIC_`, `CLAUDE_CODE_USE_`, `AWS_`, `GOOGLE_`, `AZURE_`, `OTEL_`, `VERTEX_REGION_`,
+    `CLAUDE_CODE_CLIENT_`, by name `CLAUDE_CONFIG_DIR`, `CLAUDE_CODE_OAUTH_TOKEN`, `CLOUD_ML_REGION`, and
+    `CLAUDE_CODE_SKIP_<…>_AUTH`; `HTTP_PROXY` / `HTTPS_PROXY` / `NO_PROXY` shared (machine network); string lists
+    below `permissions.` and `autoMode.` merged as sets; containers for a seeded merge (`SettingsRule::containers`): the
+    top level, `env`, `permissions`, `autoMode` — every other object (`statusLine`, …) is one unit;
+  - `.claude.json`, three-way merged — entry keys `mcpServers`, `projects`; whole-value keys `showSpinnerTree`,
+    `claudeInChromeDefaultEnabled`; own project fields: prefix `last`, name `hasUnseenTeamArtifacts`; containers for a
+    seeded merge: the top level, `mcpServers`, `projects` — each MCP server and project entry is one unit;
+  - never read: `.credentials.json`; user extras (`settings.profileShare`) are linked like the dirs or copied
+    whole like `CLAUDE.md`; never shareable as extras: names starting with `.claude.json` or `.credentials.json`
+    and `never_shared` — `policy-limits.json`, `policy-limits.json.stamp.json`, `remote-settings.json`, `cache`,
+    `statsig`, `telemetry`, `backups`, `debug`, `shell-snapshots`, `ide`, `local`, `sessions`, `jobs`, `daemon`.
 - **UNVERIFIED on Windows:** `claude auth login` honouring `CLAUDE_CONFIG_DIR`, the CLI following directory
-  junctions in its config dir, and how it rewrites `settings.json` / `.claude.json` under a running session
-  (BACKLOG #52).
+  junctions in its config dir, how it rewrites `settings.json` / `.claude.json` under a running session
+  (BACKLOG #52), and whether its cleanup of `session-env` / `todos` is safe with two profiles running at once.
 
 ### Claude in Docker (must match the starter — existing login keeps working)
 

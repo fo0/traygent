@@ -13,7 +13,11 @@ import type {
   Snapshot,
 } from './types';
 import { demoGithub } from './demoGithub';
-import { demoProfileSettings, demoProfileStatuses } from './demoProfiles';
+import {
+  demoProfileSettings,
+  demoProfileShare,
+  demoProfileStatuses,
+} from './demoProfiles';
 import { DEMO_HOME, demoRecents } from './demoRecents';
 
 /** `default` (with the catalog's hint) plus the five levels. */
@@ -179,6 +183,7 @@ export function demoSettings(): AppSettings {
     agentUpdates: false,
     profiles: demoProfileSettings(),
     agentProfile: { claude: 'default', opencode: 'default', codex: 'default' },
+    profileShare: demoProfileShare(),
   };
 }
 

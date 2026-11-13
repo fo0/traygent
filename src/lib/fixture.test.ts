@@ -93,6 +93,7 @@ describe('golden snapshot fixture', () => {
           'agentUpdates',
           'profiles',
           'agentProfile',
+          'profileShare',
         ],
       },
       'settings',
@@ -104,6 +105,11 @@ describe('golden snapshot fixture', () => {
       expect(settings.agentProfile[id], `agentProfile.${agent}`).toBe(
         'default',
       );
+      // Nothing shared beyond the built-in lists.
+      expect(settings.profileShare[id], `profileShare.${agent}`).toEqual({
+        dirs: [],
+        files: [],
+      });
     }
     // Agent CLIs update automatically only after the user opted in.
     expect(settings.agentUpdates).toBe(false);

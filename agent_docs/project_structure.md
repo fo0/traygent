@@ -4,14 +4,16 @@ Moved from `CLAUDE.md` (context budget). Top-level directories are listed there 
 
 ```
 src/        Svelte panel, lib/ = components, controllers (panel, composer, settings draft, GitHub and profile actions),
-            target.ts (folder field classification), profiles.ts (profile rules), IPC map, demo (demoGithub.ts = synthetic
-            account, demoProfiles.ts); styles/ = ordered CSS
-src-tauri/  Rust core crate (traygent_core: catalog, settings/profiles, recents, store, detect/, launch/, spawn, ports, repo,
-            github/ (api, http, gh, discover, process, vault, secret), profiles/ (links, files, history, json, status,
-            sync), service/ (launch_prep, github, profiles), models/ (github, profiles))
+            target.ts (folder field classification), profiles.ts (profile rules), profileShare.ts (extra shared names),
+            IPC map, demo (demoGithub.ts = synthetic account, demoProfiles.ts); styles/ = ordered CSS
+src-tauri/  Rust core crate (traygent_core: catalog, settings/ (profiles, share), recents, store, detect/, launch/, spawn,
+            ports, repo, github/ (api, http, gh, discover, process, vault, secret), profiles/ (sync, foreign, marker,
+            share, links, files, history, settings, state, json, merge, node, pair, status), service/ (launch_prep,
+            github, profiles), models/ (github, profiles))
             + desktop bin (desktop*.rs incl. desktop_github.rs, desktop_agent_updates.rs, desktop_profiles.rs, tray_popup/),
             Tauri config, capabilities, icons
 fixtures/   snapshot.default.json — golden native snapshot (written by a Rust test, checked by Vitest);
+            profile-share-names.json — extra-name lists (written by a Rust test, checked by Vitest);
             targets.json, port-vectors.json — test vectors shared by the panel and Rust
 tests/      Playwright specs (browser demo + labelled IPC mock), support/
 scripts/    icon generator, README capture, release/updater helpers + node:test

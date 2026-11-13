@@ -77,7 +77,12 @@
     untrack(() => initialAgent ?? snapshot.settings.defaultAgent),
   );
   // Later snapshots (a finished detection) refresh the probes only.
-  const draft = new SettingsDraft(untrack(() => snapshot.settings));
+  const draft = new SettingsDraft(
+    untrack(() => snapshot.settings),
+    untrack(() =>
+      Object.fromEntries(snapshot.catalog.map((item) => [item.id, item.label])),
+    ),
+  );
   let error = $state('');
   let saving = $state(false);
   let alive = true;

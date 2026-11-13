@@ -2,6 +2,7 @@
   import { onDestroy } from 'svelte';
   import Dropdown from './Dropdown.svelte';
   import Icon from './Icon.svelte';
+  import ProfileShareFields from './ProfileShareFields.svelte';
   import { dateTime, errorMessage } from './format';
   import type { ProfileActions } from './profileActions.svelte';
   import {
@@ -31,7 +32,8 @@
   } = $props();
 
   const OUT = 'Nicht angemeldet';
-  const HELP = 'Eigene Anmeldung je Profil, alles andere wird abgeglichen';
+  const HELP =
+    'Eigene Anmeldung je Profil, alles andere wird abgeglichen. Weitere Ordner und Dateien werden wie die eingebauten abgeglichen.';
   const agent = $derived(entry.id);
   const statuses = $derived(agentProfiles(snapshot, agent));
   const rows = $derived([
@@ -194,6 +196,11 @@
   {#if typed || problem}<p id="profile-error" class="field-error">
       {typed || problem}
     </p>{/if}
+  <!-- Nothing to share with before a second profile exists. -->
+  {#if draft.value.profiles[agent]?.length}<ProfileShareFields
+      {agent}
+      {draft}
+    />{/if}
   {#if note}<p class="install-note" role="status">
       <Icon name="check" size={13} />{note}
     </p>{/if}

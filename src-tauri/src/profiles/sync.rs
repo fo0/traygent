@@ -5,62 +5,34 @@
 //! except an empty directory that makes room for a link; what a rule replaces goes to a
 //! backup folder first — the one of the home it was in (a profile's directory or the default
 //! home), so nothing crosses profiles. One sync runs at a time.
-use super::files::{problem, sync_file, write_atomic, Backup, Backups, Change, ACCESS_FAILED};
+use super::files::{problem, sync_file, Backup, Backups, Change, ACCESS_FAILED};
+use super::foreign::is_foreign;
+pub use super::foreign::{foreign_dir, refuses_sign_in};
 use super::history::sync_history;
-use super::json::{sync_state, Base};
+use super::json::{Base, Shared};
 use super::links::{self, Link, Linker, Pending};
+pub use super::marker::{read_marker, Marker, MARKER};
+use super::marker::{write_marker, MARKER_VERSION};
+use super::node::{Entries, Node};
+use super::pair::{read_base, Synced};
+use super::settings::sync_settings;
+use super::share::Sharing;
+use super::state::{sync_state, Fallback};
 use super::status::{self, Facts, Key};
-use super::{recipe, Homes, Recipe};
-use crate::models::{AgentId, AgentProfile, AppSettings, DEFAULT_PROFILE};
+use super::{recipe, Homes, SettingsRule};
+use crate::models::{AgentId, AgentProfile, AppSettings, PerAgent, ProfileShare, DEFAULT_PROFILE};
 use chrono::{DateTime, Utc};
 use std::collections::HashMap;
 use std::path::{Path, PathBuf};
 use std::sync::{Mutex, PoisonError};
 
-pub const MARKER: &str = ".traygent-sync.json";
-const MARKER_VERSION: u64 = 1;
 pub const NO_HOME: &str = "Benutzerordner nicht verfügbar";
 pub const PROFILE_DIR_FAILED: &str = "Profilordner konnte nicht angelegt werden";
 const DEFAULT_DIR_FAILED: &str = "Ordner des Standard-Profils konnte nicht angelegt werden";
 const IS_DEFAULT_HOME: &str = "Profilordner ist der Ordner des Standard-Profils";
 const DIR_UNCHECKED: &str = "Profilordner konnte nicht geprüft werden";
 
-/// An existing, non-empty directory without the CLI's state file, its sign-in or the marker
-/// is someone else's (`.claude-mem`, `.claude-backup`): nothing in it is touched.
-pub fn foreign_dir(agent: AgentId) -> String {
-    format!("Profilordner gehört nicht zu {}", agent.label())
-}
-
 static RUNNING: Mutex<()> = Mutex::new(());
-
-/// `<profile dir>\.traygent-sync.json`: `done` names the rules whose first sync succeeded —
-/// until then the default home wins for that rule, afterwards the newest. `base` holds the
-/// entry names (never values) of the state file's shared keys as of that rule's last
-/// successful sync, so a removed entry is told from an added one. `syncedAt` is the last
-/// sync without an error. A marker without `done` or `base` (an older one, or the initial
-/// one of a new profile directory) only says the directory is Traygent's.
-#[derive(Clone, Debug, Default, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
-#[serde(rename_all = "camelCase")]
-pub struct Marker {
-    pub version: u64,
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub synced_at: Option<String>,
-    #[serde(default)]
-    pub done: Vec<String>,
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub base: Option<Base>,
-}
-
-/// `None` without a marker file; an unreadable one still counts as a marker.
-pub fn read_marker(dir: &Path) -> Option<Marker> {
-    let bytes = std::fs::read(dir.join(MARKER)).ok()?;
-    Some(serde_json::from_slice(&bytes).unwrap_or_default())
-}
-
-fn write_marker(dir: &Path, marker: &Marker) -> Result<(), ()> {
-    let bytes = serde_json::to_vec(marker).map_err(drop)?;
-    write_atomic(&dir.join(MARKER), &bytes).map_err(drop)
-}
 
 /// How the sync of one profile went.
 #[derive(Clone, Debug, Default, PartialEq, Eq)]
@@ -84,6 +56,8 @@ pub struct SyncPlan {
     pub homes: Option<Homes>,
     /// Every agent with a recipe and its extra profiles (possibly none).
     pub agents: Vec<(AgentId, Vec<AgentProfile>)>,
+    /// What each agent's profiles share on top of its recipe; checked again by the sync.
+    pub share: PerAgent<ProfileShare>,
 }
 
 /// The result of a [`SyncPlan`]: the reports of the agents that were synced and every
@@ -105,6 +79,7 @@ impl SyncPlan {
         Self {
             homes: homes.cloned(),
             agents,
+            share: settings.profile_share.clone(),
         }
     }
 
@@ -130,7 +105,10 @@ impl SyncPlan {
             .iter()
             .map(|(agent, profiles)| {
                 let reports = match &self.homes {
-                    Some(homes) => sync_agent(homes, *agent, profiles, linker, now),
+                    Some(homes) => {
+                        let share = self.share.get(*agent);
+                        sync_agent(homes, *agent, profiles, share, linker, now)
+                    }
                     None => failed(profiles, NO_HOME, false),
                 };
                 (*agent, reports)
@@ -165,61 +143,28 @@ struct Pair {
     marker: Option<Marker>,
     /// The rules whose first sync succeeded, from the marker plus this run.
     done: Vec<String>,
-    /// The state file's entry names as of its last successful sync; `None`: unite only.
+    /// The state file's entry names from a marker written before the value base existed;
+    /// used once, then dropped.
     base: Option<Base>,
     backup: Backup,
     /// False when the directory is unusable; no rule runs then.
     usable: bool,
+    /// Per merged file, the base of another profile as of the start of the run: what a
+    /// pair without a base of its own learns the default home's removals from.
+    seeds: Vec<(&'static str, Entries)>,
 }
 
-/// An existing directory that holds something but nothing of the agent's: none of its own
-/// files, and not only links to the default home's shared directories (what a sync leaves
-/// that was stopped before its marker).
-fn is_foreign(dir: &Path, recipe: &Recipe, default_dir: &Path) -> std::io::Result<bool> {
-    let own = [recipe.state_file, recipe.credentials, MARKER];
-    if own
-        .iter()
-        .any(|name| std::fs::symlink_metadata(dir.join(name)).is_ok())
-    {
-        return Ok(false);
-    }
-    for entry in std::fs::read_dir(dir)? {
-        let entry = entry?;
-        let name = entry.file_name();
-        let shared = recipe
-            .shared_dirs
-            .iter()
-            .find(|shared| name.to_str() == Some(**shared));
-        let ours = match shared {
-            Some(shared) if entry.file_type()?.is_symlink() => {
-                links::same_place(&entry.path(), &default_dir.join(shared)).unwrap_or(false)
-            }
-            _ => false,
-        };
-        if !ours {
-            return Ok(true);
-        }
-    }
-    Ok(false)
-}
-
-/// Whether a session may sign in to `dir`: not when it exists and is someone else's, nor
-/// when that cannot be told. A missing directory is fine.
-pub fn refuses_sign_in(agent: AgentId, dir: &Path, default_dir: &Path) -> bool {
-    let Some(recipe) = recipe(agent) else {
-        return true;
-    };
-    match std::fs::symlink_metadata(dir) {
-        Err(error) => error.kind() != std::io::ErrorKind::NotFound,
-        Ok(_) => is_foreign(dir, recipe, default_dir).unwrap_or(true),
-    }
+/// Another profile's base of the file `name`, as of the start of the run.
+fn seed_of<'a>(seeds: &'a [(&'static str, Entries)], name: &str) -> Option<&'a [(String, Node)]> {
+    let found = seeds.iter().find(|(file, _)| *file == name);
+    found.map(|(_, seed)| seed.as_slice())
 }
 
 impl Pair {
     fn open(
         homes: &Homes,
         agent: AgentId,
-        recipe: &Recipe,
+        sharing: &Sharing,
         profile: &AgentProfile,
         default_dir: &Path,
         now: DateTime<Utc>,
@@ -242,7 +187,7 @@ impl Pair {
                 // home's. A check without an answer refuses as well.
                 match (
                     links::same_place(&dir, default_dir),
-                    is_foreign(&dir, recipe, default_dir),
+                    is_foreign(&dir, sharing, default_dir),
                 ) {
                     (Ok(true), _) => Some((IS_DEFAULT_HOME.to_string(), false)),
                     (Ok(false), Ok(true)) => {
@@ -288,6 +233,7 @@ impl Pair {
             dir,
             state,
             usable,
+            seeds: Vec::new(),
         }
     }
 
@@ -319,13 +265,17 @@ impl Pair {
     /// pass of a run, and in the next run after one that failed.
     fn files(
         &mut self,
-        recipe: &Recipe,
+        sharing: &Sharing,
         default_dir: &Path,
         default_state: &Path,
         default_backup: &mut Backup,
     ) -> bool {
+        let recipe = sharing.recipe;
         let mut change = Change::default();
-        for name in recipe.synced_files {
+        if let Some(rule) = &recipe.settings {
+            change.merge(self.settings(rule, default_dir, default_backup));
+        }
+        for name in &sharing.files {
             let (ours, theirs) = (default_dir.join(name), self.dir.join(name));
             let first = self.first(name);
             let mut backups = Backups {
@@ -345,23 +295,61 @@ impl Pair {
             default: default_backup,
             profile: &mut self.backup,
         };
-        let (keys, base) = (recipe.shared_keys, self.base.as_ref());
-        let result = sync_state(
-            name,
-            default_state,
-            &self.state,
-            first,
-            keys,
-            base,
-            &mut backups,
-        );
-        // The base moves on only with a sync that succeeded.
-        let result = result.map(|(change, base)| {
-            self.base = Some(base);
-            change
-        });
-        change.merge(self.note(Some(name), result));
+        let known = Fallback {
+            names: self.base.as_ref(),
+            seed: seed_of(&self.seeds, name),
+        };
+        let paths = [default_state, self.state.as_path()];
+        let shared = Shared::of(recipe);
+        let synced = sync_state(name, paths, &self.dir, first, &shared, known, &mut backups);
+        // With a value base recorded the marker's entry names have done their one job.
+        if synced.error.is_none() {
+            self.base = None;
+        }
+        change.merge(self.merged(name, synced));
         change.default
+    }
+
+    /// Notes how a merged rule went. A side that was written counts even when a later step
+    /// of the rule failed; a skipped rule has neither succeeded nor failed.
+    fn merged(&mut self, name: &str, synced: Synced) -> Change {
+        self.report.changed |= synced.change.any();
+        match synced.error {
+            Some(error) => {
+                self.note(Some(name), Err(error));
+            }
+            None if synced.skipped => {}
+            None => {
+                self.note(Some(name), Ok(synced.change));
+                let errors = &mut self.report.errors;
+                let new = |partial: &String| !errors.contains(partial);
+                let partial: Vec<String> = synced.partial.into_iter().filter(new).collect();
+                errors.extend(partial);
+            }
+        }
+        synced.change
+    }
+
+    /// The settings rule: a merge against the base kept in the profile's directory.
+    fn settings(
+        &mut self,
+        rule: &SettingsRule,
+        default_dir: &Path,
+        default_backup: &mut Backup,
+    ) -> Change {
+        let name = rule.file;
+        let (ours, theirs) = (default_dir.join(name), self.dir.join(name));
+        let first = self.first(name);
+        let mut backups = Backups {
+            default: default_backup,
+            profile: &mut self.backup,
+        };
+        let (paths, seed) = (
+            [ours.as_path(), theirs.as_path()],
+            seed_of(&self.seeds, name),
+        );
+        let synced = sync_settings(rule, paths, &self.dir, first, seed, &mut backups);
+        self.merged(name, synced)
     }
 
     /// Writes the marker when it changed: the rules done so far, and a new `syncedAt` only
@@ -394,12 +382,14 @@ pub fn sync_agent(
     homes: &Homes,
     agent: AgentId,
     profiles: &[AgentProfile],
+    share: &ProfileShare,
     linker: &dyn Linker,
     now: DateTime<Utc>,
 ) -> Vec<ProfileReport> {
     let Some(recipe) = recipe(agent).filter(|_| !profiles.is_empty()) else {
         return Vec::new();
     };
+    let sharing = Sharing::of(recipe, share);
     let default = homes
         .dir(agent, DEFAULT_PROFILE)
         .zip(homes.state_file(agent, DEFAULT_PROFILE));
@@ -414,12 +404,16 @@ pub fn sync_agent(
     let mut default_backup = Backup::new(&default_dir, now);
     let mut pairs: Vec<Pair> = profiles
         .iter()
-        .map(|profile| Pair::open(homes, agent, recipe, profile, &default_dir, now))
+        .map(|profile| Pair::open(homes, agent, &sharing, profile, &default_dir, now))
         .collect();
+    // An extra name that failed the check is reported, never joined into a path.
+    for pair in pairs.iter_mut().filter(|pair| pair.usable) {
+        pair.report.errors.extend(sharing.skipped.iter().cloned());
+    }
 
     let mut wanted: Vec<(usize, &str, Pending)> = Vec::new();
     for (index, pair) in pairs.iter_mut().enumerate().filter(|(_, pair)| pair.usable) {
-        for name in recipe.shared_dirs {
+        for name in &sharing.dirs {
             let (target, link) = (default_dir.join(name), pair.dir.join(name));
             match links::prepare(name, &target, &link, &mut pair.backup) {
                 Ok(Some(pending)) => wanted.push((index, name, pending)),
@@ -446,14 +440,27 @@ pub fn sync_agent(
         }
     }
 
+    let merged_files = recipe.settings.iter().map(|rule| rule.file);
+    for name in merged_files.chain([recipe.state_file]) {
+        let base = |pair: &Pair| read_base(&pair.dir, name).filter(|_| pair.usable);
+        let bases: Vec<Option<Entries>> = pairs.iter().map(base).collect();
+        for (index, pair) in pairs.iter_mut().enumerate() {
+            let others = bases
+                .iter()
+                .enumerate()
+                .filter(|(other, _)| *other != index);
+            let seed = others.flat_map(|(_, base)| base.clone()).next();
+            pair.seeds.extend(seed.map(|seed| (name, seed)));
+        }
+    }
     let mut default_changed = false;
     for pair in pairs.iter_mut().filter(|pair| pair.usable) {
-        default_changed |= pair.files(recipe, &default_dir, &default_state, &mut default_backup);
+        default_changed |= pair.files(&sharing, &default_dir, &default_state, &mut default_backup);
     }
     // What one profile handed to the default home reaches the others in the same run.
     if default_changed && pairs.len() > 1 {
         for pair in pairs.iter_mut().filter(|pair| pair.usable) {
-            pair.files(recipe, &default_dir, &default_state, &mut default_backup);
+            pair.files(&sharing, &default_dir, &default_state, &mut default_backup);
         }
     }
     for pair in pairs.iter_mut().filter(|pair| pair.usable) {

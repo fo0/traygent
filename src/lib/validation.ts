@@ -6,6 +6,7 @@
  */
 import { envsProblem } from './environments';
 import { DOCKER_ONLY, portListProblem } from './ports';
+import { agentShare, shareProblems } from './profileShare';
 import { DEFAULT_PROFILE, profilesProblem } from './profiles';
 import type { AgentId, AppSettings, LaunchRequest } from './types';
 
@@ -122,14 +123,20 @@ export type SettingsField =
   | `agents.${AgentId}.extraArgs`
   | `agents.${AgentId}.model`
   | `agents.${AgentId}.profiles`
+  | `agents.${AgentId}.share.dirs`
+  | `agents.${AgentId}.share.files`
   | `docker.images.${AgentId}`
   | 'docker.ports'
   | 'environments'
   | 'github.cloneRoot';
 
-/** Every invalid field of the settings, with its German message. */
+/**
+ * Every invalid field of the settings, with its German message; `labels`
+ * name the agents in the messages that name one, as natively.
+ */
 export function settingsProblems(
   settings: AppSettings,
+  labels: Partial<Record<AgentId, string>> = {},
 ): Partial<Record<SettingsField, string>> {
   const problems: Partial<Record<SettingsField, string>> = {};
   const environments = envsProblem(settings);
@@ -143,6 +150,12 @@ export function settingsProblems(
     const chosen = settings.agentProfile[agent] ?? DEFAULT_PROFILE;
     const profiles = profilesProblem(settings.profiles[agent] ?? [], chosen);
     if (profiles) problems[`agents.${agent}.profiles`] = profiles;
+    const share = shareProblems(
+      agentShare(settings, agent),
+      labels[agent] ?? agent,
+    );
+    if (share.dirs) problems[`agents.${agent}.share.dirs`] = share.dirs;
+    if (share.files) problems[`agents.${agent}.share.files`] = share.files;
   }
   for (const agent of Object.keys(settings.docker.images) as AgentId[]) {
     const image = imageProblem(settings.docker.images[agent]);

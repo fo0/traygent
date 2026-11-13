@@ -1,4 +1,5 @@
 import { toggleEnv } from './environments';
+import { emptyShare, type ShareKind } from './profileShare';
 import { DEFAULT_PROFILE, newProfileProblem, profileId } from './profiles';
 import type { AgentId, AppSettings, EnvId } from './types';
 import { settingsProblems, type SettingsField } from './validation';
@@ -10,7 +11,7 @@ const same = (a: unknown, b: unknown) =>
  * The staged settings of the „Agenten“, „Umgebung“, „GitHub“ and „Updates“
  * tabs. The fields edit `value`; „Speichern“ sends it whole (`save_settings`)
  * and commits the answer as the new baseline, „Abbrechen“ drops it with the
- * dialog.
+ * dialog. `labels` name the agents in the messages that name one.
  */
 export class SettingsDraft {
   /** The baseline: the settings as last saved. */
@@ -20,10 +21,13 @@ export class SettingsDraft {
   readonly dirty: boolean;
   readonly invalid: boolean;
 
-  constructor(settings: AppSettings) {
+  constructor(
+    settings: AppSettings,
+    labels: Partial<Record<AgentId, string>> = {},
+  ) {
     this.saved = $state.raw(settings);
     this.value = $state(structuredClone(settings));
-    this.problems = $derived(settingsProblems(this.value));
+    this.problems = $derived(settingsProblems(this.value, labels));
     this.dirty = $derived(!same($state.snapshot(this.value), this.saved));
     this.invalid = $derived(Object.keys(this.problems).length > 0);
   }
@@ -74,12 +78,29 @@ export class SettingsDraft {
     return problem;
   }
 
-  /** Stages a removal; a removed default profile falls back to „Standard“. */
+  /**
+   * Stages a removal; a removed default profile falls back to „Standard“.
+   * With the last one gone the shared names are hidden: valid edits stay
+   * staged, an invalid list goes back to its saved value, so a hidden field
+   * never blocks „Speichern“ (like hiding Docker).
+   */
   removeProfile(agent: AgentId, id: string) {
     const list = this.value.profiles[agent] ?? [];
     this.value.profiles[agent] = list.filter((profile) => profile.id !== id);
     if (this.value.agentProfile[agent] === id)
       this.value.agentProfile[agent] = DEFAULT_PROFILE;
+    if (this.value.profiles[agent].length) return;
+    for (const kind of ['dirs', 'files'] as const)
+      if (this.problem(`agents.${agent}.share.${kind}`))
+        this.setShare(agent, kind, [
+          ...(this.saved.profileShare?.[agent]?.[kind] ?? []),
+        ]);
+  }
+
+  /** Stages the extra shared folders or files of `agent`. */
+  setShare(agent: AgentId, kind: ShareKind, names: string[]) {
+    this.value.profileShare ??= {} as AppSettings['profileShare'];
+    (this.value.profileShare[agent] ??= emptyShare())[kind] = names;
   }
 
   /** Whether a profile of `agent` is saved, not only staged (it can sign in). */

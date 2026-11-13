@@ -2,6 +2,10 @@
 use super::*;
 use crate::profiles::links::{inspect, Found};
 
+fn none() -> ProfileShare {
+    ProfileShare::default()
+}
+
 fn shared() -> &'static [&'static str] {
     recipe(CLAUDE).unwrap().shared_dirs
 }
@@ -192,6 +196,7 @@ fn a_failed_link_gives_the_profile_its_directory_back() {
             &world.homes,
             CLAUDE,
             &profiles,
+            &none(),
             &crate::testing::NoLinker,
             at(minute),
         );
@@ -242,8 +247,8 @@ fn a_failed_link_gives_the_profile_its_directory_back() {
 fn a_foreign_directory_is_left_exactly_as_it_is() {
     let world = World::new("profiles-foreign");
     write(&world.dir("mem").join("skills/notes.md"), "someone else's");
-    write(&world.dir("mem").join("settings.json"), "theirs");
-    write(&world.dir("default").join("settings.json"), "ours");
+    write(&world.dir("mem").join("keybindings.json"), "theirs");
+    write(&world.dir("default").join("keybindings.json"), "ours");
     // An empty directory is nobody's yet, and one with the CLI's own files is the agent's.
     std::fs::create_dir_all(world.dir("fresh")).unwrap();
     write(&world.state("old"), "{}");
@@ -346,7 +351,14 @@ fn the_hidden_linker_never_runs_a_bare_powershell() {
     let linker = JunctionLinker {
         powershell: host.powershell(),
     };
-    let reports = sync_agent(&world.homes, CLAUDE, &[profile("team")], &linker, at(1));
+    let reports = sync_agent(
+        &world.homes,
+        CLAUDE,
+        &[profile("team")],
+        &none(),
+        &linker,
+        at(1),
+    );
     assert_eq!(reports[0].errors.len(), shared().len());
     assert!(reports[0].errors[0].ends_with("Verknüpfung konnte nicht angelegt werden"));
 }
@@ -363,6 +375,7 @@ fn junctions_are_created_and_recognized_on_windows() {
         &world.homes,
         CLAUDE,
         &[profile("team")],
+        &none(),
         linker.as_ref(),
         at(1),
     );
@@ -382,6 +395,7 @@ fn junctions_are_created_and_recognized_on_windows() {
         &world.homes,
         CLAUDE,
         &[profile("team")],
+        &none(),
         linker.as_ref(),
         at(2),
     );
@@ -410,7 +424,14 @@ impl Linker for Watching {
 fn a_new_profile_directory_is_marked_before_it_is_linked() {
     let world = World::new("profiles-initial-marker");
     let watching = Watching(Default::default());
-    let reports = sync_agent(&world.homes, CLAUDE, &[profile("team")], &watching, at(1));
+    let reports = sync_agent(
+        &world.homes,
+        CLAUDE,
+        &[profile("team")],
+        &none(),
+        &watching,
+        at(1),
+    );
     assert_eq!(reports[0].errors, Vec::<String>::new());
     assert_eq!(
         *watching.0.lock().unwrap(),
@@ -420,7 +441,7 @@ fn a_new_profile_directory_is_marked_before_it_is_linked() {
     // What such a stopped sync leaves — the initial marker and links — is synced on as a
     // first sync: the default home still wins.
     let stopped = World::new("profiles-stopped");
-    write(&stopped.dir("default").join("settings.json"), "ours");
+    write(&stopped.dir("default").join("CLAUDE.md"), "ours");
     write(
         &stopped.dir("team").join(MARKER),
         r#"{"version":1,"done":[]}"#,
@@ -432,7 +453,7 @@ fn a_new_profile_directory_is_marked_before_it_is_linked() {
     std::fs::create_dir_all(&plans.target).unwrap();
     linker().link(std::slice::from_ref(&plans));
     stopped.synced(&["team"], 1);
-    assert_eq!(read(&stopped.dir("team").join("settings.json")), "ours");
+    assert_eq!(read(&stopped.dir("team").join("CLAUDE.md")), "ours");
     // Even without the marker a directory of nothing but links to the default home's
     // shared directories is the agent's own …
     let links_only = World::new("profiles-links-only");
@@ -459,32 +480,4 @@ fn a_new_profile_directory_is_marked_before_it_is_linked() {
     let reports = other.sync(&["team"], 1);
     assert!(reports[0].foreign, "{:?}", reports[0].errors);
     assert!(!other.dir("team").join(MARKER).exists());
-}
-
-#[test]
-fn a_sign_in_is_refused_only_for_a_directory_that_is_someone_elses() {
-    use crate::profiles::sync::refuses_sign_in;
-    let world = World::new("profiles-sign-in");
-    let default = world.dir("default");
-    let refuses = |id: &str| refuses_sign_in(CLAUDE, &world.dir(id), &default);
-    assert!(!refuses("missing"));
-    std::fs::create_dir_all(world.dir("empty")).unwrap();
-    assert!(!refuses("empty"));
-    write(&world.state("own"), "{}");
-    write(&world.dir("own").join("notes.md"), "x");
-    assert!(!refuses("own"));
-    write(&world.dir("mem").join("notes.md"), "someone else's");
-    assert!(refuses("mem"));
-    write(&world.dir("file"), "a file in the way");
-    assert!(refuses("file"));
-    assert!(refuses_sign_in(
-        AgentId::Codex,
-        &world.dir("empty"),
-        &default
-    ));
-    // The real file system answers the launch preparation's question the same way.
-    use crate::detect::{Fs, RealFs};
-    let path = |id: &str| world.dir(id).to_str().unwrap().to_string();
-    assert!(RealFs.refuses_sign_in(CLAUDE, &path("mem"), &path("default")));
-    assert!(!RealFs.refuses_sign_in(CLAUDE, &path("own"), &path("default")));
 }

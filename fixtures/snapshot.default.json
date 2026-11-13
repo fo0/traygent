@@ -48,6 +48,20 @@
       "claude": "default",
       "opencode": "default",
       "codex": "default"
+    },
+    "profileShare": {
+      "claude": {
+        "dirs": [],
+        "files": []
+      },
+      "opencode": {
+        "dirs": [],
+        "files": []
+      },
+      "codex": {
+        "dirs": [],
+        "files": []
+      }
     }
   },
   "catalog": [

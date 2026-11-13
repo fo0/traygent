@@ -8,9 +8,17 @@ use crate::detect::{host::is_search_dir, Host};
 use crate::models::{AgentId, DEFAULT_PROFILE};
 
 pub mod files;
+pub mod foreign;
 pub mod history;
 pub mod json;
 pub mod links;
+pub mod marker;
+pub mod merge;
+pub mod node;
+pub mod pair;
+pub mod settings;
+pub mod share;
+pub mod state;
 pub mod status;
 pub mod sync;
 
@@ -36,12 +44,62 @@ pub struct Recipe {
     pub shared_dirs: &'static [&'static str],
     /// Files copied between a profile and the default home, the newest winning.
     pub synced_files: &'static [&'static str],
+    /// The settings file merged key by key, apart from what belongs to the sign-in.
+    pub settings: Option<SettingsRule>,
     /// A line-based history merged as a union.
     pub history: Option<&'static str>,
-    /// Top-level keys of the state file every profile shares.
+    /// Top-level keys of the state file every profile shares, merged entry by entry.
     pub shared_keys: &'static [&'static str],
+    /// Top-level keys of the state file every profile shares as one value each.
+    pub shared_values: &'static [&'static str],
+    /// Fields inside the entries of one shared key that stay per profile.
+    pub own_fields: Option<OwnFields>,
+    /// Names in the config directory that hold an account's identity, policy or machine
+    /// state: the user can never add them to what the profiles share. Neither can any name
+    /// that starts with the state file's or the sign-in's ([`share::check_name`]).
+    pub never_shared: &'static [&'static str],
     /// The arguments that sign a profile in.
     pub login_args: &'static [&'static str],
+}
+
+/// Runtime values inside the entries of a shared key of the state file (a project's last
+/// session, cost, …): they never travel and never make two entries differ.
+#[derive(Debug, PartialEq, Eq)]
+pub struct OwnFields {
+    /// The shared key whose entries hold them.
+    pub key: &'static str,
+    /// Field names by prefix and by full name.
+    pub prefixes: &'static [&'static str],
+    pub names: &'static [&'static str],
+}
+
+impl OwnFields {
+    /// Field names are compared without case.
+    pub fn holds(&self, field: &str) -> bool {
+        let field = field.to_ascii_lowercase();
+        let named = |name: &&str| name.eq_ignore_ascii_case(&field);
+        let prefixed = |prefix: &&str| field.starts_with(&prefix.to_ascii_lowercase());
+        self.names.iter().any(named) || self.prefixes.iter().any(prefixed)
+    }
+}
+
+/// A JSON settings file every profile shares except for the keys that carry the sign-in or
+/// route requests: those stay per profile, the rest is merged three ways ([`merge`]).
+#[derive(Debug, PartialEq, Eq)]
+pub struct SettingsRule {
+    pub file: &'static str,
+    /// Top-level keys that never leave their profile.
+    pub own_keys: &'static [&'static str],
+    /// The top-level object of environment variables.
+    pub env_key: &'static str,
+    /// Variables of `env_key` that never leave their profile: by prefix and by full name,
+    /// upper case, matched without case.
+    pub own_env_prefixes: &'static [&'static str],
+    pub own_env_names: &'static [&'static str],
+    /// … and by a prefix together with a suffix (`CLAUDE_CODE_SKIP_<provider>_AUTH`).
+    pub own_env_affixes: &'static [(&'static str, &'static str)],
+    /// Lists of strings below these paths (keys joined with `.`) are merged as sets.
+    pub set_paths: &'static [&'static str],
 }
 
 /// Claude Code: one config directory per account through `CLAUDE_CONFIG_DIR`.
@@ -65,10 +123,68 @@ const CLAUDE: Recipe = Recipe {
         "plans",
         "tasks",
         "paste-cache",
+        "hooks",
+        "todos",
+        "session-env",
     ],
-    synced_files: &["settings.json", "CLAUDE.md", "keybindings.json"],
+    synced_files: &["CLAUDE.md", "keybindings.json"],
+    settings: Some(SettingsRule {
+        file: "settings.json",
+        own_keys: &[
+            "apiKeyHelper",
+            "forceLoginOrgUUID",
+            "forceLoginMethod",
+            "awsAuthRefresh",
+            "awsCredentialExport",
+            "anthropicProfile",
+            "anthropicProfiles",
+            "otelHeadersHelper",
+        ],
+        env_key: "env",
+        own_env_prefixes: &[
+            "ANTHROPIC_",
+            "CLAUDE_CODE_USE_",
+            "AWS_",
+            "GOOGLE_",
+            "AZURE_",
+            // Organisation-bound telemetry endpoints and their auth headers.
+            "OTEL_",
+            "VERTEX_REGION_",
+            // The mTLS client certificate and key.
+            "CLAUDE_CODE_CLIENT_",
+        ],
+        own_env_names: &[
+            "CLAUDE_CONFIG_DIR",
+            "CLAUDE_CODE_OAUTH_TOKEN",
+            "CLOUD_ML_REGION",
+        ],
+        own_env_affixes: &[("CLAUDE_CODE_SKIP_", "_AUTH")],
+        set_paths: &["permissions.", "autoMode."],
+    }),
     history: Some("history.jsonl"),
     shared_keys: &["mcpServers", "projects"],
+    shared_values: &["showSpinnerTree", "claudeInChromeDefaultEnabled"],
+    own_fields: Some(OwnFields {
+        key: "projects",
+        prefixes: &["last"],
+        names: &["hasUnseenTeamArtifacts"],
+    }),
+    never_shared: &[
+        "policy-limits.json",
+        "policy-limits.json.stamp.json",
+        "remote-settings.json",
+        "cache",
+        "statsig",
+        "telemetry",
+        "backups",
+        "debug",
+        "shell-snapshots",
+        "ide",
+        "local",
+        "sessions",
+        "jobs",
+        "daemon",
+    ],
     login_args: &["auth", "login"],
 };
 

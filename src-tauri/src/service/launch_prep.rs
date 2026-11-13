@@ -200,7 +200,8 @@ impl Service {
         // (it would look like the agent's own from then on and be adopted).
         if let Some(dir) = &resolved.profile_dir {
             let default_dir = profile_dir(agent, Some(DEFAULT_PROFILE), host)?.unwrap_or_default();
-            if fs.refuses_sign_in(agent, dir, &default_dir) {
+            let share = self.state.settings.profile_share.get(agent);
+            if fs.refuses_sign_in(agent, dir, &default_dir, share) {
                 return Err(format!(
                     "Der {}.",
                     crate::profiles::sync::foreign_dir(agent)

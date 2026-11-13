@@ -186,6 +186,52 @@ describe('SettingsDraft', () => {
     expect(draft.invalid).toBe(false);
   });
 
+  it('stages the shared names: dirty, invalid per list, reset with the draft', () => {
+    const saved = demoSettings();
+    const draft = new SettingsDraft(saved, { claude: 'Claude Code' });
+    draft.setShare('claude', 'dirs', ['.caveman-sessions', 'notes']);
+    expect(draft.dirty).toBe(true);
+    expect(saved.profileShare.claude.dirs).toEqual(['.caveman-sessions']);
+    draft.setShare('claude', 'dirs', ['.caveman-sessions']);
+    expect(draft.dirty).toBe(false);
+    draft.setShare('claude', 'files', ['Notes.md', 'skills']);
+    expect(draft.invalidIn('agents')).toBe(true);
+    expect(draft.problem('agents.claude.share.files')).toBe(
+      'Name „skills“ für Claude Code wird bereits abgeglichen.',
+    );
+    draft.setShare('claude', 'files', ['Notes.md']);
+    expect(draft.invalid).toBe(false);
+    expect(draft.current().profileShare.claude).toEqual({
+      dirs: ['.caveman-sessions'],
+      files: ['Notes.md'],
+    });
+    draft.commit(draft.current());
+    expect(draft.dirty).toBe(false);
+    expect(draft.saved.profileShare.claude.files).toEqual(['Notes.md']);
+    // An agent without a share yet gets one.
+    draft.setShare('codex', 'dirs', ['x']);
+    expect(draft.current().profileShare.codex).toEqual({
+      dirs: ['x'],
+      files: [],
+    });
+  });
+
+  it('keeps valid shared names when the last profile goes, resets invalid ones', () => {
+    const saved = demoSettings();
+    const draft = new SettingsDraft(saved);
+    draft.setShare('claude', 'dirs', ['notes']);
+    draft.setShare('claude', 'files', ['nul']);
+    expect(draft.invalid).toBe(true);
+    draft.removeProfile('claude', 'team');
+    // The hidden fields never block „Speichern“; the valid edit stays.
+    expect(draft.invalid).toBe(false);
+    expect(draft.current().profileShare.claude).toEqual({
+      dirs: ['notes'],
+      files: ['orca-state.json'],
+    });
+    expect(draft.dirty).toBe(true);
+  });
+
   it('marks the Agenten tab when a staged default is not listed', () => {
     const draft = new SettingsDraft(demoSettings());
     draft.value.agentProfile.claude = 'weg';
