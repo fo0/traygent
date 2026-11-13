@@ -57,6 +57,7 @@
     ><button
       class="icon-button small"
       aria-label="Hinweis schließen"
+      title="Hinweis schließen"
       onclick={(event) => dismissUpdate(event, update.version)}
       ><Icon name="close" size={13} /></button
     >

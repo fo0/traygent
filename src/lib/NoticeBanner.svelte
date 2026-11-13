@@ -121,6 +121,7 @@
     >{/if}<button
     class="icon-button small"
     aria-label="Meldung schließen"
+    title="Meldung schließen"
     onclick={close}><Icon name="close" size={13} /></button
   >
 </div>

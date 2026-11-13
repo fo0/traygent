@@ -28,6 +28,7 @@
       copied = true;
       failed = false;
     } catch {
+      copied = false;
       failed = true;
       input?.select();
     }
@@ -52,5 +53,13 @@
     title={copied ? 'Kopiert' : failed ? 'Mit Strg+C kopieren' : 'Kopieren'}
     onclick={() => void copy()}
     ><Icon name={copied ? 'check' : 'copy'} size={14} /></button
+  >
+  <!-- Always present, so the result of a press is announced, not only shown. -->
+  <span class="sr-only" role="status"
+    >{copied
+      ? 'Kopiert'
+      : failed
+        ? 'Nicht kopiert, mit Strg+C kopieren'
+        : ''}</span
   >
 </div>

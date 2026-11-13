@@ -192,6 +192,7 @@
   eyebrow={`TRAYGENT · ${demo ? 'DEMO' : 'LOKAL'}`}
   wide
   {returnFocus}
+  closeDisabled={saving}
   onClose={() => !saving && onClose()}
 >
   <div
