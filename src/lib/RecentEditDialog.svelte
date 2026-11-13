@@ -91,6 +91,7 @@
   title={folderName(recent.folder)}
   eyebrow={`${(entry?.label ?? recent.agent).toUpperCase()} · ${envInfo(recent.env).label.toUpperCase()}`}
   {returnFocus}
+  closeDisabled={saving}
   onClose={() => !saving && onClose()}
 >
   <form

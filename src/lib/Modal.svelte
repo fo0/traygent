@@ -8,6 +8,7 @@
     eyebrow,
     wide = false,
     returnFocus,
+    closeDisabled = false,
     onClose,
     children,
   }: {
@@ -18,6 +19,8 @@
     wide?: boolean;
     /** Opener that gets focus back when the dialog closes. */
     returnFocus?: (() => HTMLElement | null | undefined) | undefined;
+    /** A save runs: the close button shows it cannot close now. */
+    closeDisabled?: boolean;
     /** Close button and Escape. */
     onClose: () => void;
     children: Snippet;
@@ -48,6 +51,7 @@
       <button
         class="icon-button"
         aria-label="Dialog schließen"
+        aria-disabled={closeDisabled ? 'true' : undefined}
         onclick={() => onClose()}><Icon name="close" size={19} /></button
       >
     </div>
