@@ -7,7 +7,7 @@
 //! home), so nothing crosses profiles. One sync runs at a time.
 use super::files::{problem, sync_file, Backup, Backups, Change, ACCESS_FAILED};
 use super::history::sync_history;
-use super::json::{sync_state, Base};
+use super::json::{sync_state, Base, Shared};
 use super::links::{self, Link, Linker, Pending};
 pub use super::marker::{read_marker, Marker, MARKER};
 use super::marker::{write_marker, MARKER_VERSION};
@@ -327,13 +327,13 @@ impl Pair {
             default: default_backup,
             profile: &mut self.backup,
         };
-        let (keys, base) = (recipe.shared_keys, self.base.as_ref());
+        let (keys, base) = (Shared::of(recipe), self.base.as_ref());
         let result = sync_state(
             name,
             default_state,
             &self.state,
             first,
-            keys,
+            &keys,
             base,
             &mut backups,
         );

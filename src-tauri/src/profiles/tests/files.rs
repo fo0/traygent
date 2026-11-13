@@ -207,7 +207,7 @@ fn credentials_never_leave_their_profile() {
         &world.dir("default").join("statsig/cache.json"),
         "default cache",
     );
-    write(&world.dir("team").join("todos/1.json"), "team todo");
+    write(&world.dir("team").join("debug/1.txt"), "team log");
     write(&world.dir("default").join("settings.json"), "{}");
     write(&world.state("default"), DEFAULT_STATE);
     write(&world.state("team"), TEAM_STATE);
@@ -224,7 +224,7 @@ fn credentials_never_leave_their_profile() {
     );
     assert!(!world.dir("solo").join(".credentials.json").exists());
     assert!(!world.dir("solo").join("statsig").exists());
-    assert!(!world.dir("default").join("todos").exists());
+    assert!(!world.dir("default").join("debug").exists());
     // Each secret exists exactly once under the whole user profile, backups included.
     let holders = |secret: &str| -> Vec<PathBuf> {
         tree(world.home())

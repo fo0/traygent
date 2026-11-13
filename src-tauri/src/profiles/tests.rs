@@ -12,6 +12,7 @@ use std::time::{Duration, SystemTime};
 
 mod files;
 mod links;
+mod projects;
 mod settings;
 mod state;
 

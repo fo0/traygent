@@ -4,6 +4,7 @@
 use super::files::{
     bytes, load, problem, unchanged, writable, write_atomic, Backups, Change, CHANGED_MEANWHILE,
 };
+use super::{OwnFields, Recipe};
 use serde::de::{Deserializer, MapAccess, Visitor};
 use serde_json::value::RawValue;
 use serde_json::Value;
@@ -60,6 +61,32 @@ impl Entries {
     }
 }
 
+/// What two state files share.
+#[derive(Clone, Copy, Debug, Default)]
+pub struct Shared<'a> {
+    /// Keys merged entry by entry.
+    pub entries: &'a [&'a str],
+    /// Keys that travel as one value: the winning file's, never united.
+    pub values: &'a [&'a str],
+    /// Fields of the entries of one key that stay on their side.
+    pub own_fields: Option<&'a OwnFields>,
+}
+
+impl<'a> Shared<'a> {
+    pub fn of(recipe: &'a Recipe) -> Self {
+        Self {
+            entries: recipe.shared_keys,
+            values: recipe.shared_values,
+            own_fields: recipe.own_fields.as_ref(),
+        }
+    }
+
+    /// The side-owned fields of the entries of `key`, when it has any.
+    fn own(&self, key: &str) -> Option<&'a OwnFields> {
+        self.own_fields.filter(|own| own.key == key)
+    }
+}
+
 /// The entry names of each shared key as of the rule's last successful sync — names only,
 /// never a value. With it a sync tells an entry one side removed from one the other added.
 pub type Base = std::collections::BTreeMap<String, Vec<String>>;
@@ -103,10 +130,53 @@ fn merged_names(
     (names.len() <= MAX_BASE_NAMES && chars <= MAX_BASE_CHARS).then_some(names)
 }
 
-/// Compared as values: formatting alone never causes a write.
-fn same(first: &RawValue, second: &RawValue) -> bool {
-    let parsed = |raw: &RawValue| serde_json::from_str::<Value>(raw.get()).ok();
+/// Compared as values: formatting alone never causes a write. Neither do the fields of an
+/// entry that belong to its side (`own`).
+fn same(first: &RawValue, second: &RawValue, own: Option<&OwnFields>) -> bool {
+    let parsed = |raw: &RawValue| {
+        let mut value = serde_json::from_str::<Value>(raw.get()).ok()?;
+        if let (Some(own), Value::Object(fields)) = (own, &mut value) {
+            fields.retain(|name, _| !own.holds(name));
+        }
+        Some(value)
+    };
     parsed(first).is_some() && parsed(first) == parsed(second)
+}
+
+/// The entry a side holds after taking `other`'s: the other side's fields without its own
+/// ones (`own`), this side's own ones kept — in this side's order, new fields appended.
+/// Without such fields on either side the entry keeps the other side's text.
+fn taken(
+    mine: Option<&RawValue>,
+    other: &RawValue,
+    own: Option<&OwnFields>,
+    layout: &Layout,
+) -> Box<RawValue> {
+    let (Some(own), Some(theirs)) = (own, object(other)) else {
+        return other.to_owned();
+    };
+    let mine = mine.and_then(object).unwrap_or_default();
+    if !mine
+        .names()
+        .chain(theirs.names())
+        .any(|name| own.holds(name))
+    {
+        return other.to_owned();
+    }
+    let mut entry = Entries::default();
+    for (name, value) in &mine.0 {
+        if own.holds(name) {
+            entry.set(name, value.clone());
+        } else if let Some(value) = theirs.get(name) {
+            entry.set(name, value.to_owned());
+        }
+    }
+    for (name, value) in &theirs.0 {
+        if !own.holds(name) && mine.get(name).is_none() {
+            entry.set(name, value.clone());
+        }
+    }
+    RawValue::from_string(layout.object(&entry, 2)).unwrap_or_else(|_| other.to_owned())
 }
 
 /// How the file indents (`None`: everything on one line) and whether it ends with a line
@@ -187,24 +257,33 @@ fn merged_value(
     other: Option<&RawValue>,
     other_wins: bool,
     base: Option<&[String]>,
+    own: Option<&OwnFields>,
     layout: &Layout,
 ) -> Option<(Box<RawValue>, bool)> {
     let other = other?;
-    let Some(side) = side else {
+    // A key this side lacks is the other side's: nothing was removed here.
+    if side.is_none() && own.is_none() {
         return Some((other.to_owned(), false));
+    }
+    let base = base.filter(|_| side.is_some());
+    let mine = match side {
+        Some(side) => object(side),
+        None => Some(Entries::default()),
     };
-    let (Some(mut mine), Some(theirs)) = (object(side), object(other)) else {
-        return (other_wins && !same(side, other)).then(|| (other.to_owned(), false));
+    let (Some(mut mine), Some(theirs)) = (mine, object(other)) else {
+        return whole_value(side, other, other_wins).map(|value| (value, false));
     };
     let known = |name: &str| base.is_some_and(|base| base.iter().any(|known| known == name));
     let mut changed = false;
     for (key, value) in &theirs.0 {
-        let take = match mine.get(key) {
+        let current = mine.get(key);
+        let take = match current {
             None => !known(key),
-            Some(current) => other_wins && !same(current, value),
+            Some(current) => other_wins && !same(current, value, own),
         };
         if take {
-            mine.set(key, value.clone());
+            let entry = taken(current, value, own, layout);
+            mine.set(key, entry);
             changed = true;
         }
     }
@@ -212,8 +291,20 @@ fn merged_value(
     mine.0
         .retain(|(name, _)| theirs.get(name).is_some() || !known(name));
     let removed = mine.0.len() != before;
-    let text = (changed || removed).then(|| layout.object(&mine, 1))?;
+    // A key this side lacks is created even when the other side's object is empty.
+    let text = (changed || removed || side.is_none()).then(|| layout.object(&mine, 1))?;
     Some((RawValue::from_string(text).ok()?, removed))
+}
+
+/// One side's value of a key that travels as a whole: the other side's when this side has
+/// none or the other side wins a difference; `None` when it stays as it is.
+fn whole_value(
+    side: Option<&RawValue>,
+    other: &RawValue,
+    other_wins: bool,
+) -> Option<Box<RawValue>> {
+    let differs = side.is_none_or(|side| other_wins && !same(side, other, None));
+    differs.then(|| other.to_owned())
 }
 
 /// One side's file after the merge and whether entries were removed from it; `None` when
@@ -222,20 +313,22 @@ fn merged_side(
     bytes: Option<&[u8]>,
     side: &Entries,
     other: &Entries,
-    keys: &[&str],
+    shared: &Shared,
     other_wins: bool,
     base: Option<&Base>,
 ) -> Option<(Vec<u8>, bool)> {
     let layout = Layout::of(bytes);
-    let new: Vec<(&str, Box<RawValue>, bool)> = keys
-        .iter()
-        .filter_map(|key| {
-            let known = base.and_then(|base| base.get(*key)).map(Vec::as_slice);
-            let (value, removed) =
-                merged_value(side.get(key), other.get(key), other_wins, known, &layout)?;
-            Some((*key, value, removed))
-        })
-        .collect();
+    let entries = shared.entries.iter().filter_map(|key| {
+        let known = base.and_then(|base| base.get(*key)).map(Vec::as_slice);
+        let (mine, theirs, own) = (side.get(key), other.get(key), shared.own(key));
+        let (value, removed) = merged_value(mine, theirs, other_wins, known, own, &layout)?;
+        Some((*key, value, removed))
+    });
+    let values = shared.values.iter().filter_map(|key| {
+        let value = whole_value(side.get(key), other.get(key)?, other_wins)?;
+        Some((*key, value, false))
+    });
+    let new: Vec<(&str, Box<RawValue>, bool)> = entries.chain(values).collect();
     if new.is_empty() {
         return None;
     }
@@ -279,18 +372,20 @@ pub struct Merged {
     pub base: Base,
 }
 
-/// Both files with the `keys` merged entry by entry. An entry only one file has reaches the
+/// Both files with the shared keys merged: the whole-value keys taken from the winning file
+/// (a file without one never removes it), the others entry by entry. An entry only one file has reaches the
 /// other; with a `base` (the names as of the last sync) an entry the base knows that one
 /// file lacks was removed there and is removed from the other too — whatever the other did
 /// to it since, the removal wins; a side that holds none of two or more base names is a
 /// reset and removes nothing ([`without_resets`]). One that differs is taken from the default home's file
-/// when `default_wins`, else from the profile's. Without a base (first sync, a marker from
+/// when `default_wins`, else from the profile's — apart from the fields that belong to each
+/// side ([`Shared::own_fields`]), which neither travel nor count as a difference. Without a base (first sync, a marker from
 /// before it) and while one file is missing nothing is ever removed. A missing file is
 /// created with the shared keys only.
 pub fn merge_keys(
     default: Option<&[u8]>,
     profile: Option<&[u8]>,
-    keys: &[&str],
+    shared: &Shared,
     default_wins: bool,
     base: Option<&Base>,
 ) -> Result<Merged, NotJson> {
@@ -303,10 +398,10 @@ pub fn merge_keys(
     let base = base.filter(|_| default.is_some() && profile.is_some());
     let base = base.map(|base| without_resets(base, &ours, &theirs));
     let base = base.as_ref();
-    let new_default = merged_side(default, &ours, &theirs, keys, !default_wins, base);
-    let new_profile = merged_side(profile, &theirs, &ours, keys, default_wins, base);
+    let new_default = merged_side(default, &ours, &theirs, shared, !default_wins, base);
+    let new_profile = merged_side(profile, &theirs, &ours, shared, default_wins, base);
     let mut names = Base::new();
-    for key in keys {
+    for key in shared.entries {
         let known = base.and_then(|base| base.get(*key)).map(Vec::as_slice);
         if let Some(list) = merged_names(ours.get(key), theirs.get(key), known) {
             names.insert(key.to_string(), list);
@@ -339,7 +434,7 @@ pub fn sync_state(
     default: &Path,
     profile: &Path,
     first: bool,
-    keys: &[&str],
+    shared: &Shared,
     base: Option<&Base>,
     backups: &mut Backups,
 ) -> Result<(Change, Base), String> {
@@ -351,7 +446,7 @@ pub fn sync_state(
         _ => true,
     };
     let base = base.filter(|_| !first);
-    let merged = merge_keys(bytes(&ours), bytes(&theirs), keys, default_wins, base)
+    let merged = merge_keys(bytes(&ours), bytes(&theirs), shared, default_wins, base)
         .map_err(|NotJson| fail(UNREADABLE))?;
     let (new_default, new_profile) = (merged.default, merged.profile);
     // Everything is checked before the first write, so a refusal leaves both files alone.

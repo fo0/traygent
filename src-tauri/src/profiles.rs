@@ -44,10 +44,31 @@ pub struct Recipe {
     pub settings: Option<SettingsRule>,
     /// A line-based history merged as a union.
     pub history: Option<&'static str>,
-    /// Top-level keys of the state file every profile shares.
+    /// Top-level keys of the state file every profile shares, merged entry by entry.
     pub shared_keys: &'static [&'static str],
+    /// Top-level keys of the state file every profile shares as one value each.
+    pub shared_values: &'static [&'static str],
+    /// Fields inside the entries of one shared key that stay per profile.
+    pub own_fields: Option<OwnFields>,
     /// The arguments that sign a profile in.
     pub login_args: &'static [&'static str],
+}
+
+/// Runtime values inside the entries of a shared key of the state file (a project's last
+/// session, cost, …): they never travel and never make two entries differ.
+#[derive(Debug, PartialEq, Eq)]
+pub struct OwnFields {
+    /// The shared key whose entries hold them.
+    pub key: &'static str,
+    /// Field names by prefix and by full name.
+    pub prefixes: &'static [&'static str],
+    pub names: &'static [&'static str],
+}
+
+impl OwnFields {
+    pub fn holds(&self, field: &str) -> bool {
+        self.names.contains(&field) || self.prefixes.iter().any(|prefix| field.starts_with(prefix))
+    }
 }
 
 /// A JSON settings file every profile shares except for the keys that carry the sign-in or
@@ -88,6 +109,9 @@ const CLAUDE: Recipe = Recipe {
         "plans",
         "tasks",
         "paste-cache",
+        "hooks",
+        "todos",
+        "session-env",
     ],
     synced_files: &["CLAUDE.md", "keybindings.json"],
     settings: Some(SettingsRule {
@@ -114,6 +138,12 @@ const CLAUDE: Recipe = Recipe {
     }),
     history: Some("history.jsonl"),
     shared_keys: &["mcpServers", "projects"],
+    shared_values: &["showSpinnerTree", "claudeInChromeDefaultEnabled"],
+    own_fields: Some(OwnFields {
+        key: "projects",
+        prefixes: &["last"],
+        names: &["hasUnseenTeamArtifacts"],
+    }),
     login_args: &["auth", "login"],
 };
 

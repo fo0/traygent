@@ -1,6 +1,6 @@
 //! The state file's shared keys: united entry by entry, everything else left alone.
 use super::*;
-use crate::profiles::json::{merge_keys, Base, NotJson, MAX_BASE_NAMES};
+use crate::profiles::json::{merge_keys, Base, NotJson, Shared, MAX_BASE_NAMES};
 use serde_json::{json, Value};
 
 fn parsed(path: &Path) -> Value {
@@ -13,7 +13,10 @@ fn text(bytes: Option<Vec<u8>>) -> Option<String> {
 
 #[test]
 fn shared_keys_are_united_entry_by_entry() {
-    let keys = ["mcpServers", "projects"];
+    let keys = Shared {
+        entries: &["mcpServers", "projects"],
+        ..Shared::default()
+    };
     let merge = |ours: &str, theirs: &str, default_wins: bool| {
         let merged = merge_keys(
             Some(ours.as_bytes()),
@@ -236,7 +239,10 @@ fn base(servers: &[&str]) -> Base {
 /// knows it, an addition when it does not.
 #[test]
 fn a_base_tells_a_removed_entry_from_an_added_one() {
-    let keys = ["mcpServers"];
+    let keys = Shared {
+        entries: &["mcpServers"],
+        ..Shared::default()
+    };
     let merge = |ours: &str, theirs: &str, known: Option<&Base>| {
         merge_keys(
             Some(ours.as_bytes()),
@@ -400,7 +406,10 @@ fn a_removed_entry_stays_removed_in_every_profile() {
 /// reset, not a row of removals, and nothing is removed anywhere.
 #[test]
 fn a_reset_side_removes_nothing_but_a_partial_removal_still_travels() {
-    let keys = ["mcpServers"];
+    let keys = Shared {
+        entries: &["mcpServers"],
+        ..Shared::default()
+    };
     let merge = |ours: &str, theirs: &str, known: &Base| {
         merge_keys(
             Some(ours.as_bytes()),
