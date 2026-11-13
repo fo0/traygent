@@ -151,9 +151,22 @@ export function createDemoBridge(latency = 150, detection = 600): DemoBridge {
       const root =
         data.settings.github.cloneRoot.trim() || data.github.defaultCloneRoot;
       const folder = repo && !given ? cloneFolder(root, repo) : request.folder;
-      // Normalized like natively: the recent stores what the start published.
+      // Normalized like natively: the recent stores what the start published
+      // (no profile outside Lokal or for „Standard“).
       const ports = normalizePorts(request.ports);
-      const recent = recordStart(data.recents, { ...request, folder, ports });
+      const { profile: wanted, ...rest } = request;
+      const profile = editedProfile(
+        data.settings,
+        rest.agent,
+        rest.env,
+        wanted,
+      );
+      const recent = recordStart(data.recents, {
+        ...rest,
+        folder,
+        ports,
+        ...(profile && { profile }),
+      });
       change({ recents: upsertRecent(data.recents, recent) });
       return { recent: structuredClone(recent), snapshot: copy() };
     },

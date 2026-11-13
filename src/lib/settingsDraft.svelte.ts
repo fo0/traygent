@@ -27,7 +27,7 @@ function rebase<T>(from: T, to: T, value: T): T {
 }
 
 /** Saves settings at once (`save_settings`); rejects with the German message. */
-export type SaveNow = (settings: AppSettings) => Promise<AppSettings>;
+type SaveNow = (settings: AppSettings) => Promise<AppSettings>;
 
 /**
  * The staged settings of the „Agenten“, „Umgebung“, „GitHub“ and „Updates“

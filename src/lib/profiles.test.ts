@@ -122,6 +122,13 @@ describe('a saved profile list', () => {
     expect(renameProblem([team, { id: 'kunde', label: 'TEAM' }], 1)).toBe(
       'Profil gibt es schon.',
     );
+    // Against every other profile, not only the earlier ones.
+    expect(renameProblem([{ id: 'kunde', label: 'team' }, team], 0)).toBe(
+      'Profil gibt es schon.',
+    );
+    expect(renameProblem([{ id: 'team', label: ' Team' }], 0)).toBe(
+      'Ungültiger Name.',
+    );
     expect(renameProblem(list, 5)).toBe('');
   });
 
@@ -166,30 +173,30 @@ describe('profiles of a snapshot', () => {
     expect(defaultProfile(settings, 'claude')).toBe('default');
   });
 
-  it('refuse a start with a profile that is gone, outside Lokal or the agent', () => {
+  it('refuse a start only with a Lokal profile the agent does not list', () => {
     const snapshot = demoSnapshot();
     const start = { agent: 'claude' as const, env: 'local' as const };
     expect(launchProfileProblem(snapshot, start)).toBe('');
-    expect(launchProfileProblem(snapshot, { ...start, profile: 'team' })).toBe(
-      '',
-    );
+    for (const profile of ['team', ' team ', 'default', ''])
+      expect(launchProfileProblem(snapshot, { ...start, profile })).toBe('');
     expect(launchProfileProblem(snapshot, { ...start, profile: 'alt' })).toBe(
-      'Profil „alt“ gibt es nicht mehr.',
+      'Profil nicht gefunden.',
     );
-    expect(
-      launchProfileProblem(snapshot, {
-        ...start,
-        env: 'docker',
-        profile: 'team',
-      }),
-    ).toBe('Profile gelten nur lokal.');
     expect(
       launchProfileProblem(snapshot, {
         ...start,
         agent: 'codex',
         profile: 'team',
       }),
-    ).toBe('Dieser Agent hat keine Profile.');
+    ).toBe('Profil nicht gefunden.');
+    // A container has its own home: any profile is dropped, never refused.
+    expect(
+      launchProfileProblem(snapshot, {
+        ...start,
+        env: 'docker',
+        profile: 'alt',
+      }),
+    ).toBe('');
   });
 });
 

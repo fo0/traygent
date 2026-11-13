@@ -45,14 +45,21 @@ describe('demo profiles', () => {
     expect(snapshot.recents.filter((r) => r.profile)).toHaveLength(1);
   });
 
-  it('records a start’s profile and refuses one that is gone', async () => {
+  it('records a start’s profile and refuses one that is gone, as natively', async () => {
     const bridge = createDemoBridge(0);
-    const outcome = await bridge.launchSession({ ...start, profile: 'team' });
+    const outcome = await bridge.launchSession({ ...start, profile: ' team ' });
     expect(outcome.recent.profile).toBe('team');
     expect(outcome).not.toHaveProperty('warning');
     await expect(
       bridge.launchSession({ ...start, profile: 'weg' }),
-    ).rejects.toThrow('Profil „weg“ gibt es nicht mehr.');
+    ).rejects.toThrow('Profil nicht gefunden.');
+    // A container has its own home: the profile is dropped, not refused.
+    const docker = await bridge.launchSession({
+      ...start,
+      env: 'docker',
+      profile: 'team',
+    });
+    expect(docker.recent).not.toHaveProperty('profile');
   });
 
   it('saves a new profile signed out and keeps the others’ sign-in', async () => {
