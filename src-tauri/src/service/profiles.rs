@@ -7,8 +7,9 @@ use crate::profiles::{recipe, Homes, Linker, ProfileReport, SyncOutcome, SyncPla
 use chrono::{DateTime, Utc};
 use std::collections::HashMap;
 
-/// Leads `LaunchOutcome.warning`; the session started all the same.
-pub const SYNC_WARNING: &str = "Profile konnten nicht vollständig synchronisiert werden: ";
+/// `LaunchOutcome.warning`: one sentence, the session started all the same. What could not
+/// be done stays in each profile's `syncError`.
+pub const SYNC_WARNING: &str = "Profile konnten nicht vollständig synchronisiert werden.";
 const PROFILE_DIR_FAILED: &str = "Der Profilordner konnte nicht angelegt werden.";
 const MAX_ERROR_CHARS: usize = 400;
 
@@ -32,15 +33,12 @@ fn capped(text: String) -> String {
     short
 }
 
-/// `<label>: <error> · <error>` per profile with errors, joined by `; `.
 fn warning(reports: &[(AgentId, Vec<ProfileReport>)]) -> Option<String> {
-    let failed: Vec<String> = reports
+    let failed = reports
         .iter()
         .flat_map(|(_, reports)| reports)
-        .filter(|report| !report.errors.is_empty())
-        .map(|report| format!("{}: {}", report.label, report.errors.join(" · ")))
-        .collect();
-    (!failed.is_empty()).then(|| capped(format!("{SYNC_WARNING}{}", failed.join("; "))))
+        .any(|report| !report.errors.is_empty());
+    failed.then(|| SYNC_WARNING.to_string())
 }
 
 impl Service {
@@ -97,43 +95,67 @@ impl Service {
         text
     }
 
-    /// Reads every profile's status again (after a settings save, a sign-in).
+    /// Reads every profile's status again, the service borrowed throughout (tests; the
+    /// shell runs the plan without the lock).
     pub fn refresh_profiles(&mut self) {
         let outcome = self.profile_plan().read();
         self.apply_profiles(outcome);
     }
 
-    /// Syncs every profile of every agent now; the warning names what could not be done.
+    /// Syncs every profile of every agent now, the service borrowed throughout (tests; the
+    /// shell runs the plan without the lock).
     pub fn sync_profiles(&mut self, linker: &dyn Linker, now: DateTime<Utc>) -> Option<String> {
         let outcome = self.profile_plan().run(linker, now);
         self.apply_profiles(outcome)
     }
 
     /// The sync before a local start of an agent that has extra profiles: all of that
-    /// agent's profiles. A failure is a warning — the session still starts — except when the
-    /// requested profile's directory cannot be created. `request` is the prepared one.
+    /// agent's profiles, `None` when there is nothing to sync. `request` is the prepared
+    /// one. Run the plan without the service lock, then [`Service::finish_launch_sync`].
+    pub fn launch_sync_plan(&self, request: &LaunchRequest) -> Option<SyncPlan> {
+        let agent = request.agent;
+        let extra = !self.state.settings.profiles.get(agent).is_empty();
+        (request.env == EnvId::Local && recipe(agent).is_some() && extra)
+            .then(|| self.profile_plan().only(agent))
+    }
+
+    /// Commits the sync of a start. A failure is a warning — the session still starts —
+    /// except when the requested profile's directory cannot be used.
+    pub fn finish_launch_sync(
+        &mut self,
+        request: &LaunchRequest,
+        outcome: SyncOutcome,
+    ) -> Result<Option<String>, String> {
+        let blocked = outcome
+            .reports
+            .iter()
+            .flatten()
+            .flat_map(|(_, reports)| reports)
+            .find(|report| report.dir_failed && Some(&report.id) == request.profile.as_ref())
+            .map(|report| report.foreign);
+        let text = self.apply_profiles(outcome);
+        match blocked {
+            Some(true) => Err(format!(
+                "Der {}.",
+                crate::profiles::sync::foreign_dir(request.agent)
+            )),
+            Some(false) => Err(PROFILE_DIR_FAILED.into()),
+            None => Ok(text),
+        }
+    }
+
+    /// Plan, run and commit in one call, the service borrowed throughout (tests; the shell
+    /// runs the plan without the lock).
     pub fn sync_for_launch(
         &mut self,
         request: &LaunchRequest,
         linker: &dyn Linker,
         now: DateTime<Utc>,
     ) -> Result<Option<String>, String> {
-        let agent = request.agent;
-        let extra = !self.state.settings.profiles.get(agent).is_empty();
-        if request.env != EnvId::Local || recipe(agent).is_none() || !extra {
+        let Some(plan) = self.launch_sync_plan(request) else {
             return Ok(None);
-        }
-        let outcome = self.profile_plan().only(agent).run(linker, now);
-        let blocked = outcome.reports.iter().flatten().any(|(_, reports)| {
-            reports
-                .iter()
-                .any(|report| report.dir_failed && Some(&report.id) == request.profile.as_ref())
-        });
-        let text = self.apply_profiles(outcome);
-        if blocked {
-            return Err(PROFILE_DIR_FAILED.into());
-        }
-        Ok(text)
+        };
+        self.finish_launch_sync(request, plan.run(linker, now))
     }
 }
 

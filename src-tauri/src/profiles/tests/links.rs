@@ -47,6 +47,7 @@ fn a_profile_directory_is_adopted_into_the_default_home_and_backed_up() {
     let (ours, theirs) = (world.dir("default"), world.dir("team"));
     write(&ours.join("skills/shared.md"), "default version");
     write(&ours.join("skills/nested/kept.md"), "kept");
+    own(&world, "team");
     write(&theirs.join("skills/shared.md"), "team version");
     write(&theirs.join("skills/only-team.md"), "team only");
     write(&theirs.join("skills/nested/new.md"), "nested new");
@@ -97,7 +98,7 @@ fn a_link_that_points_elsewhere_is_left_alone_and_reported() {
     let world = World::new("profiles-elsewhere");
     let elsewhere = world.home().join("dotfiles-skills");
     write(&elsewhere.join("mine.md"), "mine");
-    std::fs::create_dir_all(world.dir("team")).unwrap();
+    own(&world, "team");
     let foreign = Link {
         link: world.dir("team").join("skills"),
         target: elsewhere.clone(),
@@ -125,9 +126,18 @@ fn a_link_that_points_elsewhere_is_left_alone_and_reported() {
         world.dir("default").join("plans"),
     );
     assert_eq!(inspect(&link, &target).unwrap(), Found::Linked);
-    // The first sync happened (the default home wins only once), but not without an error.
+    // No sync without an error yet; the file rules that succeeded had their first sync.
     let marker = read_marker(&world.dir("team")).unwrap();
     assert_eq!((marker.version, marker.synced_at), (1, None));
+    assert_eq!(
+        marker.done,
+        [
+            "settings.json",
+            "CLAUDE.md",
+            "keybindings.json",
+            ".claude.json"
+        ]
+    );
 }
 
 #[test]
@@ -165,4 +175,215 @@ fn a_profile_directory_that_cannot_be_created_is_reported_as_such() {
     // The other profile is synced.
     assert!(reports[1].errors.is_empty() && !reports[1].dir_failed);
     assert!(read_marker(&world.dir("solo")).is_some());
+}
+
+/// PowerShell blocked, a timeout: the profile keeps its own directories, and a later sync
+/// starts from the same state — no backup piles up.
+#[test]
+fn a_failed_link_gives_the_profile_its_directory_back() {
+    let world = World::new("profiles-nolink");
+    let (ours, theirs) = (world.dir("default"), world.dir("team"));
+    own(&world, "team");
+    write(&theirs.join("skills/team.md"), "team skill");
+    std::fs::create_dir_all(theirs.join("agents")).unwrap();
+    let profiles = [profile("team")];
+    for minute in [1, 2] {
+        let reports = sync_agent(
+            &world.homes,
+            CLAUDE,
+            &profiles,
+            &crate::testing::NoLinker,
+            at(minute),
+        );
+        assert_eq!(
+            reports[0].errors.len(),
+            shared().len(),
+            "{:?}",
+            reports[0].errors
+        );
+        assert_eq!(
+            reports[0].errors[0],
+            "skills: Verknüpfung konnte nicht angelegt werden"
+        );
+        assert!(!reports[0].dir_failed);
+        // The non-empty directory is back in place, the removed empty one exists again.
+        assert_eq!(
+            inspect(&theirs.join("skills"), &ours.join("skills")).unwrap(),
+            Found::Directory
+        );
+        assert_eq!(read(&theirs.join("skills/team.md")), "team skill");
+        assert_eq!(
+            inspect(&theirs.join("agents"), &ours.join("agents")).unwrap(),
+            Found::Directory
+        );
+        assert_eq!(
+            inspect(&theirs.join("plans"), &ours.join("plans")).unwrap(),
+            Found::Missing
+        );
+        assert!(
+            !theirs.join(super::super::files::BACKUP_DIR).exists(),
+            "run {minute}"
+        );
+        assert_eq!(read_marker(&theirs).unwrap().synced_at, None);
+    }
+    // Once linking works the directory is adopted as usual.
+    world.synced(&["team"], 3);
+    assert_eq!(
+        inspect(&theirs.join("skills"), &ours.join("skills")).unwrap(),
+        Found::Linked
+    );
+    assert_eq!(
+        read(&world.backup("team").join("skills/team.md")),
+        "team skill"
+    );
+}
+
+#[test]
+fn a_foreign_directory_is_left_exactly_as_it_is() {
+    let world = World::new("profiles-foreign");
+    write(&world.dir("mem").join("skills/notes.md"), "someone else's");
+    write(&world.dir("mem").join("settings.json"), "theirs");
+    write(&world.dir("default").join("settings.json"), "ours");
+    // An empty directory is nobody's yet, and one with the CLI's own files is the agent's.
+    std::fs::create_dir_all(world.dir("fresh")).unwrap();
+    write(&world.state("old"), "{}");
+    write(&world.dir("old").join("skills/own.md"), "own");
+    let before = tree(&world.dir("mem"));
+    let reports = world.sync(&["mem", "fresh", "old"], 1);
+    assert_eq!(
+        reports[0].errors,
+        ["Profilordner gehört nicht zu Claude Code"]
+    );
+    assert!(reports[0].dir_failed && reports[0].foreign);
+    assert_eq!(tree(&world.dir("mem")), before);
+    assert!(world
+        .dir("mem")
+        .join("skills")
+        .symlink_metadata()
+        .unwrap()
+        .is_dir());
+    assert!(!world.dir("default").join("skills/notes.md").exists());
+    for report in &reports[1..] {
+        assert_eq!(report.errors, Vec::<String>::new(), "{}", report.id);
+        assert!(!report.foreign);
+    }
+    assert_eq!(read(&world.dir("default").join("skills/own.md")), "own");
+}
+
+/// A guard that cannot tell refuses: no answer is never read as "different places".
+#[test]
+fn an_unanswered_same_place_check_is_an_error_and_a_dangling_link_is_never_touched() {
+    use crate::profiles::links::same_place;
+    let world = World::new("profiles-same-place");
+    let (here, gone) = (world.home().join("here"), world.home().join("gone"));
+    std::fs::create_dir_all(&here).unwrap();
+    assert!(same_place(&here, &here).unwrap());
+    assert!(same_place(&here, &gone).is_err());
+    assert!(same_place(&gone, &here).is_err());
+    let dangling = Link {
+        link: world.home().join("dangling"),
+        target: here.clone(),
+    };
+    linker().link(std::slice::from_ref(&dangling));
+    std::fs::remove_dir(&here).unwrap();
+    std::fs::create_dir_all(&gone).unwrap();
+    assert_eq!(inspect(&dangling.link, &gone).unwrap(), Found::Elsewhere);
+}
+
+/// Git pack files in `plugins` are read-only: the copy keeps flag and file time, and the
+/// time step does not need to reopen a read-only temp file.
+#[test]
+fn a_read_only_file_is_adopted_with_its_time_and_flag() {
+    use crate::profiles::links::copy_new;
+    let world = World::new("profiles-readonly");
+    let (source, dest) = (world.home().join("pack.idx"), world.home().join("copy.idx"));
+    write(&source, "pack");
+    touch(&source, 77);
+    let mut read_only = std::fs::metadata(&source).unwrap().permissions();
+    read_only.set_readonly(true);
+    std::fs::set_permissions(&source, read_only).unwrap();
+    copy_new(&source, &dest).unwrap();
+    let (from, to) = (
+        std::fs::metadata(&source).unwrap(),
+        std::fs::metadata(&dest).unwrap(),
+    );
+    assert_eq!(read(&dest), "pack");
+    assert_eq!(to.modified().unwrap(), from.modified().unwrap());
+    assert!(to.permissions().readonly());
+    let names: Vec<_> = tree(world.home())
+        .into_iter()
+        .map(|(path, _, _)| path)
+        .collect();
+    assert_eq!(
+        names,
+        [dest.clone(), source.clone()],
+        "no temp file stays behind"
+    );
+    // Writable again, so the temp dir can be removed on every platform.
+    for path in [&source, &dest] {
+        let mut writable = std::fs::metadata(path).unwrap().permissions();
+        #[allow(clippy::permissions_set_readonly_false)]
+        writable.set_readonly(false);
+        std::fs::set_permissions(path, writable).unwrap();
+    }
+}
+
+#[test]
+fn the_hidden_linker_never_runs_a_bare_powershell() {
+    use crate::profiles::links::JunctionLinker;
+    let bare = JunctionLinker {
+        powershell: "powershell.exe".into(),
+    };
+    assert!(!bare.runnable());
+    let found = JunctionLinker {
+        powershell: crate::testing::windows_host().powershell(),
+    };
+    assert!(found.runnable());
+    // A host without a usable `SystemRoot`: nothing is run, every link reports its failure.
+    let mut host = crate::testing::windows_host();
+    host.system_root = None;
+    let world = World::new("profiles-bare");
+    let linker = JunctionLinker {
+        powershell: host.powershell(),
+    };
+    let reports = sync_agent(&world.homes, CLAUDE, &[profile("team")], &linker, at(1));
+    assert_eq!(reports[0].errors.len(), shared().len());
+    assert!(reports[0].errors[0].ends_with("Verknüpfung konnte nicht angelegt werden"));
+}
+
+/// The one test that creates real junctions through Windows PowerShell.
+#[cfg(windows)]
+#[test]
+fn junctions_are_created_and_recognized_on_windows() {
+    let world = World::new("profiles-junction");
+    own(&world, "team");
+    write(&world.dir("team").join("skills/team.md"), "team skill");
+    let linker = system_linker(&crate::detect::Host::current());
+    let reports = sync_agent(
+        &world.homes,
+        CLAUDE,
+        &[profile("team")],
+        linker.as_ref(),
+        at(1),
+    );
+    assert_eq!(reports[0].errors, Vec::<String>::new());
+    for name in shared() {
+        let (link, target) = (
+            world.dir("team").join(name),
+            world.dir("default").join(name),
+        );
+        assert_eq!(inspect(&link, &target).unwrap(), Found::Linked, "{name}");
+    }
+    assert_eq!(
+        read(&world.dir("default").join("skills/team.md")),
+        "team skill"
+    );
+    let again = sync_agent(
+        &world.homes,
+        CLAUDE,
+        &[profile("team")],
+        linker.as_ref(),
+        at(2),
+    );
+    assert!(again[0].errors.is_empty() && !again[0].changed);
 }

@@ -96,3 +96,25 @@ impl Drop for TempDir {
         let _ = std::fs::remove_dir_all(&self.0);
     }
 }
+
+/// Directory links for the engine tests on every platform: symbolic links, so no test
+/// spawns PowerShell. The real junction linker has one dedicated Windows test.
+pub(crate) struct TestLinker;
+
+impl crate::profiles::Linker for TestLinker {
+    fn link(&self, links: &[crate::profiles::links::Link]) {
+        for pair in links {
+            #[cfg(unix)]
+            let _ = std::os::unix::fs::symlink(&pair.target, &pair.link);
+            #[cfg(windows)]
+            let _ = std::os::windows::fs::symlink_dir(&pair.target, &pair.link);
+        }
+    }
+}
+
+/// A linker that creates nothing: PowerShell blocked, a timeout.
+pub(crate) struct NoLinker;
+
+impl crate::profiles::Linker for NoLinker {
+    fn link(&self, _: &[crate::profiles::links::Link]) {}
+}

@@ -4,10 +4,10 @@
 //! Std file system only, over paths [`Homes`] built. Nothing is ever deleted except an empty
 //! directory that makes room for a link; what a rule replaces goes to the profile's backup
 //! folder first. One sync runs at a time.
-use super::files::{problem, sync_file, write_atomic, Backup, Change};
+use super::files::{problem, sync_file, write_atomic, Backup, Backups, Change, ACCESS_FAILED};
 use super::history::sync_history;
 use super::json::sync_state;
-use super::links::{self, Link, Linker};
+use super::links::{self, Link, Linker, Pending};
 use super::status::{self, Facts, Key};
 use super::{recipe, Homes, Recipe};
 use crate::models::{AgentId, AgentProfile, AppSettings, DEFAULT_PROFILE};
@@ -22,17 +22,27 @@ pub const NO_HOME: &str = "Benutzerordner nicht verfügbar";
 pub const PROFILE_DIR_FAILED: &str = "Profilordner konnte nicht angelegt werden";
 const DEFAULT_DIR_FAILED: &str = "Ordner des Standard-Profils konnte nicht angelegt werden";
 const IS_DEFAULT_HOME: &str = "Profilordner ist der Ordner des Standard-Profils";
+const DIR_UNCHECKED: &str = "Profilordner konnte nicht geprüft werden";
+
+/// An existing, non-empty directory without the CLI's state file, its sign-in or the marker
+/// is someone else's (`.claude-mem`, `.claude-backup`): nothing in it is touched.
+pub fn foreign_dir(agent: AgentId) -> String {
+    format!("Profilordner gehört nicht zu {}", agent.label())
+}
 
 static RUNNING: Mutex<()> = Mutex::new(());
 
-/// `<profile dir>\.traygent-sync.json`: the profile had its first sync; `syncedAt` is the
-/// last one without an error.
+/// `<profile dir>\.traygent-sync.json`: `done` names the rules whose first sync succeeded —
+/// until then the default home wins for that rule, afterwards the newest. `syncedAt` is the
+/// last sync without an error.
 #[derive(Clone, Debug, Default, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct Marker {
     pub version: u64,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub synced_at: Option<String>,
+    #[serde(default)]
+    pub done: Vec<String>,
 }
 
 /// `None` without a marker file; an unreadable one still counts as a marker.
@@ -48,8 +58,10 @@ pub struct ProfileReport {
     pub label: String,
     /// German, one entry per thing that could not be done; empty = in sync.
     pub errors: Vec<String>,
-    /// The profile's directory could not be created: a session cannot start in it.
+    /// The profile's directory cannot be used: a session cannot start in it.
     pub dir_failed: bool,
+    /// … because it exists and is not this agent's ([`foreign_dir`]).
+    pub foreign: bool,
     /// The run created a link or wrote a file of the pair (the marker does not count).
     pub changed: bool,
 }
@@ -128,7 +140,7 @@ fn failed(profiles: &[AgentProfile], error: &str, dir_failed: bool) -> Vec<Profi
             label: profile.label.clone(),
             errors: vec![error.to_string()],
             dir_failed,
-            changed: false,
+            ..ProfileReport::default()
         })
         .collect()
 }
@@ -138,18 +150,30 @@ struct Pair {
     report: ProfileReport,
     dir: PathBuf,
     state: PathBuf,
-    /// No marker yet: the default home wins.
-    first: bool,
+    /// As read; `None` before the first sync.
     marker: Option<Marker>,
+    /// The rules whose first sync succeeded, from the marker plus this run.
+    done: Vec<String>,
     backup: Backup,
     /// False when the directory is unusable; no rule runs then.
     usable: bool,
+}
+
+/// An existing directory that holds something but none of the agent's own files.
+fn is_foreign(dir: &Path, recipe: &Recipe) -> std::io::Result<bool> {
+    if std::fs::read_dir(dir)?.next().is_none() {
+        return Ok(false);
+    }
+    let own = [recipe.state_file, recipe.credentials, MARKER];
+    let known = |name: &&str| std::fs::symlink_metadata(dir.join(name)).is_ok();
+    Ok(!own.iter().any(known))
 }
 
 impl Pair {
     fn open(
         homes: &Homes,
         agent: AgentId,
+        recipe: &Recipe,
         profile: &AgentProfile,
         default_dir: &Path,
         now: DateTime<Utc>,
@@ -163,30 +187,41 @@ impl Pair {
         };
         // Only a validated id of an extra profile yields a directory.
         let paths = dir.zip(state).filter(|_| profile.id != DEFAULT_PROFILE);
-        let usable = match &paths {
-            Some((dir, _)) if std::fs::create_dir_all(dir).is_err() => {
-                report.dir_failed = true;
-                report.errors.push(PROFILE_DIR_FAILED.into());
-                false
+        let (dir, state) = paths.clone().unwrap_or_default();
+        let refusal = match &paths {
+            None => Some((PROFILE_DIR_FAILED.to_string(), true)),
+            Some(_) if std::fs::symlink_metadata(&dir).is_ok() => {
+                // E.g. a profile directory that is itself a link to the default home: there
+                // is nothing to sync, and adopting its directories would move the default
+                // home's. A check without an answer refuses as well.
+                match (
+                    links::same_place(&dir, default_dir),
+                    is_foreign(&dir, recipe),
+                ) {
+                    (Ok(true), _) => Some((IS_DEFAULT_HOME.to_string(), false)),
+                    (Ok(false), Ok(true)) => {
+                        report.foreign = true;
+                        Some((foreign_dir(agent), true))
+                    }
+                    (Ok(false), Ok(false)) => None,
+                    // A file where the directory belongs.
+                    _ if !dir.is_dir() => Some((PROFILE_DIR_FAILED.to_string(), true)),
+                    _ => Some((DIR_UNCHECKED.to_string(), false)),
+                }
             }
-            // E.g. a profile directory that is itself a link to the default home: there is
-            // nothing to sync, and adopting its directories would move the default home's.
-            Some((dir, _)) if links::same_place(dir, default_dir) => {
-                report.errors.push(IS_DEFAULT_HOME.into());
-                false
-            }
-            Some(_) => true,
-            None => {
-                report.dir_failed = true;
-                report.errors.push(PROFILE_DIR_FAILED.into());
-                false
-            }
+            Some(_) => std::fs::create_dir_all(&dir)
+                .is_err()
+                .then(|| (PROFILE_DIR_FAILED.to_string(), true)),
         };
-        let (dir, state) = paths.unwrap_or_default();
+        if let Some((error, dir_failed)) = &refusal {
+            report.errors.push(error.clone());
+            report.dir_failed = *dir_failed;
+        }
+        let usable = refusal.is_none();
         let marker = usable.then(|| read_marker(&dir)).flatten();
         Self {
             report,
-            first: marker.is_none(),
+            done: marker.clone().unwrap_or_default().done,
             marker,
             backup: Backup::new(&dir, now),
             dir,
@@ -195,10 +230,14 @@ impl Pair {
         }
     }
 
-    fn note(&mut self, result: Result<Change, String>) -> Change {
+    /// Notes a rule's result; a rule that succeeded has had its first sync.
+    fn note(&mut self, rule: Option<&str>, result: Result<Change, String>) -> Change {
         match result {
             Ok(change) => {
                 self.report.changed |= change.any();
+                if let Some(rule) = rule.filter(|rule| !self.done.iter().any(|done| done == rule)) {
+                    self.done.push(rule.to_string());
+                }
                 change
             }
             Err(error) => {
@@ -210,42 +249,59 @@ impl Pair {
         }
     }
 
-    /// The file rules of the pair; says whether the default home's side changed.
-    fn files(&mut self, recipe: &Recipe, default_dir: &Path, default_state: &Path) -> bool {
+    fn first(&self, rule: &str) -> bool {
+        !self.done.iter().any(|done| done == rule)
+    }
+
+    /// The file rules of the pair; says whether the default home's side changed. A rule is
+    /// a first sync (the default home wins) until it succeeded once — also in the second
+    /// pass of a run, and in the next run after one that failed.
+    fn files(
+        &mut self,
+        recipe: &Recipe,
+        default_dir: &Path,
+        default_state: &Path,
+        default_backup: &mut Backup,
+    ) -> bool {
         let mut change = Change::default();
-        let first = self.first;
         for name in recipe.synced_files {
             let (ours, theirs) = (default_dir.join(name), self.dir.join(name));
-            let result = sync_file(name, &ours, &theirs, first, &mut self.backup);
-            change.merge(self.note(result));
+            let first = self.first(name);
+            let mut backups = Backups {
+                default: default_backup,
+                profile: &mut self.backup,
+            };
+            let result = sync_file(name, &ours, &theirs, first, &mut backups);
+            change.merge(self.note(Some(name), result));
         }
         if let Some(name) = recipe.history {
             let result = sync_history(name, &default_dir.join(name), &self.dir.join(name));
-            change.merge(self.note(result));
+            change.merge(self.note(None, result));
         }
         let name = recipe.state_file;
-        let result = sync_state(name, default_state, &self.state, first, recipe.shared_keys);
-        change.merge(self.note(result));
-        // From here on the newest wins: a second pass must not hand the default home's side
-        // out again as a first sync would.
-        self.first = false;
+        let first = self.first(name);
+        let mut backups = Backups {
+            default: default_backup,
+            profile: &mut self.backup,
+        };
+        let keys = recipe.shared_keys;
+        let result = sync_state(name, default_state, &self.state, first, keys, &mut backups);
+        change.merge(self.note(Some(name), result));
         change.default
     }
 
-    /// Writes the marker: always after the first sync (so the default home wins only once),
-    /// with a new `syncedAt` only after a sync without an error.
+    /// Writes the marker when it changed: the rules done so far, and a new `syncedAt` only
+    /// after a sync without an error.
     fn mark(&mut self, now: DateTime<Utc>) {
-        let clean = self.report.errors.is_empty();
-        if !clean && self.marker.is_some() {
-            return;
-        }
+        let previous = self.marker.clone().unwrap_or_default();
         let marker = Marker {
             version: MARKER_VERSION,
-            synced_at: if clean {
+            synced_at: if self.report.errors.is_empty() {
                 Some(crate::recents::timestamp(now))
             } else {
-                None
+                previous.synced_at
             },
+            done: self.done.clone(),
         };
         if self.marker.as_ref() == Some(&marker) {
             return;
@@ -254,8 +310,7 @@ impl Pair {
             .map_err(drop)
             .and_then(|bytes| write_atomic(&self.dir.join(MARKER), &bytes).map_err(drop));
         if written.is_err() {
-            let error = problem(MARKER, super::files::ACCESS_FAILED);
-            self.report.errors.push(error);
+            self.report.errors.push(problem(MARKER, ACCESS_FAILED));
         }
     }
 }
@@ -284,41 +339,49 @@ pub fn sync_agent(
     if std::fs::create_dir_all(&default_dir).is_err() {
         return failed(profiles, DEFAULT_DIR_FAILED, false);
     }
+    let mut default_backup = Backup::new(&default_dir, now);
     let mut pairs: Vec<Pair> = profiles
         .iter()
-        .map(|profile| Pair::open(homes, agent, profile, &default_dir, now))
+        .map(|profile| Pair::open(homes, agent, recipe, profile, &default_dir, now))
         .collect();
 
-    let mut wanted: Vec<(usize, &str, Link)> = Vec::new();
+    let mut wanted: Vec<(usize, &str, Pending)> = Vec::new();
     for (index, pair) in pairs.iter_mut().enumerate().filter(|(_, pair)| pair.usable) {
         for name in recipe.shared_dirs {
             let (target, link) = (default_dir.join(name), pair.dir.join(name));
             match links::prepare(name, &target, &link, &mut pair.backup) {
-                Ok(Some(link)) => wanted.push((index, name, link)),
+                Ok(Some(pending)) => wanted.push((index, name, pending)),
                 Ok(None) => {}
                 Err(error) => pair.report.errors.push(error),
             }
         }
     }
     if !wanted.is_empty() {
-        let list: Vec<Link> = wanted.iter().map(|(_, _, link)| link.clone()).collect();
+        let list: Vec<Link> = wanted
+            .iter()
+            .map(|(_, _, pending)| pending.link.clone())
+            .collect();
         linker.link(&list);
-        for (index, name, link) in &wanted {
-            match links::verify(name, link) {
-                Ok(()) => pairs[*index].report.changed = true,
-                Err(error) => pairs[*index].report.errors.push(error),
+        for (index, name, pending) in &wanted {
+            let pair = &mut pairs[*index];
+            match links::verify(name, &pending.link) {
+                Ok(()) => pair.report.changed = true,
+                Err(error) => {
+                    pending.undo(&mut pair.backup);
+                    pair.report.errors.push(error);
+                }
             }
         }
     }
 
     let mut default_changed = false;
     for pair in pairs.iter_mut().filter(|pair| pair.usable) {
-        default_changed |= pair.files(recipe, &default_dir, &default_state);
+        default_changed |= pair.files(recipe, &default_dir, &default_state, &mut default_backup);
     }
     // What one profile handed to the default home reaches the others in the same run.
     if default_changed && pairs.len() > 1 {
         for pair in pairs.iter_mut().filter(|pair| pair.usable) {
-            pair.files(recipe, &default_dir, &default_state);
+            pair.files(recipe, &default_dir, &default_state, &mut default_backup);
         }
     }
     for pair in pairs.iter_mut().filter(|pair| pair.usable) {

@@ -41,6 +41,28 @@ pub(crate) struct Loaded {
     pub modified: SystemTime,
 }
 
+/// The content of a side, when there is one.
+pub(crate) fn bytes(side: &Option<Loaded>) -> Option<&[u8]> {
+    side.as_ref().map(|loaded| loaded.bytes.as_slice())
+}
+
+pub(crate) const CHANGED_MEANWHILE: &str =
+    "wurde gerade geändert, nächster Versuch beim nächsten Abgleich";
+
+/// Whether `path` still is what `seen` was read from (size and file time; missing stays
+/// missing). The CLI writes its files while a session runs: a rule that merged an older
+/// read must not replace what arrived since.
+pub(crate) fn unchanged(path: &Path, seen: Option<&Loaded>) -> bool {
+    match (std::fs::metadata(path), seen) {
+        (Ok(meta), Some(seen)) => {
+            meta.len() == seen.bytes.len() as u64
+                && meta.modified().unwrap_or(SystemTime::UNIX_EPOCH) == seen.modified
+        }
+        (Err(error), None) => error.kind() == io::ErrorKind::NotFound,
+        _ => false,
+    }
+}
+
 /// Reads `path` when it is a file of at most `cap` bytes. A link is followed (a `CLAUDE.md`
 /// kept in a dotfiles folder still syncs out); anything else that is no file is an error.
 pub(crate) fn load(path: &Path, cap: u64) -> Result<Option<Loaded>, &'static str> {
@@ -64,6 +86,14 @@ pub(crate) fn load(path: &Path, cap: u64) -> Result<Option<Loaded>, &'static str
     let bytes = std::fs::read(path).map_err(|_| ACCESS_FAILED)?;
     let modified = meta.modified().unwrap_or(SystemTime::UNIX_EPOCH);
     Ok(Some(Loaded { bytes, modified }))
+}
+
+/// A link is never written through ([`write_atomic`]).
+pub(crate) fn writable(path: &Path) -> Result<(), &'static str> {
+    if is_link(path) {
+        return Err(IS_A_LINK);
+    }
+    Ok(())
 }
 
 fn is_link(path: &Path) -> bool {
@@ -119,9 +149,11 @@ pub struct Backup {
 }
 
 impl Backup {
-    pub fn new(profile_dir: &Path, now: chrono::DateTime<chrono::Utc>) -> Self {
+    /// The backup folder inside `home`: a profile's directory or the default home. What a
+    /// rule replaces stays in the home it came from, so no identity crosses profiles.
+    pub fn new(home: &Path, now: chrono::DateTime<chrono::Utc>) -> Self {
         Self {
-            root: profile_dir.join(BACKUP_DIR),
+            root: home.join(BACKUP_DIR),
             stamp: now.format("%Y%m%dT%H%M%SZ").to_string(),
             dir: None,
         }
@@ -143,20 +175,58 @@ impl Backup {
             }
             self.dir = Some(dir);
         }
-        let slot = self.dir.as_ref().map(|dir| dir.join(name));
-        slot.ok_or_else(|| io::ErrorKind::NotFound.into())
+        let dir = self.dir.as_ref().ok_or(io::ErrorKind::NotFound)?;
+        // Two losers of one name in one run (two profiles replacing the default home's
+        // file) each keep their own slot.
+        let mut slot = dir.join(name);
+        let mut counter = 1;
+        while std::fs::symlink_metadata(&slot).is_ok() {
+            counter += 1;
+            if counter > 100 {
+                return Err(io::ErrorKind::AlreadyExists.into());
+            }
+            slot = dir.join(format!("{name}.{counter}"));
+        }
+        Ok(slot)
+    }
+
+    /// Copies `loser` into a slot before a rule replaces it.
+    pub(crate) fn keep(&mut self, name: &str, loser: &Loaded) -> Result<(), &'static str> {
+        let slot = self.slot(name).map_err(|_| ACCESS_FAILED)?;
+        copy_to(&slot, loser)
+    }
+
+    /// Hands a moved directory back to `home` and drops the run's folder when that leaves
+    /// it empty (`remove_dir` only ever removes an empty directory).
+    pub(crate) fn give_back(&mut self, slot: &Path, home: &Path) -> io::Result<()> {
+        std::fs::rename(slot, home)?;
+        if let Some(dir) = self.dir.take() {
+            if std::fs::remove_dir(&dir).is_err() {
+                self.dir = Some(dir);
+            } else {
+                let _ = std::fs::remove_dir(&self.root);
+            }
+        }
+        Ok(())
     }
 }
 
-/// One synced file of a pair. The first sync of a profile takes the default home's file (a
-/// differing profile file goes to the backup first); later the newer one wins in either
-/// direction. Equal content writes nothing; a file on one side only is copied to the other.
+/// The backup folders of a pair: what a rule replaces goes to its own side's folder.
+pub struct Backups<'a> {
+    pub default: &'a mut Backup,
+    pub profile: &'a mut Backup,
+}
+
+/// One synced file of a pair. Until the rule's first sync succeeded (`first`) the default
+/// home's file wins; later the newer one wins in either direction. The file that loses is
+/// copied to its side's backup first, whichever side it is. Equal content writes nothing; a
+/// file on one side only is copied to the other.
 pub fn sync_file(
     name: &str,
     default: &Path,
     profile: &Path,
     first: bool,
-    backup: &mut Backup,
+    backups: &mut Backups,
 ) -> Result<Change, String> {
     let fail = |what: &str| problem(name, what);
     let ours = load(default, MAX_FILE_BYTES).map_err(fail)?;
@@ -183,13 +253,14 @@ pub fn sync_file(
         (Some(ours), Some(theirs)) => {
             // A tie goes to the default home.
             if first || ours.modified >= theirs.modified {
-                if first {
-                    let slot = backup.slot(name).map_err(|_| fail(ACCESS_FAILED))?;
-                    copy_to(&slot, &theirs).map_err(fail)?;
-                }
+                // Checked before the backup, so a refused write leaves no backup behind.
+                writable(profile).map_err(fail)?;
+                backups.profile.keep(name, &theirs).map_err(fail)?;
                 copy_to(profile, &ours).map_err(fail)?;
                 Ok(to_profile)
             } else {
+                writable(default).map_err(fail)?;
+                backups.default.keep(name, &ours).map_err(fail)?;
                 copy_to(default, &theirs).map_err(fail)?;
                 Ok(to_default)
             }

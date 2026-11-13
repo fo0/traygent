@@ -16,7 +16,7 @@ fn the_sync_before_a_start_warns_and_only_a_blocked_profile_directory_stops_it()
         TempDir::new("home-sync"),
     );
     let (mut service, homes) = hosted(&state, &home);
-    let linker = system_linker(&crate::detect::Host::current());
+    let linker: Box<dyn crate::profiles::Linker> = Box::new(crate::testing::TestLinker);
     let local = |profile: Option<&str>| request(AgentId::Claude, EnvId::Local, profile);
     let dir = |id: &str| std::path::PathBuf::from(homes.dir(AgentId::Claude, id).unwrap());
     std::fs::create_dir_all(dir("default")).unwrap();
@@ -56,10 +56,14 @@ fn the_sync_before_a_start_warns_and_only_a_blocked_profile_directory_stops_it()
         .sync_for_launch(&local(None), linker.as_ref(), at(2))
         .unwrap()
         .unwrap();
+    // One sentence; the detail is each profile's `syncError`.
     assert_eq!(
         warning,
-        "Profile konnten nicht vollständig synchronisiert werden: \
-         Team: plans: ist im Standard-Profil kein Ordner; Solo: plans: ist im Standard-Profil kein Ordner"
+        "Profile konnten nicht vollständig synchronisiert werden."
+    );
+    assert_eq!(
+        status(&service.snapshot(), "team").sync_error.as_deref(),
+        Some("plans: ist im Standard-Profil kein Ordner")
     );
     let snapshot = service.snapshot();
     assert_eq!(
@@ -90,8 +94,11 @@ fn the_sync_before_a_start_warns_and_only_a_blocked_profile_directory_stops_it()
     let warning = service.sync_for_launch(&local(Some("team")), linker.as_ref(), at(5));
     assert_eq!(
         warning.unwrap().unwrap(),
-        "Profile konnten nicht vollständig synchronisiert werden: \
-         Blockiert: Profilordner konnte nicht angelegt werden"
+        "Profile konnten nicht vollständig synchronisiert werden."
+    );
+    assert_eq!(
+        status(&service.snapshot(), "blocked").sync_error.as_deref(),
+        Some("Profilordner konnte nicht angelegt werden")
     );
     // A removed profile leaves its directory on disk and no status behind.
     let mut settings = service.settings().clone();
@@ -121,7 +128,7 @@ fn nothing_is_synced_without_an_extra_profile_or_for_another_agent() {
     let mut service = Service::open(&state.0);
     let homes = crate::profiles::Homes::new(home.0.to_str().unwrap(), cfg!(windows));
     service.set_profile_homes(homes);
-    let linker = system_linker(&crate::detect::Host::current());
+    let linker: Box<dyn crate::profiles::Linker> = Box::new(crate::testing::TestLinker);
     for agent in AgentId::ALL {
         let synced =
             service.sync_for_launch(&request(agent, EnvId::Local, None), linker.as_ref(), at(1));
@@ -131,4 +138,56 @@ fn nothing_is_synced_without_an_extra_profile_or_for_another_agent() {
     assert!(home.entries().is_empty(), "nothing is created");
     assert!(service.take_startup_profile_sync());
     assert!(!service.take_startup_profile_sync());
+}
+
+/// `~/.claude-mem` and the like: an existing directory that is not Claude Code's is never
+/// adopted, and no session starts in it.
+#[test]
+fn a_foreign_directory_is_not_adopted_and_its_profile_does_not_start() {
+    let (state, home) = (
+        TempDir::new("service-profiles-foreign"),
+        TempDir::new("home-foreign"),
+    );
+    let mut service = Service::open(&state.0);
+    let homes = crate::profiles::Homes::new(home.0.to_str().unwrap(), cfg!(windows)).unwrap();
+    service.set_profile_homes(Some(homes.clone()));
+    let mut settings = with_profiles(&[("mem", "Mem"), ("team", "Team")]);
+    settings.agent_profile.claude = "team".into();
+    service.save_settings(settings).unwrap();
+    let foreign = std::path::PathBuf::from(homes.dir(AgentId::Claude, "mem").unwrap());
+    std::fs::create_dir_all(foreign.join("skills")).unwrap();
+    std::fs::write(foreign.join("skills/notes.md"), "someone else's").unwrap();
+    std::fs::write(foreign.join("settings.json"), "theirs").unwrap();
+    let linker = crate::testing::TestLinker;
+    let local = |profile: &str| request(AgentId::Claude, EnvId::Local, Some(profile));
+    assert_eq!(
+        service.sync_for_launch(&local("mem"), &linker, at(1)),
+        Err("Der Profilordner gehört nicht zu Claude Code.".into())
+    );
+    // Another profile starts, with the warning; the foreign directory is as it was.
+    assert_eq!(
+        service.sync_for_launch(&local("team"), &linker, at(2)),
+        Ok(Some(
+            "Profile konnten nicht vollständig synchronisiert werden.".into()
+        ))
+    );
+    let snapshot = service.snapshot();
+    let mem = snapshot.profiles.iter().find(|p| p.id == "mem").unwrap();
+    assert_eq!(
+        mem.sync_error.as_deref(),
+        Some("Profilordner gehört nicht zu Claude Code")
+    );
+    let mut names: Vec<_> = std::fs::read_dir(&foreign)
+        .unwrap()
+        .map(|entry| entry.unwrap().file_name().into_string().unwrap())
+        .collect();
+    names.sort();
+    assert_eq!(names, ["settings.json", "skills"]);
+    assert!(foreign.join("skills").symlink_metadata().unwrap().is_dir());
+    assert_eq!(
+        std::fs::read_to_string(foreign.join("settings.json")).unwrap(),
+        "theirs"
+    );
+    let default = std::path::PathBuf::from(homes.dir(AgentId::Claude, "default").unwrap());
+    assert!(!default.join("skills/notes.md").exists());
 }

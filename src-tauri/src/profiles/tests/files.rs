@@ -1,47 +1,13 @@
 //! The synced files, the history, the state file's shared keys and what is never touched.
 use super::*;
 use crate::profiles::history::union;
-use crate::profiles::json::{merge_keys, NotJson};
-use serde_json::{json, Value};
-
-const DEFAULT_STATE: &str = r#"{
-  "numStartups": 5,
-  "oauthAccount": {
-    "emailAddress": "max@example.test"
-  },
-  "mcpServers": {
-    "docs": {
-      "command": "docs-mcp"
-    }
-  },
-  "projects": {
-    "C:/Code/demo": {
-      "hasTrustDialogAccepted": true
-    }
-  }
-}
-"#;
-const TEAM_STATE: &str = r#"{
-  "installMethod": "native",
-  "oauthAccount": {
-    "emailAddress": "team@example.test",
-    "organizationName": "Team GmbH"
-  },
-  "mcpServers": {},
-  "bigNumber": 12345678901234567890.5000,
-  "numStartups": 1
-}
-"#;
-
-fn parsed(path: &Path) -> Value {
-    serde_json::from_str(&read(path)).unwrap()
-}
 
 #[test]
 fn the_first_sync_takes_the_default_homes_files_and_backs_the_profiles_up() {
     let world = World::new("profiles-first");
     let (ours, theirs) = (world.dir("default"), world.dir("team"));
     write(&ours.join("settings.json"), r#"{"theme":"dark"}"#);
+    own(&world, "team");
     write(&theirs.join("settings.json"), r#"{"theme":"light"}"#);
     write(&ours.join("CLAUDE.md"), "same");
     write(&theirs.join("CLAUDE.md"), "same");
@@ -81,8 +47,9 @@ fn later_the_newer_file_wins_in_either_direction() {
     assert_eq!(read(&theirs.join("settings.json")), "team edit");
     assert_eq!(read(&ours.join("CLAUDE.md")), "default edit");
     assert_eq!(read(&theirs.join("CLAUDE.md")), "default edit");
-    // Later syncs replace without a backup.
-    assert!(!theirs.join(super::super::files::BACKUP_DIR).exists());
+    // Whatever was replaced is in the backup of the home it was in.
+    assert_eq!(read(&world.backup("default").join("settings.json")), "v1");
+    assert_eq!(read(&world.backup("team").join("CLAUDE.md")), "v1");
     // A file deleted on one side comes back from the other.
     std::fs::remove_file(ours.join("CLAUDE.md")).unwrap();
     world.synced(&["team"], 3);
@@ -140,148 +107,88 @@ fn history_lines_are_united_in_timestamp_order_without_duplicates() {
     );
     write(&ours_file, &ours);
     write(&theirs_file, &theirs);
+    own(&world, "team");
     world.synced(&["team"], 1);
     assert_eq!(read(&ours_file), merged);
     assert_eq!(read(&theirs_file), merged);
     // Only one side has a history: the other gets it.
     let solo = World::new("profiles-history-solo");
     write(&solo.dir("team").join("history.jsonl"), &ours);
+    own(&solo, "team");
     solo.synced(&["team"], 1);
     assert_eq!(read(&solo.dir("default").join("history.jsonl")), ours);
 }
 
+/// A rule that failed has not had its first sync: the default home still wins the next
+/// time, and what loses is backed up — on either side, first sync or not.
 #[test]
-fn only_the_shared_keys_of_the_state_file_travel() {
-    let world = World::new("profiles-state");
-    write(&world.state("default"), DEFAULT_STATE);
-    write(&world.state("team"), TEAM_STATE);
-    // First sync: from the default home, even though the profile's file is newer.
-    touch(&world.state("default"), 10);
-    touch(&world.state("team"), 500);
-    world.synced(&["team"], 1);
-    assert_eq!(
-        read(&world.state("default")),
-        DEFAULT_STATE,
-        "the source is not written"
+fn a_failed_rule_stays_a_first_sync_and_every_loser_is_backed_up() {
+    let world = World::new("profiles-first-failed");
+    let (ours, theirs) = (world.dir("default"), world.dir("team"));
+    write(&ours.join("CLAUDE.md"), "default rules");
+    write(&ours.join("settings.json"), "default settings");
+    own(&world, "team");
+    // Something no rule can write to: a directory where the profile's file belongs.
+    write(&theirs.join("CLAUDE.md/inner"), "x");
+    let reports = world.sync(&["team"], 1);
+    assert_eq!(reports[0].errors, ["CLAUDE.md: ist keine Datei"]);
+    let marker = read_marker(&theirs).unwrap();
+    assert_eq!(marker.synced_at, None);
+    assert!(
+        !marker.done.iter().any(|rule| rule == "CLAUDE.md"),
+        "{:?}",
+        marker.done
     );
-    let team = read(&world.state("team"));
-    let value: Value = serde_json::from_str(&team).unwrap();
-    let default_value: Value = serde_json::from_str(DEFAULT_STATE).unwrap();
-    assert_eq!(value["mcpServers"], default_value["mcpServers"]);
-    assert_eq!(value["projects"], default_value["projects"]);
-    // Identity and everything else stay the profile's own.
-    assert_eq!(value["oauthAccount"]["emailAddress"], "team@example.test");
-    assert_eq!(value["oauthAccount"]["organizationName"], "Team GmbH");
-    assert_eq!(value["numStartups"], 1);
-    assert_eq!(value["installMethod"], "native");
-    // Untouched values keep their text, the keys their order; a new key goes last.
-    assert!(team.contains("\"bigNumber\": 12345678901234567890.5000,"));
-    let order: Vec<usize> = [
-        "installMethod",
-        "oauthAccount",
-        "mcpServers",
-        "bigNumber",
-        "numStartups",
-        "projects",
-    ]
-    .iter()
-    .map(|key| team.find(&format!("\n  \"{key}\":")).unwrap())
-    .collect();
-    assert!(order.windows(2).all(|pair| pair[0] < pair[1]), "{team}");
-    assert!(team.ends_with("}\n"));
-
-    // Later the newer file is the source: a server added in the profile reaches the default.
-    let mut edited: Value = serde_json::from_str(&team).unwrap();
-    edited["mcpServers"]["tickets"] = json!({ "command": "tickets-mcp" });
-    write(
-        &world.state("team"),
-        &serde_json::to_string_pretty(&edited).unwrap(),
-    );
-    touch(&world.state("default"), 600);
-    touch(&world.state("team"), 700);
+    assert!(marker.done.iter().any(|rule| rule == "settings.json"));
+    // The profile now has a real, newer file. Newest-wins would replace the default home's
+    // rules; the rule's first sync is still due, so the default home wins.
+    std::fs::remove_dir_all(theirs.join("CLAUDE.md")).unwrap();
+    write(&theirs.join("CLAUDE.md"), "team rules");
+    touch(&ours.join("CLAUDE.md"), 10);
+    touch(&theirs.join("CLAUDE.md"), 900);
     world.synced(&["team"], 2);
-    let ours = parsed(&world.state("default"));
-    assert_eq!(ours["mcpServers"]["tickets"]["command"], "tickets-mcp");
-    assert_eq!(ours["oauthAccount"]["emailAddress"], "max@example.test");
-    assert_eq!(ours["numStartups"], 5);
+    assert_eq!(read(&ours.join("CLAUDE.md")), "default rules");
+    assert_eq!(read(&theirs.join("CLAUDE.md")), "default rules");
+    assert_eq!(read(&world.backup("team").join("CLAUDE.md")), "team rules");
+    assert!(read_marker(&theirs)
+        .unwrap()
+        .done
+        .iter()
+        .any(|rule| rule == "CLAUDE.md"));
+    // From now on the newer file wins — and the default home's loser is kept in its backup.
+    write(&theirs.join("settings.json"), "team settings");
+    touch(&ours.join("settings.json"), 10);
+    touch(&theirs.join("settings.json"), 900);
+    world.synced(&["team"], 3);
+    assert_eq!(read(&ours.join("settings.json")), "team settings");
     assert_eq!(
-        parsed(&world.state("team"))["oauthAccount"]["emailAddress"],
-        "team@example.test"
+        read(&world.backup("default").join("settings.json")),
+        "default settings"
     );
 }
 
+/// The CLI appends to its files while a session runs: what arrived since a file was read
+/// is never replaced by a merge of the older read.
 #[test]
-fn key_merges_keep_what_the_source_lacks_and_ignore_formatting() {
-    let keys = ["mcpServers", "projects"];
-    // A key the source lacks stays as the target has it.
-    let merged = merge_keys(
-        br#"{"mcpServers":{"a":1}}"#,
-        Some(br#"{"projects":{"p":1},"x":true}"#),
-        &keys,
-    )
-    .unwrap()
-    .unwrap();
-    assert_eq!(
-        String::from_utf8(merged).unwrap(),
-        r#"{"projects":{"p":1},"x":true,"mcpServers":{"a":1}}"#
-    );
-    // The same values in another layout are no change.
-    let same = merge_keys(
-        b"{\"mcpServers\": {\"a\": 1,\n \"b\": [1, 2]}}",
-        Some(br#"{"mcpServers":{"b":[1,2],"a":1},"id":"keep"}"#),
-        &keys,
-    );
-    assert_eq!(same, Ok(None));
-    assert_eq!(merge_keys(b"{}", Some(b"{}"), &keys), Ok(None));
-    // A profile without a state file gets one with the shared keys only.
-    let created = merge_keys(
-        br#"{"mcpServers":{"a":1},"oauthAccount":{"emailAddress":"max@example.test"}}"#,
-        None,
-        &keys,
-    )
-    .unwrap()
-    .unwrap();
-    assert_eq!(
-        String::from_utf8(created).unwrap(),
-        "{\n  \"mcpServers\": {\"a\":1}\n}"
-    );
-    // Anything that is no JSON object stops the merge.
-    for broken in ["", "{ nope", "[1]", "null", "{\"a\":1} trailing"] {
-        assert_eq!(
-            merge_keys(broken.as_bytes(), Some(b"{}"), &keys),
-            Err(NotJson),
-            "{broken}"
-        );
-        assert_eq!(
-            merge_keys(b"{\"mcpServers\":{}}", Some(broken.as_bytes()), &keys),
-            Err(NotJson)
-        );
-    }
-}
-
-#[test]
-fn an_unparsable_state_file_is_never_overwritten() {
-    for broken_side in ["default", "team"] {
-        let world = World::new("profiles-broken");
-        write(&world.state("default"), DEFAULT_STATE);
-        write(&world.state("team"), TEAM_STATE);
-        write(&world.state(broken_side), "{ \"mcpServers\": ");
-        let other = if broken_side == "default" {
-            "team"
-        } else {
-            "default"
-        };
-        let before = read(&world.state(other));
-        let reports = world.sync(&["team"], 1);
-        assert_eq!(
-            reports[0].errors,
-            [".claude.json: ist kein lesbares JSON und bleibt unverändert"]
-        );
-        assert_eq!(read(&world.state(broken_side)), "{ \"mcpServers\": ");
-        assert_eq!(read(&world.state(other)), before);
-        // The rest of the profile is synced.
-        assert!(world.dir("team").join("skills").exists());
-    }
+fn a_file_that_changed_since_it_was_read_is_noticed() {
+    use crate::profiles::files::{load, unchanged};
+    let world = World::new("profiles-meanwhile");
+    let file = world.dir("default").join("history.jsonl");
+    assert!(unchanged(&file, None));
+    write(&file, "{\"timestamp\":1}\n");
+    assert!(!unchanged(&file, None), "it appeared");
+    touch(&file, 10);
+    let seen = load(&file, 1024).unwrap();
+    assert!(unchanged(&file, seen.as_ref()));
+    // A line appended (other size) or a rewrite of the same size (other time).
+    write(&file, "{\"timestamp\":1}\n{\"timestamp\":2}\n");
+    touch(&file, 10);
+    assert!(!unchanged(&file, seen.as_ref()));
+    write(&file, "{\"timestamp\":7}\n");
+    touch(&file, 11);
+    assert!(!unchanged(&file, seen.as_ref()));
+    std::fs::remove_file(&file).unwrap();
+    assert!(!unchanged(&file, seen.as_ref()));
 }
 
 #[test]

@@ -1,5 +1,7 @@
 //! The line-based history of a profile pair: both files end as the union of their lines.
-use super::files::{load, problem, write_atomic, Change};
+use super::files::{
+    bytes, load, problem, unchanged, write_atomic, Change, Loaded, CHANGED_MEANWHILE,
+};
 use std::collections::HashSet;
 use std::path::Path;
 
@@ -62,30 +64,35 @@ pub fn union<'a>(first: &'a [u8], second: &'a [u8]) -> Vec<u8> {
     out
 }
 
-/// Writes the union to each side whose content differs from it.
+/// Writes the union to each side whose content differs from it. A side a session wrote to
+/// since it was read is skipped with a note — the line it appended must not be lost — and
+/// merged by the next sync.
 pub fn sync_history(name: &str, default: &Path, profile: &Path) -> Result<Change, String> {
     let fail = |what: &str| problem(name, what);
     let ours = load(default, MAX_HISTORY_BYTES).map_err(fail)?;
     let theirs = load(profile, MAX_HISTORY_BYTES).map_err(fail)?;
-    if ours.is_none() && theirs.is_none() {
-        return Ok(Change::default());
-    }
-    let bytes = |side: &Option<super::files::Loaded>| {
-        side.as_ref()
-            .map(|loaded| loaded.bytes.clone())
-            .unwrap_or_default()
-    };
-    let (ours_bytes, theirs_bytes) = (bytes(&ours), bytes(&theirs));
-    let merged = union(&ours_bytes, &theirs_bytes);
+    let merged = union(
+        bytes(&ours).unwrap_or_default(),
+        bytes(&theirs).unwrap_or_default(),
+    );
     let mut change = Change::default();
+    let mut skipped = false;
     // A missing side counts as empty, so an empty union creates no file.
-    if ours_bytes != merged {
-        write_atomic(default, &merged).map_err(fail)?;
-        change.default = true;
-    }
-    if theirs_bytes != merged {
-        write_atomic(profile, &merged).map_err(fail)?;
-        change.profile = true;
+    let mut write = |path: &Path, side: &Option<Loaded>| -> Result<bool, String> {
+        if bytes(side).unwrap_or_default() == merged {
+            return Ok(false);
+        }
+        if !unchanged(path, side.as_ref()) {
+            skipped = true;
+            return Ok(false);
+        }
+        write_atomic(path, &merged).map_err(fail)?;
+        Ok(true)
+    };
+    change.default = write(default, &ours)?;
+    change.profile = write(profile, &theirs)?;
+    if skipped {
+        return Err(fail(CHANGED_MEANWHILE));
     }
     Ok(change)
 }

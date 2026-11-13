@@ -97,8 +97,20 @@ pub fn junction_payloads(links: &[Link]) -> Vec<String> {
     payloads
 }
 
+impl JunctionLinker {
+    /// Only an absolute `powershell.exe` is ever run: a bare name would resolve against the
+    /// working directory and PATH. Without one nothing is linked and every link reports
+    /// that it could not be created.
+    pub fn runnable(&self) -> bool {
+        crate::launch::is_windows_absolute(&self.powershell)
+    }
+}
+
 impl Linker for JunctionLinker {
     fn link(&self, links: &[Link]) {
+        if !self.runnable() {
+            return;
+        }
         let args = junction_args();
         let args: Vec<&str> = args.iter().map(String::as_str).collect();
         for payload in junction_payloads(links) {
@@ -141,12 +153,10 @@ pub enum Found {
     Other,
 }
 
-/// Two existing paths that resolve to the same place.
-pub(crate) fn same_place(first: &Path, second: &Path) -> bool {
-    match (std::fs::canonicalize(first), std::fs::canonicalize(second)) {
-        (Ok(first), Ok(second)) => first == second,
-        _ => false,
-    }
+/// Whether two existing paths resolve to the same place. An error is no answer: a caller
+/// that guards a move with this must refuse, not go on.
+pub(crate) fn same_place(first: &Path, second: &Path) -> io::Result<bool> {
+    Ok(std::fs::canonicalize(first)? == std::fs::canonicalize(second)?)
 }
 
 pub fn inspect(link: &Path, target: &Path) -> io::Result<Found> {
@@ -157,7 +167,8 @@ pub fn inspect(link: &Path, target: &Path) -> io::Result<Found> {
     };
     // `is_symlink` is true for a junction too (a name-surrogate reparse point).
     Ok(if meta.file_type().is_symlink() {
-        if same_place(link, target) {
+        // A link that resolves nowhere is one that points elsewhere: it is never touched.
+        if same_place(link, target).unwrap_or(false) {
             Found::Linked
         } else {
             Found::Elsewhere
@@ -200,25 +211,67 @@ pub(crate) fn copy_missing(from: &Path, into: &Path) -> io::Result<()> {
     Ok(())
 }
 
-/// Copies to a temp name beside `dest`, keeps the file time (session lists sort by it), then
-/// renames into place.
-fn copy_new(source: &Path, dest: &Path) -> io::Result<()> {
+/// Copies to a temp name beside `dest`, keeps the file time (session lists sort by it) and
+/// the read-only flag (git pack files in `plugins`), then renames into place. The temp file
+/// is written through one handle and stays writable until it has its name, so neither the
+/// time step nor a cleanup trips over a read-only copy.
+pub(crate) fn copy_new(source: &Path, dest: &Path) -> io::Result<()> {
     let mut temp_name = std::ffi::OsString::from(".traygent-tmp-");
     temp_name.push(std::process::id().to_string());
     temp_name.push("-");
     temp_name.push(dest.file_name().unwrap_or_default());
     let temp = dest.with_file_name(temp_name);
-    let copied = std::fs::copy(source, &temp).and_then(|_| {
-        if let Ok(modified) = std::fs::metadata(source).and_then(|meta| meta.modified()) {
-            let file = std::fs::File::options().write(true).open(&temp)?;
-            let _ = file.set_modified(modified);
+    let meta = std::fs::metadata(source)?;
+    let copied = (|| {
+        let mut from = std::fs::File::open(source)?;
+        let mut into = std::fs::File::create(&temp)?;
+        io::copy(&mut from, &mut into)?;
+        // Best effort: a file system without settable times still gets the content.
+        if let Ok(modified) = meta.modified() {
+            let _ = into.set_modified(modified);
         }
+        into.sync_all()?;
+        drop(into);
         std::fs::rename(&temp, dest)
-    });
-    if copied.is_err() {
-        let _ = std::fs::remove_file(&temp);
+    })();
+    match copied {
+        Ok(()) => {
+            if meta.permissions().readonly() {
+                let _ = std::fs::set_permissions(dest, meta.permissions());
+            }
+            Ok(())
+        }
+        Err(error) => {
+            let _ = std::fs::remove_file(&temp);
+            Err(error)
+        }
     }
-    copied
+}
+
+/// A link to create and how to undo the room made for it should the link fail.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct Pending {
+    pub link: Link,
+    /// The profile's own directory, moved to this backup slot.
+    moved: Option<PathBuf>,
+    /// An empty directory was removed.
+    removed: bool,
+}
+
+impl Pending {
+    /// The link could not be created: the profile gets its own directory back, so the CLI
+    /// finds its data and the next sync starts from the same state instead of adopting (and
+    /// backing up) a directory the CLI made anew.
+    pub fn undo(&self, backup: &mut Backup) {
+        if std::fs::symlink_metadata(&self.link.link).is_ok() {
+            return;
+        }
+        if let Some(slot) = &self.moved {
+            let _ = backup.give_back(slot, &self.link.link);
+        } else if self.removed {
+            let _ = std::fs::create_dir(&self.link.link);
+        }
+    }
 }
 
 /// Makes room for the link of the shared directory `name` and says whether one is to be
@@ -230,7 +283,7 @@ pub fn prepare(
     target: &Path,
     link: &Path,
     backup: &mut Backup,
-) -> Result<Option<Link>, String> {
+) -> Result<Option<Pending>, String> {
     let fail = |what: &str| problem(name, what);
     match std::fs::metadata(target) {
         Ok(meta) if meta.is_dir() => {}
@@ -244,19 +297,23 @@ pub fn prepare(
         }
         Err(_) => return Err(fail(ACCESS_FAILED)),
     }
-    let wanted = || Link {
-        link: link.to_path_buf(),
-        target: target.to_path_buf(),
+    let wanted = |moved: Option<PathBuf>, removed: bool| Pending {
+        link: Link {
+            link: link.to_path_buf(),
+            target: target.to_path_buf(),
+        },
+        moved,
+        removed,
     };
     match inspect(link, target).map_err(|_| fail(ACCESS_FAILED))? {
         Found::Linked => Ok(None),
-        Found::Missing => Ok(Some(wanted())),
+        Found::Missing => Ok(Some(wanted(None, false))),
         Found::Elsewhere => Err(fail(ELSEWHERE)),
         Found::Other => Err(fail(NOT_A_DIR)),
         Found::Directory => {
             // The profile's directory *is* the default home's: nothing to adopt, and moving
-            // it away would empty the default home.
-            if same_place(link, target) {
+            // it away would empty the default home. No answer is a refusal too.
+            if same_place(link, target).map_err(|_| fail(ACCESS_FAILED))? {
                 return Err(fail(ELSEWHERE));
             }
             let empty = std::fs::read_dir(link)
@@ -265,12 +322,12 @@ pub fn prepare(
             if empty {
                 // `remove_dir` only ever removes an empty directory.
                 std::fs::remove_dir(link).map_err(|_| fail(ACCESS_FAILED))?;
-                return Ok(Some(wanted()));
+                return Ok(Some(wanted(None, true)));
             }
             copy_missing(link, target).map_err(|_| fail(ADOPT_FAILED))?;
             let slot = backup.slot(name).map_err(|_| fail(ADOPT_FAILED))?;
-            std::fs::rename(link, slot).map_err(|_| fail(ADOPT_FAILED))?;
-            Ok(Some(wanted()))
+            std::fs::rename(link, &slot).map_err(|_| fail(ADOPT_FAILED))?;
+            Ok(Some(wanted(Some(slot), false)))
         }
     }
 }

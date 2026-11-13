@@ -4,7 +4,6 @@ use super::*;
 use crate::detect::Fs;
 use crate::launch::tests::script;
 use crate::models::{AgentProfile, AppSettings, LaunchOptions, SessionMode, Snapshot, TerminalId};
-use crate::profiles::system_linker;
 use crate::testing::{windows_host, FakeFs, TempDir};
 use chrono::TimeZone;
 
@@ -276,7 +275,7 @@ fn a_docker_start_ignores_the_profile() {
         assert!(!script(&prepared.plan).contains(".claude-team"));
         let recent = service.record_launch(&prepared.request, at(1));
         assert_eq!(recent.profile, None);
-        let linker = system_linker(&host);
+        let linker: Box<dyn crate::profiles::Linker> = Box::new(crate::testing::TestLinker);
         let synced = service.sync_for_launch(&prepared.request, linker.as_ref(), at(1));
         assert_eq!(synced, Ok(None));
     }

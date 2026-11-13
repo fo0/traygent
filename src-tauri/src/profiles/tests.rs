@@ -12,8 +12,38 @@ use std::time::{Duration, SystemTime};
 
 mod files;
 mod links;
+mod state;
 
 const CLAUDE: AgentId = AgentId::Claude;
+
+pub(super) const DEFAULT_STATE: &str = r#"{
+  "numStartups": 5,
+  "oauthAccount": {
+    "emailAddress": "max@example.test"
+  },
+  "mcpServers": {
+    "docs": {
+      "command": "docs-mcp"
+    }
+  },
+  "projects": {
+    "C:/Code/demo": {
+      "hasTrustDialogAccepted": true
+    }
+  }
+}
+"#;
+pub(super) const TEAM_STATE: &str = r#"{
+  "installMethod": "native",
+  "oauthAccount": {
+    "emailAddress": "team@example.test",
+    "organizationName": "Team GmbH"
+  },
+  "mcpServers": {},
+  "bigNumber": 12345678901234567890.5000,
+  "numStartups": 1
+}
+"#;
 
 pub(super) fn at(minute: u32) -> DateTime<Utc> {
     Utc.with_ymd_and_hms(2026, 11, 13, 9, minute, 0).unwrap()
@@ -85,7 +115,13 @@ impl World {
 }
 
 pub(super) fn linker() -> Box<dyn Linker> {
-    system_linker(&crate::detect::Host::current())
+    Box::new(crate::testing::TestLinker)
+}
+
+/// Makes an existing profile directory the agent's own: without the state file, a sign-in
+/// or the marker a non-empty directory is someone else's and is not touched.
+pub(super) fn own(world: &World, id: &str) {
+    write(&world.dir(id).join(".credentials.json"), "synthetic");
 }
 
 pub(super) fn write(path: &Path, text: &str) {

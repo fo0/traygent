@@ -79,17 +79,20 @@ pub async fn save_settings(
     settings: AppSettings,
 ) -> Result<traygent_core::Snapshot, String> {
     let handle = app.clone();
-    work(app, move |service| {
+    let (plan, changed) = work(app.clone(), move |service| {
         let saved = service.save_settings(settings)?;
-        // A changed profile list is synced at once; the statuses are read anew either way.
-        if saved.profiles_changed {
-            let linker = traygent_core::profiles::system_linker(&Host::current());
-            service.sync_profiles(linker.as_ref(), chrono::Utc::now());
-        } else {
-            service.refresh_profiles();
-        }
         if saved.start_detection {
             run_detection(&handle, service);
+        }
+        Ok((service.profile_plan(), saved.profiles_changed))
+    })
+    .await?;
+    // A changed profile list is synced at once; the statuses are read anew either way.
+    // Without the service lock: the settings are saved, whatever the sync does.
+    let outcome = crate::desktop_profiles::run_plan(plan, changed).await;
+    work(app, move |service| {
+        if let Ok(outcome) = outcome {
+            service.apply_profiles(outcome);
         }
         Ok(service.snapshot())
     })
@@ -101,13 +104,24 @@ pub async fn launch_session(
     app: AppHandle,
     request: LaunchRequest,
 ) -> Result<LaunchOutcome, String> {
-    let outcome = work(app.clone(), move |service| {
+    let (prepared, plan) = work(app.clone(), move |service| {
         let host = Host::current();
         let prepared = service.prepare_launch(&request, &host, &RealFs, &service::nonce())?;
-        // Every profile of the agent is brought in line before its session starts.
-        let linker = traygent_core::profiles::system_linker(&host);
-        let warning =
-            service.sync_for_launch(&prepared.request, linker.as_ref(), chrono::Utc::now())?;
+        let plan = service.launch_sync_plan(&prepared.request);
+        Ok((prepared, plan))
+    })
+    .await?;
+    // Every profile of the agent is brought in line before its session starts — without
+    // the service lock, so the panel stays responsive during a long first adoption.
+    let synced = match plan {
+        Some(plan) => Some(crate::desktop_profiles::run_plan(plan, true).await?),
+        None => None,
+    };
+    let outcome = work(app.clone(), move |service| {
+        let warning = match synced {
+            Some(synced) => service.finish_launch_sync(&prepared.request, synced)?,
+            None => None,
+        };
         start(&prepared.plan, prepared.fallback.as_ref())?;
         let recent = service.record_launch(&prepared.request, chrono::Utc::now());
         Ok(LaunchOutcome {
