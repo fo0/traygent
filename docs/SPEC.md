@@ -359,8 +359,9 @@ Commands (Rust `#[tauri::command]`, German `Err` strings; panel calls only via `
   profile and the user profile is known, also during an agent update (a sync never runs the CLI).
   It is silent apart from each profile's `syncedAt` / `syncError`, which reach an open panel as
   a `traygent:snapshot` event; a run that broke down also waits the full interval. A tick while
-  another sync is in flight is skipped (that sync restarts the interval), so no stale plan waits
-  behind it. An agent without an extra profile is never touched. One sync runs at a time; every
+  another sync is in flight is skipped (that sync restarts the interval); a sync that starts
+  between that check and the tick's own run is waited for, and the tick then runs the plan it took
+  before. An agent without an extra profile is never touched. One sync runs at a time; every
   run's file system work happens without the service lock.
 - **Profile directory:** created when missing; a new or empty one gets the initial marker
   `{"version":1,"done":[]}` before anything is linked into it. An existing, non-empty one is
