@@ -23,9 +23,9 @@ pub struct Synced {
     /// neither succeeded nor failed.
     pub skipped: bool,
     pub error: Option<String>,
-    /// The rule went through, but had to leave a part alone: reported like an error, yet
+    /// The rule went through, but had to leave parts alone: reported like errors, yet
     /// the rule has had its sync.
-    pub partial: Option<String>,
+    pub partial: Vec<String>,
 }
 
 #[cfg(test)]

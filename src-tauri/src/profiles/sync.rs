@@ -322,7 +322,9 @@ impl Pair {
             None => {
                 self.note(Some(name), Ok(synced.change));
                 let errors = &mut self.report.errors;
-                errors.extend(synced.partial.filter(|partial| !errors.contains(partial)));
+                let new = |partial: &String| !errors.contains(partial);
+                let partial: Vec<String> = synced.partial.into_iter().filter(new).collect();
+                errors.extend(partial);
             }
         }
         synced.change

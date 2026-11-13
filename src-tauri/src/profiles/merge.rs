@@ -23,6 +23,15 @@ impl SettingsRule {
     }
 }
 
+impl SettingsRule {
+    /// The objects of the settings whose children are independent of each other: `env` and
+    /// the parents of the set lists (`permissions`, `autoMode`).
+    pub fn containers(&self) -> Vec<&'static str> {
+        let parents = self.set_paths.iter().map(|path| path.trim_end_matches('.'));
+        [self.env_key].into_iter().chain(parents).collect()
+    }
+}
+
 /// Whether a list of strings at `path` (keys joined with `.`) is a set: it lies below one
 /// of the `set_paths` prefixes.
 fn is_set(set_paths: &[&str], path: &str) -> bool {
@@ -131,6 +140,9 @@ pub struct Merge<'a> {
     pub conflicts: Vec<String>,
     /// The base is another profile's ([`Merge::seeded`]).
     seeded: bool,
+    /// Seeded only: the objects (by path, besides the top level) whose children are
+    /// independent of each other. Any other object is one unit.
+    containers: &'a [&'a str],
 }
 
 impl<'a> Merge<'a> {
@@ -140,20 +152,32 @@ impl<'a> Merge<'a> {
             prefer_a,
             conflicts: Vec::new(),
             seeded: false,
+            containers: &[],
         }
     }
 
     /// For a pair that has no base of its own: the base is the one of another profile of
     /// the agent and `a`, the default home, wins. The base then only tells what the default
-    /// home has removed: of what `b` still has and `a` lacks, exactly the part the base
-    /// knows goes ([`Merge::unknown`]) — what the base never saw is `b`'s own and stays.
-    /// Everything else is united as without a base, so a value `b` holds from an older
-    /// state never replaces the default home's.
-    pub fn seeded(set_paths: &'a [&'a str]) -> Self {
+    /// home has removed — of what `b` still has and `a` lacks ([`Merge::unknown`]):
+    /// - inside a container (the top level and `containers`: objects whose children are
+    ///   independent, like the settings' `env` or the state file's `projects`) each child
+    ///   is looked at on its own, a set list item by item;
+    /// - anything else — an object that is one unit (`statusLine`, an MCP server, a
+    ///   project entry), a plain value — goes when it is exactly what the base knows and
+    ///   stays whole when `b` changed it. Nothing is ever reduced to a fragment.
+    ///
+    /// What the base never saw is `b`'s own and stays. Everything else is united as without
+    /// a base, so a value `b` holds from an older state never replaces the default home's.
+    pub fn seeded(set_paths: &'a [&'a str], containers: &'a [&'a str]) -> Self {
         Self {
             seeded: true,
+            containers,
             ..Self::new(set_paths, true)
         }
+    }
+
+    fn is_container(&self, path: &str) -> bool {
+        path.is_empty() || self.containers.contains(&path)
     }
 
     /// The shared parts of both sides merged. `base`: the shared part as of the last sync;
@@ -169,13 +193,17 @@ impl<'a> Merge<'a> {
     }
 
     fn value(&mut self, base: Option<&Node>, a: &Node, b: &Node, path: &str) -> Node {
-        if a == b || (!self.seeded && base == Some(b)) {
+        // `b` as the base knows it has changed nothing: `a`'s value, also against a seed.
+        if a == b || base == Some(b) {
             return a.clone();
         }
         if !self.seeded && base == Some(a) {
             return b.clone();
         }
         if let (Node::Object(a), Node::Object(b)) = (a, b) {
+            // A seed says nothing about the inside of an object that is one unit: both
+            // sides' fields are united there.
+            let base = base.filter(|_| !self.seeded || self.is_container(path));
             return Node::Object(self.entries(base, a, b, path));
         }
         if let (Some(a), Some(b), true) =
@@ -221,12 +249,14 @@ impl<'a> Merge<'a> {
         merged
     }
 
-    /// What is left of `value` — something only `b` has — without the part the seed knows
-    /// (the default home removed that): two objects are compared key by key, two sets item
-    /// by item, and a parent goes only when nothing of it is left. Any other value goes when
-    /// it is the seed's and stays when `b` changed it.
+    /// What is left of `value` — something only `b` has — without what the seed knows (the
+    /// default home removed that). Inside a container child by child, the container going
+    /// only when nothing of it is left; a set list item by item; anything else goes when
+    /// it is the seed's very value and stays whole when `b` changed it.
     fn unknown(&self, seed: &Node, value: &Node, path: &str) -> Option<Node> {
-        if let (Node::Object(seed), Node::Object(entries)) = (seed, value) {
+        if let (Node::Object(seed), Node::Object(entries), true) =
+            (seed, value, self.is_container(path))
+        {
             let seed = index(seed);
             let left: Entries = entries
                 .iter()
@@ -276,11 +306,12 @@ pub struct Merged {
 
 /// The shared parts of the default home (`a`) and a profile (`b`) merged: against the
 /// pair's own `base` when it has one — the side with the newer file (`a_newer`) then wins a
-/// conflict; else against the `seed` of another profile ([`Merge::seeded`]), the default
+/// conflict; else against the `seed` of another profile ([`Merge::seeded`], with its
+/// `containers`), the default
 /// home winning; else without a base, nothing removed, `a_newer` deciding again. The caller
 /// passes `a_newer` as true for a rule's first sync: the default home wins it.
 pub fn merge_pair(
-    set_paths: &[&str],
+    (set_paths, containers): (&[&str], &[&str]),
     base: Option<&[(String, Node)]>,
     seed: Option<&[(String, Node)]>,
     [a, b]: [&[(String, Node)]; 2],
@@ -288,7 +319,7 @@ pub fn merge_pair(
 ) -> Merged {
     let (mut merge, base) = match (base, seed) {
         (Some(base), _) => (Merge::new(set_paths, a_newer), Some(base)),
-        (None, Some(seed)) => (Merge::seeded(set_paths), Some(seed)),
+        (None, Some(seed)) => (Merge::seeded(set_paths, containers), Some(seed)),
         (None, None) => (Merge::new(set_paths, a_newer), None),
     };
     let shared = merge.objects(base, a, b);

@@ -291,7 +291,9 @@ pub fn merge_keys(
                 Known::Seed(seed) => (None, Some(without_resets(seed, [sides[0]; 2], shared))),
             };
             let pair = [ours.shared.as_slice(), theirs.shared.as_slice()];
-            let merged = merge_pair(&[], base.as_deref(), seed.as_deref(), pair, default_newer);
+            // Against a seed an entry is one unit; the keys that hold entries are containers.
+            let how: (&[&str], &[&str]) = (&[], shared.entries);
+            let merged = merge_pair(how, base.as_deref(), seed.as_deref(), pair, default_newer);
             let lost = [
                 merged.conflict && !merged.a_wins,
                 merged.conflict && merged.a_wins,
@@ -376,10 +378,8 @@ pub fn sync_state(
             return synced;
         }
     };
-    let odd = merged.skipped.first().map(|key| {
-        let what = format!("„{key}“ ist kein Objekt und bleibt unverändert");
-        fail(&what)
-    });
+    let odd = |key: &String| fail(&format!("„{key}“ ist kein Objekt und bleibt unverändert"));
+    let odd: Vec<String> = merged.skipped.iter().map(odd).collect();
     let outs = [
         Out {
             path: default,
@@ -403,6 +403,8 @@ pub fn sync_state(
         &mut synced.change,
     );
     synced.error = done.err().map(fail);
-    synced.partial = odd.filter(|_| synced.error.is_none());
+    if synced.error.is_none() {
+        synced.partial = odd;
+    }
     synced
 }

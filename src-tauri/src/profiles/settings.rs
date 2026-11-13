@@ -153,7 +153,9 @@ fn run(
             // The default home wins a first sync; later the newer file does, with or
             // without a base (a profile synced by a version from before the base).
             let newer = first || modified(&ours.seen) >= modified(&theirs.seen);
-            let merged = merge_pair(rule.set_paths, base, seed, [&a.shared, &b.shared], newer);
+            let how = (rule.set_paths, rule.containers());
+            let how = (how.0, how.1.as_slice());
+            let merged = merge_pair(how, base, seed, [&a.shared, &b.shared], newer);
             (default_wins, conflict) = (merged.a_wins, merged.conflict);
             merged.shared
         }
