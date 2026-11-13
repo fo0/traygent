@@ -2,6 +2,7 @@
 //! account's listing). Pure logic over a [`Transport`]; the HTTPS adapter lives in `http`.
 use super::secret::{looks_like_credential, SecretToken};
 use super::{valid_login, RepoSummary};
+use crate::repo::is_valid_name;
 use chrono::{DateTime, SecondsFormat, Utc};
 use serde::Deserialize;
 use std::collections::BTreeSet;
@@ -167,19 +168,8 @@ struct WireOwner {
     login: String,
 }
 
-/// A repository name GitHub can hold: 1–100 of `A-Za-z0-9._-`, not `.` or `..`.
-pub fn valid_repo_name(name: &str) -> bool {
-    !name.is_empty()
-        && name.len() <= 100
-        && name != "."
-        && name != ".."
-        && name
-            .bytes()
-            .all(|byte| byte.is_ascii_alphanumeric() || b"._-".contains(&byte))
-}
-
 fn summary(wire: WireRepo) -> Option<RepoSummary> {
-    if !valid_login(&wire.owner.login) || !valid_repo_name(&wire.name) {
+    if !valid_login(&wire.owner.login) || !is_valid_name(&wire.name) {
         return None;
     }
     let pushed_at = wire

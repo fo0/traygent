@@ -251,10 +251,10 @@ fn api_urls_stay_on_api_github_com() {
 #[test]
 fn names_follow_github_rules() {
     for good in ["a", "repo.name", "my_repo-2", &"x".repeat(100)] {
-        assert!(valid_repo_name(good), "{good}");
+        assert!(is_valid_name(good), "{good}");
     }
     for bad in ["", ".", "..", "a/b", "a b", &"x".repeat(101)] {
-        assert!(!valid_repo_name(bad), "{bad}");
+        assert!(!is_valid_name(bad), "{bad}");
     }
 }
 
