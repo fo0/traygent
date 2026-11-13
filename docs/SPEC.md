@@ -293,7 +293,9 @@ Commands (Rust `#[tauri::command]`, German `Err` strings; panel calls only via `
   `Remove-Item Env:CLAUDE_CONFIG_DIR -ErrorAction SilentlyContinue` while the agent has at
   least one extra profile, so an inherited value cannot move the default home; without extra
   profiles there is no line. Before the spawn every profile of that agent is synced, outside
-  the service lock (plan under the lock → run → commit → spawn). A failed sync starts the
+  the service lock (plan under the lock → run → commit → spawn); right before the spawn the
+  start is checked again — the agent not updating („<Agent> wird gerade aktualisiert.“), the
+  profile still listed („Profil nicht gefunden.“). A failed or crashed sync starts the
   session anyway with `LaunchOutcome.warning` = „Profile konnten nicht vollständig
   synchronisiert werden.“ (shown after „<Agent> gestartet.“ in the warning tone; the detail
   stays in each profile's `syncError`). Only the requested profile's directory refuses the
@@ -303,9 +305,11 @@ Commands (Rust `#[tauri::command]`, German `Err` strings; panel calls only via `
   statuses), `save_settings` when `profiles` changed (otherwise a re-read), `sync_profiles` and
   a local start (that agent only). An agent without an extra profile is never touched. One sync
   runs at a time; every run's file system work happens without the service lock.
-- **Profile directory:** created when missing. An existing, non-empty one is adopted only when
-  it holds `.claude.json`, `.credentials.json` or the marker; otherwise it belongs to something
-  else (`.claude-mem`, `.claude-backup`) and nothing in it is touched: „Profilordner gehört
+- **Profile directory:** created when missing; a new or empty one gets the initial marker
+  `{"version":1,"done":[]}` before anything is linked into it. An existing, non-empty one is
+  adopted only when it holds `.claude.json`, `.credentials.json` or the marker, or nothing
+  but links into „Standard“'s shared directories (a sync stopped before its marker);
+  otherwise it belongs to something else (`.claude-mem`, `.claude-backup`) and nothing in it is touched: „Profilordner gehört
   nicht zu Claude Code“. One that resolves to „Standard“'s: „Profilordner ist der Ordner des
   Standard-Profils“; a comparison without an answer: „Profilordner konnte nicht geprüft
   werden“; a file in its place or a failed create: „Profilordner konnte nicht angelegt
@@ -340,22 +344,32 @@ Commands (Rust `#[tauri::command]`, German `Err` strings; panel calls only via `
      A side whose size or file time changed since the read is not written („history.jsonl:
      wurde gerade geändert, nächster Versuch beim nächsten Abgleich“), so a line a session
      just appended survives; over 64 MiB left alone. No backup: nothing is lost.
-  4. `.claude.json`: the keys `mcpServers` and `projects` are united entry by entry — an entry
-     one file lacks is added to it, a differing entry is taken from the winner („Standard“
-     until the rule's first sync succeeded and on a tie, later the newer file); a value that
-     is no object counts as one entry; entries are compared as values. Every other key keeps
+  4. `.claude.json`: the keys `mcpServers` and `projects` are merged entry by entry against
+     the marker's `base` (the entry names both files held after the rule's last successful
+     sync). Per name: in `base` and missing on one side → removed on the other too (the
+     removal wins, whatever the other side changed); not in `base` → an addition, copied to
+     the side that lacks it; on both and different → taken from the winner („Standard“ until
+     the rule's first sync succeeded and on a tie, later the newer file). Without a `base`
+     (first sync, an older marker) the keys are united, nothing removed, and the `base` is
+     recorded. A removal needs both files to exist with the key as an object; a value that is
+     no object counts as one entry; entries are compared as values. A key with more than
+     2000 entries or 256 KiB of names keeps no `base` (united, no removals). Reset guard: a
+     `base` of 2 or more names of which one side holds none counts as a reset — that run
+     unites without removals. Every other key keeps
      its bytes and place, the layout (indent, line ends) is kept; a missing file is created
      with the shared keys only. Everything is checked before the first write: unparsable →
      „.claude.json: ist kein lesbares JSON und bleibt unverändert“; a link →
      „.claude.json: ist eine Verknüpfung und wird nicht überschrieben“; changed since the read
      → „.claude.json: wurde gerade geändert, nächster Versuch beim nächsten Abgleich“
-     (neither side written). Each side rewritten during the rule's first sync is backed up
-     first; over 64 MiB left alone.
+     (neither side written). A side rewritten during the rule's first sync, or one that loses
+     entries through a removal, is copied to its own home's backup first; over 64 MiB left
+     alone.
   5. When one profile changed „Standard“ and there are several, steps 2–4 run once more, so
      the change reaches the others in the same run.
-- **Marker** `<profile>\.traygent-sync.json`
-  (`{ "version": 1, "syncedAt": "<RFC 3339>", "done": ["settings.json", …, ".claude.json"] }`):
-  `done` lists the rules (the synced files and `.claude.json`) whose first sync succeeded; a
+- **Marker** `<profile>\.traygent-sync.json`, compact on one line:
+  `{"version":1,"syncedAt":"<RFC 3339>","done":["settings.json",…,".claude.json"],"base":{"mcpServers":[…],"projects":[…]}}`.
+  `base` holds entry names only (sorted, never values) as of the `.claude.json` rule's last
+  successful sync; it moves only with a successful run of that rule. `done` lists the rules (the synced files and `.claude.json`) whose first sync succeeded; a
   rule that failed stays a first sync in the next run. `syncedAt` moves only after a sync
   without errors. Written whenever it changed; an unreadable marker counts as present (all
   rules first).
@@ -376,8 +390,10 @@ Commands (Rust `#[tauri::command]`, German `Err` strings; panel calls only via `
   the profile directory and opens a terminal in `%USERPROFILE%` (else `C:\`) titled „<Agent> ·
   <Label> anmelden“ running the env line (for „Standard“ always the `Remove-Item`) and
   `& '<cli>' 'auth' 'login'`; it stays open like the install terminal. Refused: „<Agent> wird
-  gerade aktualisiert.“, „<Agent> ist nicht installiert.“, „Profil nicht gefunden.“. It does
-  not apply the foreign-directory check (BACKLOG #57). The status follows with the next
+  gerade aktualisiert.“, „<Agent> ist nicht installiert.“, „Profil nicht gefunden.“, and „Der
+  Profilordner gehört nicht zu Claude Code.“ for an existing foreign directory (the rule
+  above; also when that cannot be checked) — a sign-in never writes credentials into it. The
+  status follows with the next
   detection, sync or settings save.
 
 ## Ports (Docker sessions)
