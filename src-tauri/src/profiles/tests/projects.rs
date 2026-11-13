@@ -1,7 +1,8 @@
 //! Step 3 of #35: the directories the owner's script shared, the state file's whole-value
 //! keys and the runtime fields of a project entry, which stay with their profile.
 use super::*;
-use crate::profiles::json::{merge_keys, Shared};
+use crate::profiles::json::Shared;
+use crate::profiles::state::{merge_keys, Known};
 use serde_json::{json, Value};
 
 fn parsed(path: &Path) -> Value {
@@ -46,7 +47,7 @@ fn hooks_todos_and_the_session_environment_are_shared_directories() {
 }
 
 #[test]
-fn whole_value_keys_follow_the_winning_file_and_are_never_united() {
+fn whole_value_keys_follow_the_winning_file() {
     let rule = recipe(CLAUDE).unwrap();
     assert_eq!(
         rule.shared_values,
@@ -58,8 +59,9 @@ fn whole_value_keys_follow_the_winning_file_and_are_never_united() {
             Some(ours.as_bytes()),
             Some(theirs.as_bytes()),
             &shared,
+            // A base that knows nothing: the newer file wins.
+            Known::Values(&[]),
             default_wins,
-            None,
         )
         .unwrap();
         let value = |bytes: Option<Vec<u8>>| {
@@ -92,15 +94,6 @@ fn whole_value_keys_follow_the_winning_file_and_are_never_united() {
             (Some(json!({"claudeInChromeDefaultEnabled": true})), None)
         );
     }
-    // Even an object is one value here, not a set of entries.
-    assert_eq!(
-        merge(
-            r#"{"showSpinnerTree":{"a":1}}"#,
-            r#"{"showSpinnerTree":{"b":2}}"#,
-            true
-        ),
-        (None, Some(json!({"showSpinnerTree": {"a": 1}})))
-    );
 
     // Through the sync: the default home on the first sync, later the newer file.
     let world = World::new("profiles-whole-values");
@@ -136,7 +129,12 @@ fn project_entries_that_differ_only_in_runtime_fields_cause_no_write() {
     ] {
         assert!(own_fields.holds(name), "{name}");
     }
-    for name in ["allowedTools", "hasUnseenTeamArtifactsToo", "blast", "Last"] {
+    for name in [
+        "allowedTools",
+        "hasUnseenTeamArtifactsToo",
+        "blast",
+        "atLast",
+    ] {
         assert!(!own_fields.holds(name), "{name}");
     }
     let world = World::new("profiles-runtime-fields");

@@ -9,13 +9,15 @@ use super::files::{problem, sync_file, Backup, Backups, Change, ACCESS_FAILED};
 use super::foreign::is_foreign;
 pub use super::foreign::{foreign_dir, refuses_sign_in};
 use super::history::sync_history;
-use super::json::{sync_state, Base, Shared};
+use super::json::{Base, Shared};
 use super::links::{self, Link, Linker, Pending};
 pub use super::marker::{read_marker, Marker, MARKER};
 use super::marker::{write_marker, MARKER_VERSION};
-use super::node::Entries;
-use super::settings::{read_base, sync_settings};
+use super::node::{Entries, Node};
+use super::pair::{read_base, Synced};
+use super::settings::sync_settings;
 use super::share::Sharing;
+use super::state::{sync_state, Fallback};
 use super::status::{self, Facts, Key};
 use super::{recipe, Homes, SettingsRule};
 use crate::models::{AgentId, AgentProfile, AppSettings, PerAgent, ProfileShare, DEFAULT_PROFILE};
@@ -141,14 +143,21 @@ struct Pair {
     marker: Option<Marker>,
     /// The rules whose first sync succeeded, from the marker plus this run.
     done: Vec<String>,
-    /// The state file's entry names as of its last successful sync; `None`: unite only.
+    /// The state file's entry names from a marker written before the value base existed;
+    /// used once, then dropped.
     base: Option<Base>,
     backup: Backup,
     /// False when the directory is unusable; no rule runs then.
     usable: bool,
-    /// The settings base of another profile as of the start of the run: what a pair
-    /// without a base of its own learns the default home's removals from.
-    seed: Option<Entries>,
+    /// Per merged file, the base of another profile as of the start of the run: what a
+    /// pair without a base of its own learns the default home's removals from.
+    seeds: Vec<(&'static str, Entries)>,
+}
+
+/// Another profile's base of the file `name`, as of the start of the run.
+fn seed_of<'a>(seeds: &'a [(&'static str, Entries)], name: &str) -> Option<&'a [(String, Node)]> {
+    let found = seeds.iter().find(|(file, _)| *file == name);
+    found.map(|(_, seed)| seed.as_slice())
 }
 
 impl Pair {
@@ -224,7 +233,7 @@ impl Pair {
             dir,
             state,
             usable,
-            seed: None,
+            seeds: Vec::new(),
         }
     }
 
@@ -286,27 +295,38 @@ impl Pair {
             default: default_backup,
             profile: &mut self.backup,
         };
-        let (keys, base) = (Shared::of(recipe), self.base.as_ref());
-        let result = sync_state(
-            name,
-            default_state,
-            &self.state,
-            first,
-            &keys,
-            base,
-            &mut backups,
-        );
-        // The base moves on only with a sync that succeeded.
-        let result = result.map(|(change, base)| {
-            self.base = Some(base);
-            change
-        });
-        change.merge(self.note(Some(name), result));
+        let known = Fallback {
+            names: self.base.as_ref(),
+            seed: seed_of(&self.seeds, name),
+        };
+        let paths = [default_state, self.state.as_path()];
+        let shared = Shared::of(recipe);
+        let synced = sync_state(name, paths, &self.dir, first, &shared, known, &mut backups);
+        // With a value base recorded the marker's entry names have done their one job.
+        if synced.error.is_none() {
+            self.base = None;
+        }
+        change.merge(self.merged(name, synced));
         change.default
     }
 
-    /// The settings rule: a merge against the base kept in the profile's directory. A side
-    /// that was written counts even when a later step of the rule failed.
+    /// Notes how a merged rule went. A side that was written counts even when a later step
+    /// of the rule failed; a skipped rule has neither succeeded nor failed.
+    fn merged(&mut self, name: &str, synced: Synced) -> Change {
+        self.report.changed |= synced.change.any();
+        match synced.error {
+            Some(error) => {
+                self.note(Some(name), Err(error));
+            }
+            None if synced.skipped => {}
+            None => {
+                self.note(Some(name), Ok(synced.change));
+            }
+        }
+        synced.change
+    }
+
+    /// The settings rule: a merge against the base kept in the profile's directory.
     fn settings(
         &mut self,
         rule: &SettingsRule,
@@ -320,19 +340,12 @@ impl Pair {
             default: default_backup,
             profile: &mut self.backup,
         };
-        let seed = self.seed.as_deref();
-        let synced = sync_settings(rule, [&ours, &theirs], &self.dir, first, seed, &mut backups);
-        self.report.changed |= synced.change.any();
-        match synced.error {
-            Some(error) => {
-                self.note(Some(name), Err(error));
-            }
-            None if synced.skipped => {}
-            None => {
-                self.note(Some(name), Ok(synced.change));
-            }
-        }
-        synced.change
+        let (paths, seed) = (
+            [ours.as_path(), theirs.as_path()],
+            seed_of(&self.seeds, name),
+        );
+        let synced = sync_settings(rule, paths, &self.dir, first, seed, &mut backups);
+        self.merged(name, synced)
     }
 
     /// Writes the marker when it changed: the rules done so far, and a new `syncedAt` only
@@ -423,15 +436,17 @@ pub fn sync_agent(
         }
     }
 
-    if let Some(rule) = &recipe.settings {
-        let base = |pair: &Pair| read_base(&pair.dir, rule.file).filter(|_| pair.usable);
+    let merged_files = recipe.settings.iter().map(|rule| rule.file);
+    for name in merged_files.chain([recipe.state_file]) {
+        let base = |pair: &Pair| read_base(&pair.dir, name).filter(|_| pair.usable);
         let bases: Vec<Option<Entries>> = pairs.iter().map(base).collect();
         for (index, pair) in pairs.iter_mut().enumerate() {
             let others = bases
                 .iter()
                 .enumerate()
                 .filter(|(other, _)| *other != index);
-            pair.seed = others.flat_map(|(_, base)| base.clone()).next();
+            let seed = others.flat_map(|(_, base)| base.clone()).next();
+            pair.seeds.extend(seed.map(|seed| (name, seed)));
         }
     }
     let mut default_changed = false;

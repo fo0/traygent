@@ -15,8 +15,10 @@ pub mod links;
 pub mod marker;
 pub mod merge;
 pub mod node;
+pub mod pair;
 pub mod settings;
 pub mod share;
+pub mod state;
 pub mod status;
 pub mod sync;
 
@@ -68,8 +70,12 @@ pub struct OwnFields {
 }
 
 impl OwnFields {
+    /// Field names are compared without case.
     pub fn holds(&self, field: &str) -> bool {
-        self.names.contains(&field) || self.prefixes.iter().any(|prefix| field.starts_with(prefix))
+        let field = field.to_ascii_lowercase();
+        let named = |name: &&str| name.eq_ignore_ascii_case(&field);
+        let prefixed = |prefix: &&str| field.starts_with(&prefix.to_ascii_lowercase());
+        self.names.iter().any(named) || self.prefixes.iter().any(prefixed)
     }
 }
 

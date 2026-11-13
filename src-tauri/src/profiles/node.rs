@@ -141,10 +141,25 @@ impl Node {
         }
     }
 
-    fn print(&self, depth: usize, out: &mut String) {
+    /// The value of a raw JSON text (already valid JSON).
+    pub fn from_raw(raw: &RawValue) -> Option<Node> {
+        Node::read(raw, 0)
+    }
+
+    /// The value as text, `depth` levels inside a file written in `style`.
+    pub fn text(&self, style: &Style, depth: usize) -> String {
+        let mut out = String::new();
+        self.print(style, depth, &mut out);
+        out
+    }
+
+    fn print(&self, style: &Style, depth: usize, out: &mut String) {
+        // Without an indent everything stays on one line, as tight as the CLI writes it.
         let pad = |out: &mut String, depth: usize| {
-            out.push('\n');
-            out.push_str(&"  ".repeat(depth));
+            if let Some(indent) = style.indent {
+                out.push_str(style.newline);
+                out.push_str(&indent.repeat(depth));
+            }
         };
         match self {
             Node::Leaf(value) => out.push_str(&value.to_string()),
@@ -158,7 +173,7 @@ impl Node {
                         out.push(',');
                     }
                     pad(out, depth + 1);
-                    item.print(depth + 1, out);
+                    item.print(style, depth + 1, out);
                 }
                 pad(out, depth);
                 out.push(']');
@@ -171,8 +186,8 @@ impl Node {
                     }
                     pad(out, depth + 1);
                     out.push_str(&Value::from(key.as_str()).to_string());
-                    out.push_str(": ");
-                    value.print(depth + 1, out);
+                    out.push_str(if style.indent.is_some() { ": " } else { ":" });
+                    value.print(style, depth + 1, out);
                 }
                 pad(out, depth);
                 out.push('}');
@@ -181,10 +196,22 @@ impl Node {
     }
 }
 
+/// How a file is laid out: its indent (`None`: everything on one line) and line break.
+#[derive(Clone, Copy, Debug)]
+pub struct Style<'a> {
+    pub indent: Option<&'a str>,
+    pub newline: &'a str,
+}
+
+/// The way the CLI writes its own files.
+pub const PRETTY: Style = Style {
+    indent: Some("  "),
+    newline: "\n",
+};
+
 /// The object as a file: two-space indent and a final line break.
 pub fn to_file(entries: &[(String, Node)]) -> Vec<u8> {
-    let mut text = String::new();
-    Node::Object(entries.to_vec()).print(0, &mut text);
+    let mut text = Node::Object(entries.to_vec()).text(&PRETTY, 0);
     text.push('\n');
     text.into_bytes()
 }

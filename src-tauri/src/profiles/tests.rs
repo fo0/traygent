@@ -16,6 +16,7 @@ mod projects;
 mod settings;
 mod share;
 mod state;
+mod subset;
 
 const CLAUDE: AgentId = AgentId::Claude;
 

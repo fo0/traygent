@@ -16,13 +16,13 @@ impl SettingsRule {
                 .iter()
                 .any(|prefix| upper.starts_with(prefix))
     }
+}
 
-    /// Whether a list of strings at `path` (keys joined with `.`) is a set.
-    fn is_set(&self, path: &str) -> bool {
-        self.set_paths
-            .iter()
-            .any(|prefix| path.len() > prefix.len() && path.starts_with(prefix))
-    }
+/// Whether a list of strings at `path` (keys joined with `.`) is a set: it lies below one
+/// of the `set_paths` prefixes.
+fn is_set(set_paths: &[&str], path: &str) -> bool {
+    let below = |prefix: &&str| path.len() > prefix.len() && path.starts_with(*prefix);
+    set_paths.iter().any(below)
 }
 
 /// A settings document in two parts.
@@ -93,7 +93,7 @@ pub fn join(
 }
 
 /// `value` with the keys of every object in the order `original` has them, others after.
-fn reorder(value: Node, original: Option<&Node>) -> Node {
+pub(super) fn reorder(value: Node, original: Option<&Node>) -> Node {
     let (Node::Object(entries), Some(order)) = (&value, original.and_then(Node::as_object)) else {
         return value;
     };
@@ -118,7 +118,8 @@ fn reorder(value: Node, original: Option<&Node>) -> Node {
 
 /// A three-way merge of two sides `a` (the default home) and `b` (the profile).
 pub struct Merge<'a> {
-    rule: &'a SettingsRule,
+    /// Lists of strings below these paths are merged as sets.
+    set_paths: &'a [&'a str],
     /// Who wins where both sides changed the same value differently.
     prefer_a: bool,
     /// The paths decided that way.
@@ -128,9 +129,9 @@ pub struct Merge<'a> {
 }
 
 impl<'a> Merge<'a> {
-    pub fn new(rule: &'a SettingsRule, prefer_a: bool) -> Self {
+    pub fn new(set_paths: &'a [&'a str], prefer_a: bool) -> Self {
         Self {
-            rule,
+            set_paths,
             prefer_a,
             conflicts: Vec::new(),
             seeded: false,
@@ -142,10 +143,10 @@ impl<'a> Merge<'a> {
     /// home has removed — a key or list item `b` still has that the base knows and `a`
     /// lacks goes; everything else is united as without a base, so a value `b` holds from
     /// an older state never replaces the default home's.
-    pub fn seeded(rule: &'a SettingsRule) -> Self {
+    pub fn seeded(set_paths: &'a [&'a str]) -> Self {
         Self {
             seeded: true,
-            ..Self::new(rule, true)
+            ..Self::new(set_paths, true)
         }
     }
 
@@ -171,7 +172,9 @@ impl<'a> Merge<'a> {
         if let (Node::Object(a), Node::Object(b)) = (a, b) {
             return Node::Object(self.entries(base, a, b, path));
         }
-        if let (Some(a), Some(b), true) = (a.as_strings(), b.as_strings(), self.rule.is_set(path)) {
+        if let (Some(a), Some(b), true) =
+            (a.as_strings(), b.as_strings(), is_set(self.set_paths, path))
+        {
             return merged_set(base, &a, &b, self.seeded);
         }
         self.conflicts.push(path.to_string());
@@ -216,6 +219,38 @@ impl<'a> Merge<'a> {
             }
         }
         merged
+    }
+}
+
+/// The merge of a pair's shared parts.
+pub struct Merged {
+    pub shared: Entries,
+    /// Both sides had changed a value differently; `a_wins` says whose was taken.
+    pub conflict: bool,
+    pub a_wins: bool,
+}
+
+/// The shared parts of the default home (`a`) and a profile (`b`) merged: against the
+/// pair's own `base` when it has one — the side with the newer file (`a_newer`) then wins a
+/// conflict; else against the `seed` of another profile ([`Merge::seeded`]); else without a
+/// base. Without a base of its own the default home wins.
+pub fn merge_pair(
+    set_paths: &[&str],
+    base: Option<&[(String, Node)]>,
+    seed: Option<&[(String, Node)]>,
+    [a, b]: [&[(String, Node)]; 2],
+    a_newer: bool,
+) -> Merged {
+    let (mut merge, base) = match (base, seed) {
+        (Some(base), _) => (Merge::new(set_paths, a_newer), Some(base)),
+        (None, Some(seed)) => (Merge::seeded(set_paths), Some(seed)),
+        (None, None) => (Merge::new(set_paths, true), None),
+    };
+    let shared = merge.objects(base, a, b);
+    Merged {
+        shared,
+        conflict: !merge.conflicts.is_empty(),
+        a_wins: merge.prefer_a,
     }
 }
 

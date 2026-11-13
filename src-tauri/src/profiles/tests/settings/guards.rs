@@ -2,7 +2,7 @@
 //! shared `env` that is no object, byte order marks, number tokens, a write meanwhile.
 use super::*;
 use crate::profiles::node::{to_file, Node};
-use crate::profiles::settings::AFTER_READ;
+use crate::profiles::pair::AFTER_READ;
 
 fn object(text: &str) -> Node {
     Node::Object(Node::parse_object(text.as_bytes()).unwrap())

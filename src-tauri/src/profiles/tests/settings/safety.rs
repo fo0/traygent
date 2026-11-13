@@ -157,7 +157,7 @@ fn object(text: &str) -> Vec<(String, Node)> {
 fn the_merge_follows_the_side_that_changed() {
     let rule = recipe(CLAUDE).unwrap().settings.as_ref().unwrap();
     let merge = |base: Option<&str>, a: &str, b: &str, prefer_a: bool| {
-        let mut merge = Merge::new(rule, prefer_a);
+        let mut merge = Merge::new(rule.set_paths, prefer_a);
         let base = base.map(object);
         let merged = merge.objects(base.as_deref(), &object(a), &object(b));
         let text = String::from_utf8(crate::profiles::node::to_file(&merged)).unwrap();
