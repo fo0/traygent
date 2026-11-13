@@ -109,7 +109,7 @@ flowchart TD
     DesktopRs --> DesktopAgentUpdates
     DesktopRs --> DesktopProfiles
     IpcTs -- "Tauri IPC, camelCase JSON" --> DesktopProfiles
-    DesktopAgents -- "profile step of each detection" --> DesktopProfiles
+    DesktopAgents -- "detection step, run_plan for save and launch" --> DesktopProfiles
     DesktopProfiles -- "short lock, commit statuses" --> ServiceRs
     DesktopProfiles -- "sync or read, no lock" --> ProfilesRs
     IpcTs -- "Tauri IPC, camelCase JSON" --> DesktopAgentUpdates
