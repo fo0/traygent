@@ -181,15 +181,25 @@ describe('profiles of a snapshot', () => {
 describe('the profile of an edited recent', () => {
   it('is offered for a Lokal entry of an agent with an extra profile', () => {
     const snapshot = demoSnapshot();
-    expect(recentProfileItems(snapshot, 'claude', 'local')).toEqual([
+    const items = (
+      agent: 'claude' | 'codex',
+      env: 'local' | 'docker',
+      stored?: string,
+    ) => recentProfileItems(snapshot, agent, env, stored);
+    expect(items('claude', 'local')).toEqual([
       { id: 'default', label: 'Standard' },
       { id: 'team', label: 'Team' },
     ]);
-    expect(recentProfileItems(snapshot, 'claude', 'docker')).toEqual([]);
-    expect(recentProfileItems(snapshot, 'codex', 'local')).toEqual([]);
+    expect(items('claude', 'docker', 'team')).toEqual([]);
+    expect(items('codex', 'local')).toEqual([]);
     snapshot.settings.profiles.claude = [];
     snapshot.profiles = [];
-    expect(recentProfileItems(snapshot, 'claude', 'local')).toEqual([]);
+    expect(items('claude', 'local')).toEqual([]);
+    expect(items('claude', 'local', 'default')).toEqual([]);
+    // A profile the entry still stores keeps the field, with „Standard“ only.
+    expect(items('claude', 'local', 'team')).toEqual([
+      { id: 'default', label: 'Standard' },
+    ]);
   });
 
   it('is stored as natively: none for „Standard“ and outside Lokal', () => {

@@ -234,7 +234,7 @@ export class Panel {
     recent: RecentSession,
     options: LaunchOptions,
     ports: string[],
-    profile?: string,
+    profile: string | undefined,
   ) {
     const { id } = recent;
     this.accept(await this.#bridge.updateRecent(id, options, ports, profile));

@@ -51,7 +51,7 @@
   let ports = $state<string[]>(untrack(() => [...recent.ports]));
   /** „Standard“ first; `[]` when the entry has no profile to choose. */
   const profiles = $derived(
-    recentProfileItems(snapshot, recent.agent, recent.env),
+    recentProfileItems(snapshot, recent.agent, recent.env, recent.profile),
   );
   /** A profile no longer listed shows (and saves) as „Standard“. */
   let profile = $state(

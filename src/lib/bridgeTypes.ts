@@ -32,7 +32,7 @@ export interface Bridge {
     id: string,
     options: LaunchOptions,
     ports: string[],
-    profile?: string,
+    profile: string | undefined,
   ): Promise<Snapshot>;
   /** A folder dialog; `null` when cancelled. */
   pickFolder(initial: string | null): Promise<string | null>;

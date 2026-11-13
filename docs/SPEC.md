@@ -95,9 +95,9 @@ Brand top left: icon + „Traygent“. Window ~480×760, frameless, tray popup l
    „Ports“ popover, the folder suggestions). Hiding an environment is a display preference, not
    a ban: its recents keep their environment and ▶ restarts them unchanged. „Bearbeiten …“
    (#3) opens a staged dialog with the row's model, thinking level, permission, extra
-   arguments, (Docker) ports and (Lokal, an agent with at least one extra profile, #37)
-   „Profil“ — „Standard“ and the agent's profiles; a stored profile removed since shows as
-   „Standard“, and saving stores that. „Speichern“ stores them on the entry without a start
+   arguments, (Docker) ports and (Lokal, an agent with at least one extra profile or an entry
+   that still stores one, #37) „Profil“ — „Standard“ and the agent's profiles; a stored profile
+   removed since shows as „Standard“, and saving stores that. „Speichern“ stores them on the entry without a start
    (`update_recent`, validated like a start; the dialog also applies the npm-shim argument rule) — place, start time and count stay, the next ▶
    sends them. The profile follows the start rule (_Profiles_): absent, blank or `default`
    and every Docker entry store none, an id the agent does not list is refused („Profil nicht

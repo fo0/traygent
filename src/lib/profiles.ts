@@ -182,16 +182,20 @@ export function launchProfileProblem(
 
 /**
  * The „Profil“ choices of a recent's „Bearbeiten …“: „Standard“ and the
- * agent's profiles; none (no field) outside Lokal or without an extra one.
+ * agent's profiles; none (no field) outside Lokal, or without an extra one
+ * unless the entry still stores a profile (then just „Standard“, so the
+ * change a save makes is visible).
  */
 export function recentProfileItems(
   snapshot: Pick<Snapshot, 'catalog' | 'profiles' | 'settings'>,
   agent: AgentId,
   env: EnvId,
+  stored: string | undefined,
 ): { id: string; label: string }[] {
   if (!profilesApply(snapshot, agent, env)) return [];
   const list = agentProfiles(snapshot, agent);
-  return list.length > 1 ? list.map(({ id, label }) => ({ id, label })) : [];
+  const shown = list.length > 1 || (!!stored && stored !== DEFAULT_PROFILE);
+  return shown ? list.map(({ id, label }) => ({ id, label })) : [];
 }
 
 /**
