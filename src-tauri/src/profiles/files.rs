@@ -46,6 +46,12 @@ pub(crate) fn bytes(side: &Option<Loaded>) -> Option<&[u8]> {
     side.as_ref().map(|loaded| loaded.bytes.as_slice())
 }
 
+/// The text without a UTF-8 byte order mark (Windows PowerShell and some editors write
+/// one; a JSON parser stops at it).
+pub(crate) fn without_bom(bytes: &[u8]) -> &[u8] {
+    bytes.strip_prefix(b"\xEF\xBB\xBF").unwrap_or(bytes)
+}
+
 pub(crate) const CHANGED_MEANWHILE: &str =
     "wurde gerade geändert, nächster Versuch beim nächsten Abgleich";
 

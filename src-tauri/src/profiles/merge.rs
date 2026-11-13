@@ -123,6 +123,8 @@ pub struct Merge<'a> {
     prefer_a: bool,
     /// The paths decided that way.
     pub conflicts: Vec<String>,
+    /// The base is another profile's ([`Merge::seeded`]).
+    seeded: bool,
 }
 
 impl<'a> Merge<'a> {
@@ -131,6 +133,19 @@ impl<'a> Merge<'a> {
             rule,
             prefer_a,
             conflicts: Vec::new(),
+            seeded: false,
+        }
+    }
+
+    /// For a pair that has no base of its own: the base is the one of another profile of
+    /// the agent and `a`, the default home, wins. The base then only tells what the default
+    /// home has removed — a key or list item `b` still has that the base knows and `a`
+    /// lacks goes; everything else is united as without a base, so a value `b` holds from
+    /// an older state never replaces the default home's.
+    pub fn seeded(rule: &'a SettingsRule) -> Self {
+        Self {
+            seeded: true,
+            ..Self::new(rule, true)
         }
     }
 
@@ -147,17 +162,17 @@ impl<'a> Merge<'a> {
     }
 
     fn value(&mut self, base: Option<&Node>, a: &Node, b: &Node, path: &str) -> Node {
-        if a == b || base == Some(b) {
+        if a == b || (!self.seeded && base == Some(b)) {
             return a.clone();
         }
-        if base == Some(a) {
+        if !self.seeded && base == Some(a) {
             return b.clone();
         }
         if let (Node::Object(a), Node::Object(b)) = (a, b) {
             return Node::Object(self.entries(base, a, b, path));
         }
         if let (Some(a), Some(b), true) = (a.as_strings(), b.as_strings(), self.rule.is_set(path)) {
-            return merged_set(base, &a, &b);
+            return merged_set(base, &a, &b, self.seeded);
         }
         self.conflicts.push(path.to_string());
         if self.prefer_a { a } else { b }.clone()
@@ -187,12 +202,16 @@ impl<'a> Merge<'a> {
                     };
                     merged.push((key.clone(), self.value(was, value, other, &sub)));
                 }
-                None if was == Some(value) => {}
+                None if !self.seeded && was == Some(value) => {}
                 None => merged.push((key.clone(), value.clone())),
             }
         }
         for (key, value) in b {
-            if !in_a.contains_key(key.as_str()) && known(key) != Some(value) {
+            let removed = match known(key) {
+                Some(_) if self.seeded => true,
+                was => was == Some(value),
+            };
+            if !in_a.contains_key(key.as_str()) && !removed {
                 merged.push((key.clone(), value.clone()));
             }
         }
@@ -201,8 +220,8 @@ impl<'a> Merge<'a> {
 }
 
 /// Two lists of strings as sets: what one side added stays, what one side removed since the
-/// base goes; `a`'s order, then `b`'s new items.
-fn merged_set(base: Option<&Node>, a: &[&str], b: &[&str]) -> Node {
+/// base goes; `a`'s order, then `b`'s new items. `keep_a`: nothing of `a` goes.
+fn merged_set(base: Option<&Node>, a: &[&str], b: &[&str], keep_a: bool) -> Node {
     let base = base.and_then(Node::as_strings).unwrap_or_default();
     let in_base: HashSet<&str> = base.into_iter().collect();
     let in_a: HashSet<&str> = a.iter().copied().collect();
@@ -210,7 +229,7 @@ fn merged_set(base: Option<&Node>, a: &[&str], b: &[&str]) -> Node {
     let mut seen = HashSet::new();
     let kept = a
         .iter()
-        .filter(|item| in_b.contains(*item) || !in_base.contains(*item));
+        .filter(|item| keep_a || in_b.contains(*item) || !in_base.contains(*item));
     let added = b
         .iter()
         .filter(|item| !in_a.contains(*item) && !in_base.contains(*item));
@@ -245,6 +264,6 @@ pub fn loses(side: &Node, merged: &Node) -> bool {
         }
         (Node::Object(side), _) => !side.is_empty(),
         (Node::Array(side), _) => !side.is_empty(),
-        (Node::Leaf(_), _) => false,
+        (Node::Leaf(_) | Node::Number(_), _) => false,
     }
 }

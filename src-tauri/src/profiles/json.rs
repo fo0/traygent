@@ -2,7 +2,8 @@
 //! profiles, entry by entry. Every other key keeps its bytes and its place — identity,
 //! onboarding state and caches belong to the profile.
 use super::files::{
-    bytes, load, problem, unchanged, writable, write_atomic, Backups, Change, CHANGED_MEANWHILE,
+    bytes, load, problem, unchanged, without_bom, writable, write_atomic, Backups, Change,
+    CHANGED_MEANWHILE,
 };
 use super::{OwnFields, Recipe};
 use serde::de::{Deserializer, MapAccess, Visitor};
@@ -20,7 +21,7 @@ pub struct NotJson;
 
 /// A JSON object in file order, every value as the text it was written in.
 #[derive(Default)]
-struct Entries(Vec<(String, Box<RawValue>)>);
+pub(super) struct Entries(pub(super) Vec<(String, Box<RawValue>)>);
 
 impl<'de> serde::Deserialize<'de> for Entries {
     fn deserialize<D: Deserializer<'de>>(deserializer: D) -> Result<Self, D::Error> {
@@ -185,6 +186,8 @@ struct Layout {
     indent: Option<String>,
     newline: &'static str,
     trailing: bool,
+    /// The file starts with a byte order mark; a rewrite keeps it.
+    bom: bool,
 }
 
 impl Layout {
@@ -194,8 +197,11 @@ impl Layout {
                 indent: Some("  ".into()),
                 newline: "\n",
                 trailing: false,
+                bom: false,
             };
         };
+        let bom = text.starts_with('\u{feff}');
+        let text = text.trim_start_matches('\u{feff}');
         let body = text.trim_start().strip_prefix('{').unwrap_or("");
         let newline = if body.starts_with("\r\n") {
             "\r\n"
@@ -210,6 +216,7 @@ impl Layout {
             indent,
             newline,
             trailing: text.ends_with('\n'),
+            bom,
         }
     }
 
@@ -238,7 +245,8 @@ impl Layout {
     }
 
     fn file(&self, entries: &Entries) -> Vec<u8> {
-        let mut text = self.object(entries, 0);
+        let mut text = String::from(if self.bom { "\u{feff}" } else { "" });
+        text.push_str(&self.object(entries, 0));
         if self.trailing {
             text.push_str(self.newline);
         }
@@ -390,7 +398,7 @@ pub fn merge_keys(
     base: Option<&Base>,
 ) -> Result<Merged, NotJson> {
     let parse = |bytes: Option<&[u8]>| match bytes {
-        Some(bytes) => serde_json::from_slice::<Entries>(bytes).map_err(|_| NotJson),
+        Some(bytes) => serde_json::from_slice::<Entries>(without_bom(bytes)).map_err(|_| NotJson),
         None => Ok(Entries::default()),
     };
     let (ours, theirs) = (parse(default)?, parse(profile)?);

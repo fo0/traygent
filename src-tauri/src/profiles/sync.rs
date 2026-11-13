@@ -13,7 +13,8 @@ use super::json::{sync_state, Base, Shared};
 use super::links::{self, Link, Linker, Pending};
 pub use super::marker::{read_marker, Marker, MARKER};
 use super::marker::{write_marker, MARKER_VERSION};
-use super::settings::sync_settings;
+use super::node::Entries;
+use super::settings::{read_base, sync_settings};
 use super::share::Sharing;
 use super::status::{self, Facts, Key};
 use super::{recipe, Homes, SettingsRule};
@@ -44,9 +45,6 @@ pub struct ProfileReport {
     pub foreign: bool,
     /// The run created a link or wrote a file of the pair (the marker does not count).
     pub changed: bool,
-    /// `<file>: <path>` for every value both sides had changed differently since the last
-    /// sync; the newer file's value was taken, the other is in its side's backup.
-    pub conflicts: Vec<String>,
 }
 
 /// What to sync or read, taken from the settings under the service lock; the file system
@@ -148,6 +146,9 @@ struct Pair {
     backup: Backup,
     /// False when the directory is unusable; no rule runs then.
     usable: bool,
+    /// The settings base of another profile as of the start of the run: what a pair
+    /// without a base of its own learns the default home's removals from.
+    seed: Option<Entries>,
 }
 
 impl Pair {
@@ -223,6 +224,7 @@ impl Pair {
             dir,
             state,
             usable,
+            seed: None,
         }
     }
 
@@ -318,13 +320,8 @@ impl Pair {
             default: default_backup,
             profile: &mut self.backup,
         };
-        let synced = sync_settings(rule, &ours, &theirs, &self.dir, first, &mut backups);
-        for path in &synced.conflicts {
-            let conflict = problem(name, path);
-            if !self.report.conflicts.contains(&conflict) {
-                self.report.conflicts.push(conflict);
-            }
-        }
+        let seed = self.seed.as_deref();
+        let synced = sync_settings(rule, [&ours, &theirs], &self.dir, first, seed, &mut backups);
         self.report.changed |= synced.change.any();
         match synced.error {
             Some(error) => {
@@ -426,6 +423,17 @@ pub fn sync_agent(
         }
     }
 
+    if let Some(rule) = &recipe.settings {
+        let base = |pair: &Pair| read_base(&pair.dir, rule.file).filter(|_| pair.usable);
+        let bases: Vec<Option<Entries>> = pairs.iter().map(base).collect();
+        for (index, pair) in pairs.iter_mut().enumerate() {
+            let others = bases
+                .iter()
+                .enumerate()
+                .filter(|(other, _)| *other != index);
+            pair.seed = others.flat_map(|(_, base)| base.clone()).next();
+        }
+    }
     let mut default_changed = false;
     for pair in pairs.iter_mut().filter(|pair| pair.usable) {
         default_changed |= pair.files(&sharing, &default_dir, &default_state, &mut default_backup);

@@ -4,17 +4,18 @@
 //! exists in profile directories alone, outside every shared directory: no rule links,
 //! syncs or backs it up.
 use super::files::{
-    load, problem, unchanged, writable, write_atomic, Backups, Change, Loaded, CHANGED_MEANWHILE,
-    MAX_FILE_BYTES,
+    load, problem, unchanged, without_bom, writable, write_atomic, Backups, Change, Loaded,
+    CHANGED_MEANWHILE, MAX_FILE_BYTES,
 };
 use super::merge::{join, loses, split, Merge, Split};
-use super::node::{same_object, to_file, Entries, Node};
+use super::node::{get, index, same_object, to_file, Entries, Node};
 use super::SettingsRule;
 use std::path::Path;
 use std::time::SystemTime;
 
 pub const BASE_DIR: &str = ".traygent-base";
 const UNREADABLE: &str = "ist kein lesbares JSON-Objekt und bleibt unverändert";
+const ENV_NO_OBJECT: &str = "„env“ ist kein Objekt und bleibt unverändert";
 const BASE_FAILED: &str = "Abgleichsstand konnte nicht gespeichert werden";
 
 /// How the rule went for one pair.
@@ -22,8 +23,6 @@ const BASE_FAILED: &str = "Abgleichsstand konnte nicht gespeichert werden";
 pub struct Synced {
     /// The sides written — also when a later step failed.
     pub change: Change,
-    /// Paths both sides had changed differently; the newer file's value was taken.
-    pub conflicts: Vec<String>,
     /// A side is being written right now (an empty file): nothing was done, the rule has
     /// neither succeeded nor failed.
     pub skipped: bool,
@@ -42,7 +41,7 @@ impl<'a> Side<'a> {
     fn read(path: &'a Path, rule: &SettingsRule) -> Result<Self, &'static str> {
         let seen = load(path, MAX_FILE_BYTES)?;
         let doc = match &seen {
-            Some(loaded) if !blank(&loaded.bytes) => {
+            Some(loaded) if !blank(without_bom(&loaded.bytes)) => {
                 Some(Node::parse_object(&loaded.bytes).ok_or(UNREADABLE)?)
             }
             _ => None,
@@ -58,7 +57,8 @@ impl<'a> Side<'a> {
 
     /// A file without content: the CLI is writing it.
     fn in_flight(&self) -> bool {
-        self.seen.as_ref().is_some_and(|seen| blank(&seen.bytes))
+        let seen = self.seen.as_ref();
+        seen.is_some_and(|seen| blank(without_bom(&seen.bytes)))
     }
 
     fn modified(&self) -> SystemTime {
@@ -115,7 +115,7 @@ fn base_dir_usable(dir: &Path) -> bool {
 }
 
 /// The shared part as of the last sync; `None` when there is none that can be read.
-fn read_base(profile_dir: &Path, name: &str) -> Option<Entries> {
+pub fn read_base(profile_dir: &Path, name: &str) -> Option<Entries> {
     let dir = profile_dir.join(BASE_DIR);
     if !base_dir_usable(&dir) {
         return None;
@@ -136,30 +136,42 @@ fn write_base(profile_dir: &Path, name: &str, shared: &[(String, Node)]) -> Resu
     write_atomic(&dir.join(name), &to_file(shared)).map_err(drop)
 }
 
+/// A side that holds none of the base's keys, the base having two or more: that file was
+/// recreated or emptied, it did not remove key after key. Merging against the base would
+/// take every shared setting from the other side — and, through the default home, from
+/// every profile.
+fn reset(base: &[(String, Node)], side: &[(String, Node)]) -> bool {
+    let held = index(side);
+    base.len() >= 2 && base.iter().all(|(key, _)| !held.contains_key(key.as_str()))
+}
+
+#[cfg(test)]
+thread_local! {
+    /// Runs after both sides were read: a test's stand-in for a session writing meanwhile.
+    pub(super) static AFTER_READ: std::cell::RefCell<Option<Box<dyn Fn()>>> =
+        const { std::cell::RefCell::new(None) };
+}
+
 /// The settings file of a pair. The shared part of both sides is merged against the base
-/// of `profile_dir`; each side then is that merge plus its own keys. Until the rule's first
-/// sync succeeded (`first`) and whenever there is no base, nothing is removed and the
-/// default home wins a conflict; with a base the newer file does. A side is written only
-/// when its content (not its formatting) changes, and goes to its backup first on the first
-/// sync, when it loses a key or a list item, and when a conflict went against it. The base
-/// is written last, after both sides.
+/// of `profile_dir`; each side then is that merge plus its own keys. With a base the newer
+/// file wins a conflict. Until the rule's first sync succeeded (`first`), whenever there is
+/// no base and when a side was reset ([`reset`]), the default home wins and nothing is
+/// removed — except, for a pair without a base, what `seed` (the base of another profile of
+/// the agent) says the default home has removed already. A side is written only when its
+/// content (not its formatting) changes, and goes to its backup first on the first sync,
+/// when it loses a key or a list item, and when a conflict went against it. The base is
+/// written last, after both sides.
 pub fn sync_settings(
     rule: &SettingsRule,
-    default: &Path,
-    profile: &Path,
+    [default, profile]: [&Path; 2],
     profile_dir: &Path,
     first: bool,
+    seed: Option<&[(String, Node)]>,
     backups: &mut Backups,
 ) -> Synced {
     let mut synced = Synced::default();
-    if let Err(what) = run(
-        rule,
-        [default, profile],
-        profile_dir,
-        first,
-        backups,
-        &mut synced,
-    ) {
+    let paths = [default, profile];
+    if let Err(what) = run(rule, paths, profile_dir, first, seed, backups, &mut synced) {
         synced.error = Some(problem(rule.file, what));
     }
     synced
@@ -170,6 +182,7 @@ fn run(
     paths: [&Path; 2],
     profile_dir: &Path,
     first: bool,
+    seed: Option<&[(String, Node)]>,
     backups: &mut Backups,
     synced: &mut Synced,
 ) -> Result<(), &'static str> {
@@ -180,24 +193,48 @@ fn run(
         synced.skipped = true;
         return Ok(());
     }
+    #[cfg(test)]
+    AFTER_READ.with(|hook| hook.borrow().as_ref().map(|hook| hook()));
     let base = if first {
         None
     } else {
         read_base(profile_dir, name)
     };
-    let mut default_wins = true;
+    let (mut default_wins, mut conflict) = (true, false);
     let shared = match (&ours.parts, &theirs.parts) {
         (None, None) => return Ok(()),
         // A file that is not there has removed nothing.
         (Some(only), None) | (None, Some(only)) => only.shared.clone(),
         (Some(a), Some(b)) => {
-            default_wins = base.is_none() || ours.modified() >= theirs.modified();
-            let mut merge = Merge::new(rule, default_wins);
-            let shared = merge.objects(base.as_deref(), &a.shared, &b.shared);
-            synced.conflicts = merge.conflicts;
+            let was_reset = base
+                .as_ref()
+                .is_some_and(|base| reset(base, &a.shared) || reset(base, &b.shared));
+            let (mut merge, base) = match (&base, seed) {
+                (Some(_), _) | (None, None) if was_reset || base.is_none() => {
+                    (Merge::new(rule, true), None)
+                }
+                (Some(base), _) => {
+                    default_wins = ours.modified() >= theirs.modified();
+                    (Merge::new(rule, default_wins), Some(base.as_slice()))
+                }
+                (None, seed) => (Merge::seeded(rule), seed),
+            };
+            let shared = merge.objects(base, &a.shared, &b.shared);
+            conflict = !merge.conflicts.is_empty();
             shared
         }
     };
+    // A shared `env` that is no object cannot hold a side's own variables: writing would
+    // either drop them or record a base that side never has.
+    let own_env = |side: &Side| {
+        side.parts
+            .as_ref()
+            .is_some_and(|parts| !parts.own_env.is_empty())
+    };
+    let env = get(&shared, rule.env_key);
+    if env.is_some_and(|env| env.as_object().is_none()) && (own_env(&ours) || own_env(&theirs)) {
+        return Err(ENV_NO_OBJECT);
+    }
     let new = [ours.merged(&shared, rule), theirs.merged(&shared, rule)];
     let sides = [&ours, &theirs];
     // Everything is checked before the first write, so a refusal leaves both files alone.
@@ -207,7 +244,6 @@ fn run(
             return Err(CHANGED_MEANWHILE);
         }
     }
-    let conflict = !synced.conflicts.is_empty();
     let lost = [conflict && !default_wins, conflict && default_wins];
     let slots = [&mut *backups.default, &mut *backups.profile];
     for (((side, new), lost), slot) in sides.iter().zip(&new).zip(lost).zip(slots) {

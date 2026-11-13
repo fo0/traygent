@@ -4,6 +4,7 @@ use super::*;
 use crate::profiles::settings::BASE_DIR;
 use serde_json::{json, Value};
 
+mod guards;
 mod safety;
 
 pub(super) const FILE: &str = "settings.json";
@@ -121,6 +122,9 @@ fn force_login_org_uuid_and_env_api_key_never_cross_profiles_or_reach_the_base()
     for minute in [2, 3] {
         world.synced(&["team", "solo"], minute);
         check(&[
+            // Replaced or removed values live on in their own home's backup only.
+            ("default", "org-default-synthetic"),
+            ("team", "org-team-synthetic"),
             ("default", "key-default-synthetic"),
             ("team", "org-team-2-synthetic"),
             ("team", "helper-team-synthetic"),
@@ -152,8 +156,7 @@ fn the_first_sync_unites_and_the_default_home_wins_a_conflict() {
     // Even a newer profile file loses the first time.
     put(&world, "team", theirs.clone(), 500);
     own(&world, "team");
-    let reports = world.synced(&["team"], 1);
-    assert_eq!(reports[0].conflicts, ["settings.json: theme"]);
+    world.synced(&["team"], 1);
     let merged = json!({
         "theme": "dark",
         "permissions": {"allow": ["A", "B"]},
@@ -219,8 +222,7 @@ fn permission_lists_merge_as_sets_with_additions_and_removals() {
         100,
     );
     put(&world, "team", with(json!(["Read", "WebFetch"])), 200);
-    let reports = world.synced(&["team"], 2);
-    assert_eq!(reports[0].conflicts, Vec::<String>::new());
+    world.synced(&["team"], 2);
     let merged = with(json!(["Read", "Edit", "WebFetch"]));
     assert_eq!(parsed(&settings(&world, "default")), merged);
     assert_eq!(parsed(&settings(&world, "team")), merged);
@@ -274,12 +276,17 @@ fn a_conflict_goes_to_the_newer_file_and_the_loser_to_its_backup() {
         json!({"theme": "blue", "model": "sonnet"}),
         200,
     );
-    let reports = world.synced(&["team"], 2);
-    assert_eq!(reports[0].conflicts, ["settings.json: theme"]);
+    world.synced(&["team"], 2);
     let merged = json!({"theme": "blue", "model": "opus"});
     assert_eq!(parsed(&settings(&world, "default")), merged);
     assert_eq!(parsed(&settings(&world, "team")), merged);
     assert_eq!(parsed(&world.backup("default").join(FILE)), ours);
+    // Both files carry the time of the newest content merged into them, not of the sync.
+    let newest = SystemTime::UNIX_EPOCH + Duration::from_secs(1_700_000_200);
+    for id in ["default", "team"] {
+        let modified = std::fs::metadata(settings(&world, id)).unwrap().modified();
+        assert_eq!(modified.unwrap(), newest, "{id}");
+    }
     // The profile took a change without losing anything: no backup.
     assert!(!world.dir("team").join(".traygent-backup").exists());
     // The other direction.
@@ -291,8 +298,7 @@ fn a_conflict_goes_to_the_newer_file_and_the_loser_to_its_backup() {
     );
     let theirs = json!({"theme": "green", "model": "opus"});
     put(&world, "team", theirs.clone(), 800);
-    let reports = world.synced(&["team"], 3);
-    assert_eq!(reports[0].conflicts, ["settings.json: theme"]);
+    world.synced(&["team"], 3);
     assert_eq!(parsed(&settings(&world, "team"))["theme"], "red");
     assert_eq!(parsed(&world.backup("team").join(FILE)), theirs);
 }
@@ -416,8 +422,7 @@ fn three_profiles_reach_a_fixed_point_in_one_run() {
         json!({"theme": "dark", "permissions": allow(json!([])), "verbose": true}),
         400,
     );
-    let reports = world.synced(&ids, 2);
-    assert!(reports.iter().all(|report| report.conflicts.is_empty()));
+    world.synced(&ids, 2);
     let merged = json!({
         "permissions": allow(json!(["D", "T", "S"])),
         "model": "opus",

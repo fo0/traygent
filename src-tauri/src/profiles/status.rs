@@ -53,7 +53,9 @@ fn shown(text: Option<String>) -> Option<String> {
 fn account(state_file: &Path) -> Option<Account> {
     let small = std::fs::metadata(state_file).is_ok_and(|meta| meta.len() <= MAX_STATE_BYTES);
     let bytes = small.then(|| std::fs::read(state_file).ok()).flatten()?;
-    serde_json::from_slice::<State>(&bytes).ok()?.account
+    serde_json::from_slice::<State>(super::files::without_bom(&bytes))
+        .ok()?
+        .account
 }
 
 /// Reads one profile. The credentials file is only checked for existence and size — its
