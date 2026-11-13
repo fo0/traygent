@@ -413,10 +413,10 @@ Commands (Rust `#[tauri::command]`, German `Err` strings; panel calls only via `
      subset only. `mcpServers` or `projects` holding anything but an object on either side (e.g.
      `null`) is skipped: left as it is on both sides and kept out of the base, while the other
      keys merge and the rule counts as synced; the profile still reports „.claude.json: „<key>“
-     ist kein Objekt und bleibt unverändert“ (the first such key), so `syncedAt` does not move
-     while it stands. Errors: „.claude.json: ist kein lesbares JSON und bleibt unverändert“,
-     „.claude.json: ist zu groß“ (over 64 MiB) and those of every merged write. Upgrade: a pair without a value base whose marker still has the
-     name-only `base` of an earlier version uses it once (not on the rule's first sync) — each
+     ist kein Objekt und bleibt unverändert“ (one entry per such key), so `syncedAt` does not
+     move while it stands. Errors: „.claude.json: ist kein lesbares JSON und bleibt unverändert“,
+     „.claude.json: ist zu groß“ (over 64 MiB) and those of every merged write. Upgrade: a pair
+     without a value base whose marker still has the name-only `base` of an earlier version uses it once (not on the rule's first sync) — each
      recorded entry only one side still holds counts as removed on the other side; a key with 2
      or more recorded names of which one side holds none gets no base (reset).
   6. When one profile changed „Standard“ and there are several, steps 2–5 run once more, so the
@@ -433,11 +433,16 @@ Commands (Rust `#[tauri::command]`, German `Err` strings; panel calls only via `
   reset — nothing is removed, and a rule already in `done` (a profile synced by a version from
   before the base) lets the newer file win. A pair without a base of its own takes the base
   another profile of the agent held at the start of the run as a seed; „Standard“ then wins every
-  conflict, and of what only the profile still has, exactly the part the seed knows is dropped
-  („Standard“ removed it): objects key by key, string sets item by item, a parent only when
-  nothing of it is left, any other value only when it equals the seed's. What the seed never saw
-  stays, so a new profile neither brings back what „Standard“ removed nor loses its own
-  additions. A seed of which „Standard“ holds none of 2 or more keys tells nothing and is not used
+  conflict, and the seed only tells what „Standard“ removed. It is read through containers —
+  objects whose children are independent: the top level, in `settings.json` also `env`,
+  `permissions` and `autoMode`, in `.claude.json` `mcpServers` and `projects` (their entries are
+  units). Of a key only the profile has that the seed knows: a container is reduced child by child
+  and goes only when empty; a string set loses the items the seed knows; anything else — a unit
+  object such as `statusLine`, an MCP server, a project entry, a plain value — is dropped when it
+  equals the seed's value and kept whole when the profile changed it (it then returns to every
+  home). A key both sides hold that is a non-container object gets both sides' fields, „Standard“
+  winning a differing one. What the seed never saw stays, so a new profile neither brings back
+  what „Standard“ removed and it still holds unchanged, nor loses its own additions. A seed of which „Standard“ holds none of 2 or more keys tells nothing and is not used
   (`settings.json`: its top-level keys; `.claude.json`: per entry key, its entries). Reset guard:
   in `settings.json`, a base of 2 or more keys of which one side holds none merges without base
   and seed this run; in `.claude.json`, the same per entry key (2 or more entries in the base,

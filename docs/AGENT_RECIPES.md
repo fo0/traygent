@@ -115,9 +115,11 @@ Versions seen: Claude Code npm `2.1.317`; OpenCode `@opencode/cli` `2.2.5` (`lat
     names by prefix `ANTHROPIC_`, `CLAUDE_CODE_USE_`, `AWS_`, `GOOGLE_`, `AZURE_`, `OTEL_`, `VERTEX_REGION_`,
     `CLAUDE_CODE_CLIENT_`, by name `CLAUDE_CONFIG_DIR`, `CLAUDE_CODE_OAUTH_TOKEN`, `CLOUD_ML_REGION`, and
     `CLAUDE_CODE_SKIP_<…>_AUTH`; `HTTP_PROXY` / `HTTPS_PROXY` / `NO_PROXY` shared (machine network); string lists
-    below `permissions.` and `autoMode.` merged as sets;
+    below `permissions.` and `autoMode.` merged as sets; containers for a seeded merge (`SettingsRule::containers`): the
+    top level, `env`, `permissions`, `autoMode` — every other object (`statusLine`, …) is one unit;
   - `.claude.json`, three-way merged — entry keys `mcpServers`, `projects`; whole-value keys `showSpinnerTree`,
-    `claudeInChromeDefaultEnabled`; own project fields: prefix `last`, name `hasUnseenTeamArtifacts`;
+    `claudeInChromeDefaultEnabled`; own project fields: prefix `last`, name `hasUnseenTeamArtifacts`; containers for a
+    seeded merge: the top level, `mcpServers`, `projects` — each MCP server and project entry is one unit;
   - never read: `.credentials.json`; user extras (`settings.profileShare`) are linked like the dirs or copied
     whole like `CLAUDE.md`; never shareable as extras: names starting with `.claude.json` or `.credentials.json`
     and `never_shared` — `policy-limits.json`, `policy-limits.json.stamp.json`, `remote-settings.json`, `cache`,
