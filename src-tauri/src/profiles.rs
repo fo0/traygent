@@ -11,6 +11,10 @@ pub mod files;
 pub mod history;
 pub mod json;
 pub mod links;
+pub mod marker;
+pub mod merge;
+pub mod node;
+pub mod settings;
 pub mod status;
 pub mod sync;
 
@@ -36,12 +40,31 @@ pub struct Recipe {
     pub shared_dirs: &'static [&'static str],
     /// Files copied between a profile and the default home, the newest winning.
     pub synced_files: &'static [&'static str],
+    /// The settings file merged key by key, apart from what belongs to the sign-in.
+    pub settings: Option<SettingsRule>,
     /// A line-based history merged as a union.
     pub history: Option<&'static str>,
     /// Top-level keys of the state file every profile shares.
     pub shared_keys: &'static [&'static str],
     /// The arguments that sign a profile in.
     pub login_args: &'static [&'static str],
+}
+
+/// A JSON settings file every profile shares except for the keys that carry the sign-in or
+/// route requests: those stay per profile, the rest is merged three ways ([`merge`]).
+#[derive(Debug, PartialEq, Eq)]
+pub struct SettingsRule {
+    pub file: &'static str,
+    /// Top-level keys that never leave their profile.
+    pub own_keys: &'static [&'static str],
+    /// The top-level object of environment variables.
+    pub env_key: &'static str,
+    /// Variables of `env_key` that never leave their profile: by prefix and by full name,
+    /// upper case, matched without case.
+    pub own_env_prefixes: &'static [&'static str],
+    pub own_env_names: &'static [&'static str],
+    /// Lists of strings below these paths (keys joined with `.`) are merged as sets.
+    pub set_paths: &'static [&'static str],
 }
 
 /// Claude Code: one config directory per account through `CLAUDE_CONFIG_DIR`.
@@ -66,7 +89,29 @@ const CLAUDE: Recipe = Recipe {
         "tasks",
         "paste-cache",
     ],
-    synced_files: &["settings.json", "CLAUDE.md", "keybindings.json"],
+    synced_files: &["CLAUDE.md", "keybindings.json"],
+    settings: Some(SettingsRule {
+        file: "settings.json",
+        own_keys: &[
+            "apiKeyHelper",
+            "forceLoginOrgUUID",
+            "forceLoginMethod",
+            "awsAuthRefresh",
+            "awsCredentialExport",
+            "anthropicProfile",
+            "anthropicProfiles",
+        ],
+        env_key: "env",
+        own_env_prefixes: &[
+            "ANTHROPIC_",
+            "CLAUDE_CODE_USE_",
+            "AWS_",
+            "GOOGLE_",
+            "AZURE_",
+        ],
+        own_env_names: &["CLAUDE_CONFIG_DIR", "CLAUDE_CODE_OAUTH_TOKEN"],
+        set_paths: &["permissions.", "autoMode."],
+    }),
     history: Some("history.jsonl"),
     shared_keys: &["mcpServers", "projects"],
     login_args: &["auth", "login"],

@@ -6,49 +6,50 @@ use crate::profiles::history::union;
 fn the_first_sync_takes_the_default_homes_files_and_backs_the_profiles_up() {
     let world = World::new("profiles-first");
     let (ours, theirs) = (world.dir("default"), world.dir("team"));
-    write(&ours.join("settings.json"), r#"{"theme":"dark"}"#);
+    write(&ours.join("keybindings.json"), "default keys");
     own(&world, "team");
-    write(&theirs.join("settings.json"), r#"{"theme":"light"}"#);
-    write(&ours.join("CLAUDE.md"), "same");
-    write(&theirs.join("CLAUDE.md"), "same");
-    write(&theirs.join("keybindings.json"), "{}");
+    write(&theirs.join("keybindings.json"), "team keys");
+    write(&theirs.join("CLAUDE.md"), "team rules");
     // Even a newer profile file loses the first time.
-    touch(&ours.join("settings.json"), 10);
-    touch(&theirs.join("settings.json"), 500);
+    touch(&ours.join("keybindings.json"), 10);
+    touch(&theirs.join("keybindings.json"), 500);
     let reports = world.synced(&["team"], 1);
     assert!(reports[0].changed);
-    assert_eq!(read(&theirs.join("settings.json")), r#"{"theme":"dark"}"#);
-    assert_eq!(read(&ours.join("settings.json")), r#"{"theme":"dark"}"#);
+    assert_eq!(read(&theirs.join("keybindings.json")), "default keys");
+    assert_eq!(read(&ours.join("keybindings.json")), "default keys");
     let backup = world.backup("team");
-    assert_eq!(read(&backup.join("settings.json")), r#"{"theme":"light"}"#);
-    // Equal content needs no backup; a file on one side only is copied over.
+    assert_eq!(read(&backup.join("keybindings.json")), "team keys");
+    // A file on one side only is copied over; nothing is replaced, so nothing is backed up.
     assert!(!backup.join("CLAUDE.md").exists());
-    assert_eq!(read(&ours.join("keybindings.json")), "{}");
+    assert_eq!(read(&ours.join("CLAUDE.md")), "team rules");
 }
 
 #[test]
 fn later_the_newer_file_wins_in_either_direction() {
     let world = World::new("profiles-newest");
     let (ours, theirs) = (world.dir("default"), world.dir("team"));
-    write(&ours.join("settings.json"), "v1");
+    write(&ours.join("keybindings.json"), "v1");
     write(&ours.join("CLAUDE.md"), "v1");
     world.synced(&["team"], 1);
-    assert_eq!(read(&theirs.join("settings.json")), "v1");
+    assert_eq!(read(&theirs.join("keybindings.json")), "v1");
     // The profile's file is newer: it reaches the default home.
-    write(&theirs.join("settings.json"), "team edit");
-    touch(&ours.join("settings.json"), 100);
-    touch(&theirs.join("settings.json"), 200);
+    write(&theirs.join("keybindings.json"), "team edit");
+    touch(&ours.join("keybindings.json"), 100);
+    touch(&theirs.join("keybindings.json"), 200);
     // The default home's file is newer: it reaches the profile.
     write(&ours.join("CLAUDE.md"), "default edit");
     touch(&ours.join("CLAUDE.md"), 400);
     touch(&theirs.join("CLAUDE.md"), 300);
     world.synced(&["team"], 2);
-    assert_eq!(read(&ours.join("settings.json")), "team edit");
-    assert_eq!(read(&theirs.join("settings.json")), "team edit");
+    assert_eq!(read(&ours.join("keybindings.json")), "team edit");
+    assert_eq!(read(&theirs.join("keybindings.json")), "team edit");
     assert_eq!(read(&ours.join("CLAUDE.md")), "default edit");
     assert_eq!(read(&theirs.join("CLAUDE.md")), "default edit");
     // Whatever was replaced is in the backup of the home it was in.
-    assert_eq!(read(&world.backup("default").join("settings.json")), "v1");
+    assert_eq!(
+        read(&world.backup("default").join("keybindings.json")),
+        "v1"
+    );
     assert_eq!(read(&world.backup("team").join("CLAUDE.md")), "v1");
     // A file deleted on one side comes back from the other.
     std::fs::remove_file(ours.join("CLAUDE.md")).unwrap();
@@ -59,17 +60,17 @@ fn later_the_newer_file_wins_in_either_direction() {
 #[test]
 fn a_change_in_one_profile_reaches_the_others_in_the_same_run() {
     let world = World::new("profiles-three");
-    write(&world.dir("default").join("settings.json"), "v1");
+    write(&world.dir("default").join("keybindings.json"), "v1");
     world.synced(&["team", "solo"], 1);
     for id in ["default", "team", "solo"] {
-        touch(&world.dir(id).join("settings.json"), 100);
+        touch(&world.dir(id).join("keybindings.json"), 100);
     }
-    write(&world.dir("solo").join("settings.json"), "solo edit");
-    touch(&world.dir("solo").join("settings.json"), 900);
+    write(&world.dir("solo").join("keybindings.json"), "solo edit");
+    touch(&world.dir("solo").join("keybindings.json"), 900);
     world.synced(&["team", "solo"], 2);
     for id in ["default", "team", "solo"] {
         assert_eq!(
-            read(&world.dir(id).join("settings.json")),
+            read(&world.dir(id).join("keybindings.json")),
             "solo edit",
             "{id}"
         );
@@ -126,7 +127,7 @@ fn a_failed_rule_stays_a_first_sync_and_every_loser_is_backed_up() {
     let world = World::new("profiles-first-failed");
     let (ours, theirs) = (world.dir("default"), world.dir("team"));
     write(&ours.join("CLAUDE.md"), "default rules");
-    write(&ours.join("settings.json"), "default settings");
+    write(&ours.join("keybindings.json"), "default settings");
     own(&world, "team");
     // Something no rule can write to: a directory where the profile's file belongs.
     write(&theirs.join("CLAUDE.md/inner"), "x");
@@ -139,7 +140,7 @@ fn a_failed_rule_stays_a_first_sync_and_every_loser_is_backed_up() {
         "{:?}",
         marker.done
     );
-    assert!(marker.done.iter().any(|rule| rule == "settings.json"));
+    assert!(marker.done.iter().any(|rule| rule == "keybindings.json"));
     // The profile now has a real, newer file. Newest-wins would replace the default home's
     // rules; the rule's first sync is still due, so the default home wins.
     std::fs::remove_dir_all(theirs.join("CLAUDE.md")).unwrap();
@@ -156,13 +157,13 @@ fn a_failed_rule_stays_a_first_sync_and_every_loser_is_backed_up() {
         .iter()
         .any(|rule| rule == "CLAUDE.md"));
     // From now on the newer file wins — and the default home's loser is kept in its backup.
-    write(&theirs.join("settings.json"), "team settings");
-    touch(&ours.join("settings.json"), 10);
-    touch(&theirs.join("settings.json"), 900);
+    write(&theirs.join("keybindings.json"), "team settings");
+    touch(&ours.join("keybindings.json"), 10);
+    touch(&theirs.join("keybindings.json"), 900);
     world.synced(&["team"], 3);
-    assert_eq!(read(&ours.join("settings.json")), "team settings");
+    assert_eq!(read(&ours.join("keybindings.json")), "team settings");
     assert_eq!(
-        read(&world.backup("default").join("settings.json")),
+        read(&world.backup("default").join("keybindings.json")),
         "default settings"
     );
 }

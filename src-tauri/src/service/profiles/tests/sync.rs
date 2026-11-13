@@ -20,7 +20,7 @@ fn the_sync_before_a_start_warns_and_only_a_blocked_profile_directory_stops_it()
     let local = |profile: Option<&str>| request(AgentId::Claude, EnvId::Local, profile);
     let dir = |id: &str| std::path::PathBuf::from(homes.dir(AgentId::Claude, id).unwrap());
     std::fs::create_dir_all(dir("default")).unwrap();
-    std::fs::write(dir("default").join("settings.json"), "{}").unwrap();
+    std::fs::write(dir("default").join("settings.json"), r#"{"theme":"dark"}"#).unwrap();
     std::fs::write(dir("default").join(".credentials.json"), "synthetic").unwrap();
     // A clean sync: no warning, every profile in line, the statuses read anew.
     let revision = service.snapshot().revision;
@@ -30,7 +30,7 @@ fn the_sync_before_a_start_warns_and_only_a_blocked_profile_directory_stops_it()
     );
     assert_eq!(
         std::fs::read_to_string(dir("solo").join("settings.json")).unwrap(),
-        "{}"
+        "{\n  \"theme\": \"dark\"\n}\n"
     );
     let snapshot = service.snapshot();
     assert!(snapshot.revision > revision);

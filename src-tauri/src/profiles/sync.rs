@@ -5,20 +5,21 @@
 //! except an empty directory that makes room for a link; what a rule replaces goes to a
 //! backup folder first — the one of the home it was in (a profile's directory or the default
 //! home), so nothing crosses profiles. One sync runs at a time.
-use super::files::{problem, sync_file, write_atomic, Backup, Backups, Change, ACCESS_FAILED};
+use super::files::{problem, sync_file, Backup, Backups, Change, ACCESS_FAILED};
 use super::history::sync_history;
 use super::json::{sync_state, Base};
 use super::links::{self, Link, Linker, Pending};
+pub use super::marker::{read_marker, Marker, MARKER};
+use super::marker::{write_marker, MARKER_VERSION};
+use super::settings::{sync_settings, BASE_DIR};
 use super::status::{self, Facts, Key};
-use super::{recipe, Homes, Recipe};
+use super::{recipe, Homes, Recipe, SettingsRule};
 use crate::models::{AgentId, AgentProfile, AppSettings, DEFAULT_PROFILE};
 use chrono::{DateTime, Utc};
 use std::collections::HashMap;
 use std::path::{Path, PathBuf};
 use std::sync::{Mutex, PoisonError};
 
-pub const MARKER: &str = ".traygent-sync.json";
-const MARKER_VERSION: u64 = 1;
 pub const NO_HOME: &str = "Benutzerordner nicht verfügbar";
 pub const PROFILE_DIR_FAILED: &str = "Profilordner konnte nicht angelegt werden";
 const DEFAULT_DIR_FAILED: &str = "Ordner des Standard-Profils konnte nicht angelegt werden";
@@ -33,35 +34,6 @@ pub fn foreign_dir(agent: AgentId) -> String {
 
 static RUNNING: Mutex<()> = Mutex::new(());
 
-/// `<profile dir>\.traygent-sync.json`: `done` names the rules whose first sync succeeded —
-/// until then the default home wins for that rule, afterwards the newest. `base` holds the
-/// entry names (never values) of the state file's shared keys as of that rule's last
-/// successful sync, so a removed entry is told from an added one. `syncedAt` is the last
-/// sync without an error. A marker without `done` or `base` (an older one, or the initial
-/// one of a new profile directory) only says the directory is Traygent's.
-#[derive(Clone, Debug, Default, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
-#[serde(rename_all = "camelCase")]
-pub struct Marker {
-    pub version: u64,
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub synced_at: Option<String>,
-    #[serde(default)]
-    pub done: Vec<String>,
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub base: Option<Base>,
-}
-
-/// `None` without a marker file; an unreadable one still counts as a marker.
-pub fn read_marker(dir: &Path) -> Option<Marker> {
-    let bytes = std::fs::read(dir.join(MARKER)).ok()?;
-    Some(serde_json::from_slice(&bytes).unwrap_or_default())
-}
-
-fn write_marker(dir: &Path, marker: &Marker) -> Result<(), ()> {
-    let bytes = serde_json::to_vec(marker).map_err(drop)?;
-    write_atomic(&dir.join(MARKER), &bytes).map_err(drop)
-}
-
 /// How the sync of one profile went.
 #[derive(Clone, Debug, Default, PartialEq, Eq)]
 pub struct ProfileReport {
@@ -75,6 +47,9 @@ pub struct ProfileReport {
     pub foreign: bool,
     /// The run created a link or wrote a file of the pair (the marker does not count).
     pub changed: bool,
+    /// `<file>: <path>` for every value both sides had changed differently since the last
+    /// sync; the newer file's value was taken, the other is in its side's backup.
+    pub conflicts: Vec<String>,
 }
 
 /// What to sync or read, taken from the settings under the service lock; the file system
@@ -186,6 +161,10 @@ fn is_foreign(dir: &Path, recipe: &Recipe, default_dir: &Path) -> std::io::Resul
     for entry in std::fs::read_dir(dir)? {
         let entry = entry?;
         let name = entry.file_name();
+        // Traygent's own: the merge base of the settings rule.
+        if name.to_str() == Some(BASE_DIR) {
+            continue;
+        }
         let shared = recipe
             .shared_dirs
             .iter()
@@ -325,6 +304,9 @@ impl Pair {
         default_backup: &mut Backup,
     ) -> bool {
         let mut change = Change::default();
+        if let Some(rule) = &recipe.settings {
+            change.merge(self.settings(rule, default_dir, default_backup));
+        }
         for name in recipe.synced_files {
             let (ours, theirs) = (default_dir.join(name), self.dir.join(name));
             let first = self.first(name);
@@ -362,6 +344,41 @@ impl Pair {
         });
         change.merge(self.note(Some(name), result));
         change.default
+    }
+
+    /// The settings rule: a merge against the base kept in the profile's directory. A side
+    /// that was written counts even when a later step of the rule failed.
+    fn settings(
+        &mut self,
+        rule: &SettingsRule,
+        default_dir: &Path,
+        default_backup: &mut Backup,
+    ) -> Change {
+        let name = rule.file;
+        let (ours, theirs) = (default_dir.join(name), self.dir.join(name));
+        let first = self.first(name);
+        let mut backups = Backups {
+            default: default_backup,
+            profile: &mut self.backup,
+        };
+        let synced = sync_settings(rule, &ours, &theirs, &self.dir, first, &mut backups);
+        for path in &synced.conflicts {
+            let conflict = problem(name, path);
+            if !self.report.conflicts.contains(&conflict) {
+                self.report.conflicts.push(conflict);
+            }
+        }
+        self.report.changed |= synced.change.any();
+        match synced.error {
+            Some(error) => {
+                self.note(Some(name), Err(error));
+            }
+            None if synced.skipped => {}
+            None => {
+                self.note(Some(name), Ok(synced.change));
+            }
+        }
+        synced.change
     }
 
     /// Writes the marker when it changed: the rules done so far, and a new `syncedAt` only

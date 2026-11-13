@@ -242,8 +242,8 @@ fn a_failed_link_gives_the_profile_its_directory_back() {
 fn a_foreign_directory_is_left_exactly_as_it_is() {
     let world = World::new("profiles-foreign");
     write(&world.dir("mem").join("skills/notes.md"), "someone else's");
-    write(&world.dir("mem").join("settings.json"), "theirs");
-    write(&world.dir("default").join("settings.json"), "ours");
+    write(&world.dir("mem").join("keybindings.json"), "theirs");
+    write(&world.dir("default").join("keybindings.json"), "ours");
     // An empty directory is nobody's yet, and one with the CLI's own files is the agent's.
     std::fs::create_dir_all(world.dir("fresh")).unwrap();
     write(&world.state("old"), "{}");
@@ -420,7 +420,7 @@ fn a_new_profile_directory_is_marked_before_it_is_linked() {
     // What such a stopped sync leaves — the initial marker and links — is synced on as a
     // first sync: the default home still wins.
     let stopped = World::new("profiles-stopped");
-    write(&stopped.dir("default").join("settings.json"), "ours");
+    write(&stopped.dir("default").join("CLAUDE.md"), "ours");
     write(
         &stopped.dir("team").join(MARKER),
         r#"{"version":1,"done":[]}"#,
@@ -432,7 +432,7 @@ fn a_new_profile_directory_is_marked_before_it_is_linked() {
     std::fs::create_dir_all(&plans.target).unwrap();
     linker().link(std::slice::from_ref(&plans));
     stopped.synced(&["team"], 1);
-    assert_eq!(read(&stopped.dir("team").join("settings.json")), "ours");
+    assert_eq!(read(&stopped.dir("team").join("CLAUDE.md")), "ours");
     // Even without the marker a directory of nothing but links to the default home's
     // shared directories is the agent's own …
     let links_only = World::new("profiles-links-only");

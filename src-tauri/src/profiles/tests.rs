@@ -12,6 +12,7 @@ use std::time::{Duration, SystemTime};
 
 mod files;
 mod links;
+mod settings;
 mod state;
 
 const CLAUDE: AgentId = AgentId::Claude;
@@ -177,6 +178,7 @@ fn only_claude_has_a_recipe_and_the_catalog_says_so() {
         .shared_dirs
         .iter()
         .chain(claude.synced_files)
+        .chain(claude.settings.iter().map(|rule| &rule.file))
         .chain(claude.history.iter())
         .chain(claude.shared_keys);
     assert!(listed.into_iter().all(|name| *name != claude.credentials));
