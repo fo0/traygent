@@ -338,3 +338,18 @@ test('agents, Docker and GitHub carry their product marks; the name stays access
     dialog.getByRole('tab', { name: 'GitHub' }).locator('svg.mark-github'),
   ).toBeVisible();
 });
+
+test('the install command copy button announces its result', async ({
+  page,
+}) => {
+  await page.context().grantPermissions(['clipboard-read', 'clipboard-write']);
+  await page.goto('/');
+  const dialog = await openSettings(page);
+  await dialog
+    .getByRole('button', { name: 'Installationsbefehl kopieren' })
+    .click();
+  await expect(
+    dialog.getByRole('status').filter({ hasText: /^Kopiert$/ }),
+  ).toBeAttached();
+  await expect(dialog.getByRole('button', { name: 'Kopiert' })).toBeVisible();
+});
