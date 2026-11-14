@@ -87,6 +87,14 @@
   const loginFailure = $derived(
     actions.failure?.agent === agent ? actions.failure : null,
   );
+  /** „<Name>: <reason>“, like a rename problem. */
+  const loginText = $derived.by(() => {
+    if (!loginFailure) return '';
+    const row = rows.find((item) => item.id === loginFailure.profile);
+    const saved = statuses.find((item) => item.id === loginFailure.profile);
+    const name = row?.label || saved?.label || loginFailure.profile;
+    return `${name}: ${loginFailure.text}`;
+  });
   async function act(run: () => Promise<unknown>, text: string) {
     if (busy) return;
     busy = true;
@@ -222,6 +230,6 @@
       role="alert"
       title={loginFailure.hint ? DEBUG_HINT : undefined}
     >
-      <Icon name="warning" size={16} /><span>{loginFailure.text}</span>
+      <Icon name="warning" size={16} /><span>{loginText}</span>
     </div>{/if}
 </section>

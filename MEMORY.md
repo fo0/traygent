@@ -58,7 +58,7 @@ Stable project knowledge. **Read at session start.**
 
 - **Agent CLI updates fail closed** — the in-use check (`agent_updates.rs → LIST_SCRIPT`) needs its end marker and only known lines; a new line kind in the script must be added to `line_agent`, or every agent reads as in use. (2026-11-10)
 
-- **A hidden child that starts the CLI through PowerShell is ended with `taskkill /PID <n> /T /F`** (`profiles/login.rs → stop`): `Child::kill` alone ends only `powershell.exe` and leaves `claude.exe` / `node.exe` running. Its output can hold a sign-in URL or code — never log, persist or show it. (2026-11-14)
+- **A hidden child that starts the CLI through PowerShell is ended with `detect/runner.rs → kill_tree`** (absolute `taskkill /T /F`, bounded wait), then `Child::kill`: `Child::kill` alone ends only `powershell.exe` and leaves `claude.exe` / `node.exe` running. The hidden sign-in's stdout and stderr go to the null device — its output can hold a sign-in URL or code and must never sit in memory, a log or the panel (`profiles/login.rs`). (2026-11-14)
 
 - **`store.rs → parse_settings` reads settings field by field** — a new `AppSettings` field needs its line there (plus `sanitize` when it reaches a path) or a saved value is dropped on load. (2026-11-10)
 

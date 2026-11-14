@@ -124,7 +124,7 @@ describe('demo profiles', () => {
     });
     expect(pushed).toEqual([]);
     await expect(bridge.profileLogin('codex', 'default')).rejects.toThrow(
-      'Dieses Profil gibt es nicht.',
+      'Profil nicht gefunden.',
     );
   });
 
@@ -135,11 +135,11 @@ describe('demo profiles', () => {
     await expect(bridge.profileLogin('claude', 'team')).rejects.toThrow(
       'Die Anmeldung läuft bereits.',
     );
-    await bridge.cancelProfileLogin('claude', 'team');
+    expect(await bridge.cancelProfileLogin('claude', 'team')).toBe(true);
     await expect(running).rejects.toThrow('Anmeldung abgebrochen.');
     expect((await bridge.snapshot()).profiles[1]?.signedIn).toBe(false);
-    // Nothing runs: a cancel is a no-op, the next sign-in starts afresh.
-    await bridge.cancelProfileLogin('claude', 'team');
+    // Nothing runs: a cancel finds nothing, the next sign-in starts afresh.
+    expect(await bridge.cancelProfileLogin('claude', 'team')).toBe(false);
     expect(
       (await bridge.profileLogin('claude', 'team')).profiles[1],
     ).toMatchObject({ signedIn: true, organization: 'Beispiel Team' });

@@ -124,11 +124,16 @@ Brand top left: icon + „Traygent“. Window ~480×760, frameless, tray popup l
   organization instead of the account (#41); tooltip: account · organization —, a warning icon
   after a failed sync, „Anmelden“ only while the profile is signed out (immediate,
   `profile_login`, tooltip „Im Browser anmelden“) and a remove button (staged, undone by
-  „Abbrechen“; none for „Standard“). While a hidden sign-in runs, the row's action is a spinning
-  icon button (accessible name „Anmeldung läuft“, tooltip „Abbrechen“) whose click sends
-  `cancel_profile_login`; success shows the answer's statuses and the 3 s note „Angemeldet.“, a
-  cancel ends quietly, a failure stays as the block's inline error until the next profile action
-  (tooltip „Mit Debug erneut versuchen“ after a hidden sign-in). The state lives in the panel
+  „Abbrechen“; none for „Standard“). While a sign-in is pending (hidden: until it ended; with
+  „Debug“: until the terminal opened) the same button turns into a spinning icon (accessible
+  name „<Name>: Anmeldung abbrechen“, `aria-busy`, tooltip „Anmeldung läuft · Abbrechen“) whose
+  click sends `cancel_profile_login`; a second sign-in of that profile waits for it. Success —
+  only when the answer reads the profile signed in — shows the answer's statuses and the 3 s
+  note „Angemeldet.“, and the focus moves from the gone button to the row's details toggle; a
+  cancel ends quietly (when `cancel_profile_login` found nothing to end, a later failure is
+  still reported); a failure stays as the block's inline error „<Name>: <reason>“ (tooltip „Mit
+  Debug erneut versuchen“ after a hidden sign-in) until that profile signs in again, „Jetzt
+  synchronisieren“ or an added profile. The state lives in the panel
   (`profileActions.svelte.ts`), so closing the dialog keeps a running sign-in. The toggle (`aria-expanded`) opens
   the row's details in place, one row at a time: „Name“ (for an extra profile a field holding a
   staged rename — the id and folder never change — checked by the list rules — a problem shows in the open detail, else under „Neues Profil“ as „<Name>: <problem>“, and in the toggle's description; read-only for
@@ -227,7 +232,7 @@ Commands (Rust `#[tauri::command]`, German `Err` strings; panel calls only via `
 | `github_refresh_repos`             | –                                                                                                | `Snapshot` (returns with `github.loading`, event follows)     |
 | `sync_profiles`                    | –                                                                                                | `Snapshot` (syncs every profile now, statuses in `profiles`)  |
 | `profile_login`                    | `{ agent, profile }`                                                                             | `Snapshot` (hidden: after the sign-in; „Debug“: once opened)  |
-| `cancel_profile_login`             | `{ agent, profile }`                                                                             | `void` (ends that profile's running hidden sign-in)           |
+| `cancel_profile_login`             | `{ agent, profile }`                                                                             | `boolean` (ends that profile's sign-in; false: none running)  |
 | shell commands kept from RepoWatch | autostart_status, set_autostart, open_startup_settings, check_update, install_update, hide_panel | unchanged                                                     |
 
 ## Repositories (GitHub, [ADR-0005](adr/0005-start-from-a-github-repository.md))
@@ -538,18 +543,23 @@ Commands (Rust `#[tauri::command]`, German `Err` strings; panel calls only via `
   - **Hidden** (`settings.debug` off, the default): the script, preceded by `$LASTEXITCODE=$null`
     and followed by `if ($null -eq $LASTEXITCODE) { exit 1 }; exit $LASTEXITCODE`, runs as
     `powershell.exe -NoLogo -NoProfile -NonInteractive -EncodedCommand <Base64>` without a
-    window (`CREATE_NO_WINDOW`), stdin closed, stdout and stderr drained into one buffer capped
-    at 64 KiB, ANSI stripped, wiped afterwards — never logged, persisted or shown, it can hold the
-    sign-in URL or a code. The CLI opens the browser itself. The command resolves when the
-    process ended: exit code 0 → the agent's statuses are read anew (`SyncPlan::read`, without
-    the service lock), committed through `apply_profiles` and returned as the `Snapshot`; any
-    other code or a process that could not start → „Anmeldung fehlgeschlagen.“; after 5 minutes
-    the process tree is ended (`taskkill /T /F`, then the process) → „Anmeldung abgelaufen.“;
-    `cancel_profile_login { agent, profile }` ends it the same way → „Anmeldung abgebrochen.“
-    (a no-op when none runs). One hidden sign-in per profile: a second one is refused with „Die
-    Anmeldung läuft bereits.“ while it runs; the registration ends with the worker, also when it
-    panics. A prompt for a pasted code gets end of input (stdin closed) and ends the CLI or
-    reaches the limit — it never hangs.
+    window (`CREATE_NO_WINDOW`), stdin closed, stdout and stderr to the null device — the
+    output can hold the sign-in URL or a code, so it never reaches Traygent's memory, a log or
+    the panel. The CLI opens the browser itself. The command resolves when the process ended
+    (checked before a cancel or the limit, so an end in the same tick counts as ended): exit
+    code 0 → the agent's statuses are read anew (`SyncPlan::read`, without the service lock) and
+    committed through `apply_profiles`; the `Snapshot` is returned only when the profile now
+    reads signed in, else „Anmeldung fehlgeschlagen.“; any other code or a process that could
+    not start → „Anmeldung fehlgeschlagen.“; after 5 minutes the process tree is ended
+    (`detect/runner.rs → kill_tree`: absolute `taskkill /T /F`, bounded wait, then the process)
+    → „Anmeldung abgelaufen.“; `cancel_profile_login { agent, profile }` ends it the same way →
+    „Anmeldung abgebrochen.“ and answers whether one was registered. The sign-in is registered
+    first thing in `profile_login`, before any work, so a cancel cannot miss it once the
+    command runs; one per profile — a second one is refused with „Die Anmeldung läuft
+    bereits.“; the registration ends with the worker, also when it panics. The app's exit
+    (`RunEvent::Exit`: „Traygent beenden“, the updater's restart) cancels every running sign-in
+    and waits at most 3 s for the trees (best effort). A prompt for a pasted code gets end of
+    input (stdin closed) and ends the CLI or reaches the limit — it never hangs.
   - **Visible** (`settings.debug` on): a terminal titled „<Agent> · <Label> anmelden“ runs the
     same lines and stays open like the install terminal (`-NoExit`), so every line of the CLI can
     be read; the command resolves with the current snapshot once it opened. A status watch

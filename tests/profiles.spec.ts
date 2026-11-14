@@ -122,7 +122,15 @@ test('natively: ▶ restarts with the stored profile, a warning stays, sign-in n
           snapshot,
           warning: 'Profil „Team“ ist nicht abgeglichen.',
         };
-      if (cmd === 'sync_profiles' || cmd === 'profile_login') return snapshot;
+      if (cmd === 'sync_profiles') return snapshot;
+      // Natively an answer after exit code 0 reads the profile signed in.
+      if (cmd === 'profile_login')
+        return {
+          ...snapshot,
+          profiles: snapshot.profiles.map((p) =>
+            p.id === 'team' ? { ...p, signedIn: true } : p,
+          ),
+        };
       return null;
     },
     { arg: snapshot, state: {} },

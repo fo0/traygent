@@ -82,7 +82,8 @@ export interface Commands {
   /**
    * Signs the profile in (`default` included, #41). „Debug“ off: hidden;
    * resolves when the sign-in ended with exit code 0, with the statuses read
-   * anew, or rejects with „Anmeldung fehlgeschlagen.“, „Anmeldung
+   * anew, or rejects with „Anmeldung fehlgeschlagen.“ (also after exit
+   * code 0 when the profile still reads signed out), „Anmeldung
    * abgelaufen.“ (5 minutes) or „Anmeldung abgebrochen.“ (see
    * `cancel_profile_login`); a second one for the same profile is refused
    * while one runs. „Debug“ on: resolves with the current snapshot once the
@@ -93,10 +94,13 @@ export interface Commands {
     args: { agent: AgentId; profile: string };
     result: Snapshot;
   };
-  /** Ends the profile's running hidden sign-in; nothing when none runs. */
+  /**
+   * Ends the profile's running hidden sign-in; false when none is
+   * registered (it already ended, or has not reached Rust yet).
+   */
   cancel_profile_login: {
     args: { agent: AgentId; profile: string };
-    result: void;
+    result: boolean;
   };
   autostart_status: { args: undefined; result: StartupStatus };
   set_autostart: { args: { enabled: boolean }; result: StartupStatus };

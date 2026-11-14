@@ -148,6 +148,10 @@ test('a profile row opens its details in place, one at a time', async ({
   await standard.focus();
   await page.keyboard.press('Enter');
   await expect(standard).toHaveAttribute('aria-expanded', 'true');
+  // A signed-in profile's details: the account and its organization.
+  const open = list.locator('.profile-detail');
+  await expect(open).toContainText('Kontodemo@example.com');
+  await expect(open).toContainText('OrganisationBeispiel GmbH');
   await expect(
     list.getByRole('button', { name: 'Kunde B Details' }),
   ).toHaveAttribute('aria-expanded', 'false');

@@ -13,12 +13,7 @@ import {
   demoLocalAccounts,
   demoRepos,
 } from './demoGithub';
-import {
-  demoLogins,
-  demoProfiles,
-  signedIn,
-  syncedProfiles,
-} from './demoProfiles';
+import { demoProfiles, demoSignIns, syncedProfiles } from './demoProfiles';
 import {
   PROFILE_MISSING,
   editedProfile,
@@ -66,7 +61,6 @@ export function createDemoBridge(latency = 150, detection = 600): DemoBridge {
   const listeners = new Set<(snapshot: Snapshot) => void>();
   let detectionTimer: ReturnType<typeof setTimeout> | undefined;
   let listingTimer: ReturnType<typeof setTimeout> | undefined;
-  const logins = demoLogins(detection);
   const delay = () =>
     new Promise<void>((resolve) => setTimeout(resolve, latency));
   const copy = () => structuredClone(data);
@@ -77,6 +71,16 @@ export function createDemoBridge(latency = 150, detection = 600): DemoBridge {
   const emit = () => {
     for (const listener of listeners) listener(copy());
   };
+  const signIns = demoSignIns(
+    {
+      profiles: () => data.profiles,
+      debug: () => data.settings.debug,
+      commit: (profiles) => change({ profiles }),
+      snapshot: copy,
+      emit,
+    },
+    detection,
+  );
   /** The account's listing, just read: no error, not loading. */
   const listed = (account: GithubAccount) => {
     change({
@@ -280,22 +284,10 @@ export function createDemoBridge(latency = 150, detection = 600): DemoBridge {
     },
     async profileLogin(agent, profile) {
       await delay();
-      if (!data.profiles.some((p) => p.agent === agent && p.id === profile))
-        throw new Error('Dieses Profil gibt es nicht.');
-      // No terminal and no CLI: the sign-in „finishes“ like a detection.
-      const finish = () =>
-        change({ profiles: signedIn(data.profiles, agent, profile) });
-      if (!data.settings.debug)
-        return logins.run(`${agent}:${profile}`, () => (finish(), copy()));
-      // „Debug“: the terminal opened at once, the status follows as an event.
-      setTimeout(() => {
-        finish();
-        emit();
-      }, detection);
-      return copy();
+      return signIns.login(agent, profile);
     },
     async cancelProfileLogin(agent, profile) {
-      logins.cancel(`${agent}:${profile}`);
+      return signIns.cancel(agent, profile);
     },
     async observe(callback) {
       listeners.add(callback);

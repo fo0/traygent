@@ -197,3 +197,28 @@ fn a_panicking_read_or_a_newer_watch_ends_the_watch_without_harm() {
     assert_eq!(quiet.reads.get(), 0);
     assert!(second.current());
 }
+
+#[test]
+fn exit_code_zero_without_a_sign_in_on_disk_is_a_failed_sign_in() {
+    let (state, home) = (
+        TempDir::new("service-finish-sign-in"),
+        TempDir::new("home-finish-sign-in"),
+    );
+    let (service, dir) = hosted(&state, &home);
+    let mut service = service.into_inner().unwrap();
+    let read = |service: &Service| service.profile_plan().only(AgentId::Claude).read();
+    // The CLI ended with 0 but wrote nothing: the row must not read „Angemeldet.“
+    let outcome = read(&service);
+    assert_eq!(
+        service
+            .finish_sign_in(AgentId::Claude, "team", outcome)
+            .unwrap_err(),
+        "Anmeldung fehlgeschlagen."
+    );
+    std::fs::write(dir.join(".credentials.json"), "synthetic").unwrap();
+    let outcome = read(&service);
+    let snapshot = service
+        .finish_sign_in(AgentId::Claude, "team", outcome)
+        .unwrap();
+    assert!(team(&snapshot).signed_in);
+}

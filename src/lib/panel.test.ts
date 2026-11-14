@@ -41,7 +41,7 @@ function bridgeWith(overrides: Partial<Bridge> = {}): Bridge {
     updateAgents: async () => snapshot(),
     syncProfiles: async () => snapshot(),
     profileLogin: async () => snapshot(),
-    cancelProfileLogin: async () => {},
+    cancelProfileLogin: async () => false,
     ...overrides,
   };
 }
@@ -244,7 +244,11 @@ describe('Panel', () => {
     const syncProfiles = vi.fn(
       () => new Promise<Snapshot>((done) => (resolve = done)),
     );
-    const profileLogin = vi.fn(async () => snapshot({ revision: 9 }));
+    const profileLogin = vi.fn(async () => {
+      const answer = snapshot({ revision: 9 });
+      answer.profiles = answer.profiles.map((p) => ({ ...p, signedIn: true }));
+      return answer;
+    });
     const panel = panelWith({ syncProfiles, profileLogin });
     const first = panel.profiles.sync();
     expect(panel.profiles.syncing).toBe(true);

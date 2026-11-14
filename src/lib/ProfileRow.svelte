@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { untrack } from 'svelte';
+  import { tick, untrack } from 'svelte';
   import CopyField from './CopyField.svelte';
   import Icon from './Icon.svelte';
   import { dateTime } from './format';
@@ -11,8 +11,9 @@
   // One profile in Settings → Agenten → „Profile“ (#37, #41): a single line —
   // name, account (or organization, when another row has the same account),
   // warning, „Anmelden“ while signed out, remove — that opens in place to its
-  // details with „Neu anmelden“. A running hidden sign-in turns the action
-  // into its cancel. An extra profile's name is a staged rename; id and
+  // details with „Neu anmelden“. A pending sign-in turns the same button
+  // into its cancel; when it leaves a signed-in row the focus moves to the
+  // details toggle. An extra profile's name is a staged rename; id and
   // folder stay.
   let {
     agent,
@@ -37,7 +38,7 @@
     open: boolean;
     /** An immediate action of the block runs. */
     busy: boolean;
-    /** Its hidden sign-in runs. */
+    /** Its sign-in is pending. */
     running: boolean;
     onToggle: () => void;
     onLogin: () => void;
@@ -56,6 +57,22 @@
     status?.signedIn ? (status.account ?? 'Angemeldet') : row.text,
   );
   const blocked = $derived(!status || busy);
+  /** „Anmelden“ while signed out, its cancel while a sign-in is pending. */
+  const acting = $derived(running || !status?.signedIn);
+  let toggle: HTMLButtonElement | undefined = $state();
+  let action: HTMLButtonElement | undefined = $state();
+  /** The action button had the focus right before it left the row. */
+  let refocus = false;
+  $effect.pre(() => {
+    if (acting) return;
+    refocus = untrack(() => !!action && document.activeElement === action);
+  });
+  $effect(() => {
+    if (acting || !refocus) return;
+    refocus = false;
+    // Never leave the focus on <body>: the row's toggle takes it.
+    void tick().then(() => toggle?.focus());
+  });
   const detail = $derived(`profile-detail-${agent}-${id}`);
   /** What was typed; the staged label is its trimmed copy. */
   let text = $state(untrack(() => label));
@@ -77,6 +94,7 @@
       aria-label={`${shown} Details`}
       aria-describedby={problem ? `${detail}-why` : undefined}
       title={problem || (open ? 'Details schließen' : 'Details')}
+      bind:this={toggle}
       onclick={onToggle}
       ><Icon name="down" size={12} /><span
         class="profile-name"
@@ -95,19 +113,23 @@
         aria-label={`Abgleich fehlgeschlagen: ${status.syncError}`}
         title={status.syncError}><Icon name="warning" size={13} /></span
       >{/if}
-    {#if running}<button
+    {#if acting}<!-- One element for both states, so the focus stays. --><button
         type="button"
-        class="icon-button small spinning profile-cancel"
-        aria-label="Anmeldung läuft"
-        title="Abbrechen"
-        onclick={onCancel}><Icon name="refresh" size={14} /></button
-      >{:else if !status?.signedIn}<button
-        type="button"
-        class="text-button profile-login"
-        aria-label={`${shown} anmelden`}
-        aria-disabled={blocked ? 'true' : undefined}
-        title="Im Browser anmelden"
-        onclick={() => !blocked && onLogin()}>Anmelden</button
+        class={running
+          ? 'icon-button small spinning profile-login'
+          : 'text-button profile-login'}
+        aria-label={running
+          ? `${shown}: Anmeldung abbrechen`
+          : `${shown} anmelden`}
+        aria-busy={running ? 'true' : undefined}
+        aria-disabled={!running && blocked ? 'true' : undefined}
+        title={running ? 'Anmeldung läuft · Abbrechen' : 'Im Browser anmelden'}
+        bind:this={action}
+        onclick={() => (running ? onCancel() : !blocked && onLogin())}
+        >{#if running}<Icon
+            name="refresh"
+            size={14}
+          />{:else}Anmelden{/if}</button
       >{/if}
     {#if index < 0}<span class="profile-slot" aria-hidden="true"
       ></span>{:else}<button
@@ -143,13 +165,14 @@
       <span class="field-label">Konto</span><span
         class="profile-value profile-account-value"
         data-out={status?.signedIn ? undefined : 'true'}
-        ><span>{account}</span>{#if status?.signedIn && !running}<button
+        ><span>{account}</span>{#if status?.signedIn}<button
             type="button"
             class="text-button"
             aria-label={`${shown} neu anmelden`}
-            aria-disabled={blocked ? 'true' : undefined}
+            aria-disabled={blocked || running ? 'true' : undefined}
             title="Im Browser anmelden"
-            onclick={() => !blocked && onLogin()}>Neu anmelden</button
+            onclick={() => !blocked && !running && onLogin()}
+            >Neu anmelden</button
           >{/if}</span
       >
       {#if status?.organization}<span class="field-label">Organisation</span

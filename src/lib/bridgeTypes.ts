@@ -65,8 +65,8 @@ export interface Bridge {
    * the terminal opened; rejects with a German message.
    */
   profileLogin(agent: AgentId, profile: string): Promise<Snapshot>;
-  /** Ends the profile's running hidden sign-in. */
-  cancelProfileLogin(agent: AgentId, profile: string): Promise<void>;
+  /** Ends the profile's running hidden sign-in; false when none ran. */
+  cancelProfileLogin(agent: AgentId, profile: string): Promise<boolean>;
 }
 
 /** Pushed snapshots, e.g. a finished detection; resolves to the unsubscribe. */

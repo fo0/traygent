@@ -112,45 +112,47 @@ pub async fn profile_login(
     profile: String,
 ) -> Result<Snapshot, String> {
     let key = (agent, profile.clone());
+    // Registered before any work, so a cancel can never miss it; it also refuses a second
+    // sign-in of the profile while this one runs. It ends with the worker, also on a panic.
+    let ticket = login::begin(key.clone())?;
     let watcher = app.clone();
+    let id = profile.clone();
     let hidden = work(app.clone(), move |service| {
-        match service.prepare_sign_in(agent, &profile, &Host::current(), &RealFs)? {
+        match service.prepare_sign_in(agent, &id, &Host::current(), &RealFs)? {
             SignIn::Visible { plan, fallback } => {
                 crate::desktop_agents::start(&plan, fallback.as_ref())?;
-                let before = service.profile_facts(agent, &profile);
+                let before = service.profile_facts(agent, &id);
                 start_watch(&watcher, watch::start(key, before, Instant::now()));
                 Ok(None)
             }
-            SignIn::Hidden(plan) => Ok(Some((plan, login::begin(key)?))),
+            SignIn::Hidden(plan) => Ok(Some(plan)),
         }
     })
     .await?;
-    if let Some((plan, ticket)) = hidden {
-        // The ticket ends with the worker, also when it panics.
-        tauri::async_runtime::spawn_blocking(move || {
-            login::sign_in(&login::ProcessLoginRunner, &plan, &ticket)
-        })
-        .await
-        .map_err(|_| FAILED.to_string())??;
-        let plan = work(app.clone(), move |service| {
-            Ok(service.profile_plan().only(agent))
-        })
-        .await?;
-        let outcome = run_plan(plan, false).await?;
-        return work(app, move |service| {
-            service.apply_profiles(outcome);
-            Ok(service.snapshot())
-        })
-        .await;
-    }
-    work(app, |service| Ok(service.snapshot())).await
+    let Some(plan) = hidden else {
+        return work(app, |service| Ok(service.snapshot())).await;
+    };
+    tauri::async_runtime::spawn_blocking(move || {
+        login::sign_in(&login::ProcessLoginRunner, &plan, &ticket)
+    })
+    .await
+    .map_err(|_| FAILED.to_string())??;
+    let plan = work(app.clone(), move |service| {
+        Ok(service.profile_plan().only(agent))
+    })
+    .await?;
+    let outcome = run_plan(plan, false).await?;
+    work(app, move |service| {
+        service.finish_sign_in(agent, &profile, outcome)
+    })
+    .await
 }
 
-/// Ends the running hidden sign-in of the profile; nothing when none runs. Its
+/// Ends the running hidden sign-in of the profile; false when none is registered. Its
 /// `profile_login` then rejects with „Anmeldung abgebrochen.“
 #[tauri::command]
-pub fn cancel_profile_login(agent: AgentId, profile: String) {
-    login::cancel(&(agent, profile));
+pub fn cancel_profile_login(agent: AgentId, profile: String) -> bool {
+    login::cancel(&(agent, profile))
 }
 
 /// The watch's thread; a watch that cannot start just does not run.

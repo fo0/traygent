@@ -152,6 +152,13 @@ pub fn run() {
             crate::desktop_updates::install_update,
             hide_panel
         ])
-        .run(tauri::generate_context!())
-        .expect("Traygent konnte nicht gestartet werden");
+        .build(tauri::generate_context!())
+        .expect("Traygent konnte nicht gestartet werden")
+        .run(|_, event| {
+            // Every exit („Traygent beenden“, the updater's `app.exit`) passes here: a hidden
+            // sign-in must not outlive the app (best effort, bounded).
+            if let tauri::RunEvent::Exit = event {
+                traygent_core::profiles::login::end_all(traygent_core::profiles::login::EXIT_WAIT);
+            }
+        });
 }

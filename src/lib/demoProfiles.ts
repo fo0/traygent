@@ -7,7 +7,7 @@
  * read from the machine.
  */
 import { DEMO_HOME } from './demoRecents';
-import { DEFAULT_PROFILE, STANDARD_LABEL } from './profiles';
+import { DEFAULT_PROFILE, PROFILE_MISSING, STANDARD_LABEL } from './profiles';
 import type {
   AgentCatalogEntry,
   AgentId,
@@ -15,6 +15,7 @@ import type {
   AppSettings,
   ProfileShare,
   ProfileStatus,
+  Snapshot,
 } from './types';
 
 /** The demo's extra profiles per agent. */
@@ -112,20 +113,48 @@ export function signedIn(
   );
 }
 
+/** What the demo's sign-ins need from the demo bridge. */
+export interface DemoSignInHost {
+  /** The current statuses. */
+  profiles: () => readonly ProfileStatus[];
+  /** The saved „Debug“ setting. */
+  debug: () => boolean;
+  /** Applies new statuses under the next revision. */
+  commit: (profiles: ProfileStatus[]) => void;
+  /** A copy of the current snapshot. */
+  snapshot: () => Snapshot;
+  /** Pushes the current snapshot like `traygent:snapshot`. */
+  emit: () => void;
+}
+
 /**
- * The demo's hidden sign-ins (#41): each ends after `wait` ms with
- * `finish()`, one per key at a time; a cancel rejects it as natively.
+ * The demo's sign-ins (#41), as natively but without a CLI: hidden, one per
+ * profile ends after `wait` ms signed in and can be cancelled; with „Debug“
+ * the terminal „opens“ at once and the status follows as an event.
  */
-export function demoLogins(wait: number) {
+export function demoSignIns(host: DemoSignInHost, wait: number) {
   const running = new Map<string, () => void>();
+  const finish = (agent: AgentId, id: string) =>
+    host.commit(signedIn(host.profiles(), agent, id));
   return {
-    run<T>(key: string, finish: () => T): Promise<T> {
+    login(agent: AgentId, id: string): Promise<Snapshot> {
+      if (!host.profiles().some((p) => p.agent === agent && p.id === id))
+        return Promise.reject(new Error(PROFILE_MISSING));
+      const key = `${agent}:${id}`;
       if (running.has(key))
         return Promise.reject(new Error('Die Anmeldung läuft bereits.'));
+      if (host.debug()) {
+        setTimeout(() => {
+          finish(agent, id);
+          host.emit();
+        }, wait);
+        return Promise.resolve(host.snapshot());
+      }
       return new Promise((resolve, reject) => {
         const timer = setTimeout(() => {
           running.delete(key);
-          resolve(finish());
+          finish(agent, id);
+          resolve(host.snapshot());
         }, wait);
         running.set(key, () => {
           clearTimeout(timer);
@@ -134,8 +163,11 @@ export function demoLogins(wait: number) {
         });
       });
     },
-    cancel(key: string) {
-      running.get(key)?.();
+    /** True when a hidden sign-in of the profile was running. */
+    cancel(agent: AgentId, id: string) {
+      const stop = running.get(`${agent}:${id}`);
+      stop?.();
+      return !!stop;
     },
   };
 }
