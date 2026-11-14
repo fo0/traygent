@@ -4,6 +4,7 @@
   import Icon from './Icon.svelte';
   import { dateTime } from './format';
   import { rowAccount } from './profileRow';
+  import { repeatClick, repeatKey } from './rowStart';
   import { STANDARD_LABEL, profileFolder, renameProblem } from './profiles';
   import type { SettingsDraft } from './settingsDraft.svelte';
   import type { AgentId, ProfileStatus } from './types';
@@ -24,6 +25,7 @@
     open,
     busy,
     running,
+    cancellable,
     onToggle,
     onLogin,
     onCancel,
@@ -40,6 +42,8 @@
     busy: boolean;
     /** Its sign-in is pending. */
     running: boolean;
+    /** The pending sign-in runs hidden: the button cancels it. */
+    cancellable: boolean;
     onToggle: () => void;
     onLogin: () => void;
     onCancel: () => void;
@@ -59,6 +63,18 @@
   const blocked = $derived(!status || busy);
   /** „Anmelden“ while signed out, its cancel while a sign-in is pending. */
   const acting = $derived(running || !status?.signedIn);
+  /** A hidden sign-in: the button is its cancel. With „Debug“ it only waits. */
+  const cancel = $derived(running && cancellable);
+
+  /**
+   * The second click of a multi-click and a held key never act again: they
+   * would cancel the sign-in their first press just started (`rowStart.ts`).
+   */
+  function press(event: MouseEvent) {
+    if (repeatClick(event)) return;
+    if (cancel) onCancel();
+    else if (!running && !blocked) onLogin();
+  }
   let toggle: HTMLButtonElement | undefined = $state();
   let action: HTMLButtonElement | undefined = $state();
   /** The action button had the focus right before it left the row. */
@@ -118,14 +134,17 @@
         class={running
           ? 'icon-button small spinning profile-login'
           : 'text-button profile-login'}
-        aria-label={running
+        aria-label={cancel
           ? `${shown}: Anmeldung abbrechen`
           : `${shown} anmelden`}
         aria-busy={running ? 'true' : undefined}
-        aria-disabled={!running && blocked ? 'true' : undefined}
-        title={running ? 'Anmeldung läuft · Abbrechen' : 'Im Browser anmelden'}
+        aria-disabled={(running && !cancel) || (!running && blocked)
+          ? 'true'
+          : undefined}
+        title={cancel ? 'Anmeldung läuft · Abbrechen' : 'Im Browser anmelden'}
         bind:this={action}
-        onclick={() => (running ? onCancel() : !blocked && onLogin())}
+        onclick={press}
+        onkeydown={(event) => repeatKey(event) && event.preventDefault()}
         >{#if running}<Icon
             name="refresh"
             size={14}

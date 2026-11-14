@@ -46,6 +46,8 @@ export class ProfileActions {
    * with „Debug“ until the terminal opened. A second click waits for it.
    */
   signingIn = $state<string[]>([]);
+  /** The pending sign-ins that run hidden: only those can be cancelled. */
+  hiddenRuns = $state<string[]>([]);
   /**
    * The last failed sign-in; cleared when that profile signs in again, by
    * „Jetzt synchronisieren“ and by adding a profile.
@@ -62,6 +64,11 @@ export class ProfileActions {
   /** Whether the sign-in of `profile` is pending. */
   running(agent: AgentId, profile: string) {
     return this.signingIn.includes(keyOf(agent, profile));
+  }
+
+  /** Whether the pending sign-in of `profile` runs hidden and can be cancelled. */
+  cancellable(agent: AgentId, profile: string) {
+    return this.hiddenRuns.includes(keyOf(agent, profile));
   }
 
   /** Syncs every profile now; false when one was already running. */
@@ -98,6 +105,7 @@ export class ProfileActions {
       this.failure = null;
     this.#cancelled.delete(key);
     this.signingIn = [...this.signingIn, key];
+    if (hidden) this.hiddenRuns = [...this.hiddenRuns, key];
     const fail = (text: string, hint: boolean): LoginResult => {
       this.failure = { agent, profile, text, hint };
       return 'failed';
@@ -116,6 +124,7 @@ export class ProfileActions {
     } finally {
       this.#cancelled.delete(key);
       this.signingIn = this.signingIn.filter((item) => item !== key);
+      this.hiddenRuns = this.hiddenRuns.filter((item) => item !== key);
     }
   }
 
@@ -126,7 +135,8 @@ export class ProfileActions {
    */
   async cancel(agent: AgentId, profile: string) {
     const key = keyOf(agent, profile);
-    if (!this.signingIn.includes(key)) return;
+    // A visible sign-in („Debug“) has no cancel: it only waits for the terminal.
+    if (!this.hiddenRuns.includes(key)) return;
     this.#cancelled.add(key);
     try {
       const found = await this.#deps.bridge.cancelProfileLogin(agent, profile);

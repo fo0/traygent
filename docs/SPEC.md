@@ -124,10 +124,14 @@ Brand top left: icon + „Traygent“. Window ~480×760, frameless, tray popup l
   organization instead of the account (#41); tooltip: account · organization —, a warning icon
   after a failed sync, „Anmelden“ only while the profile is signed out (immediate,
   `profile_login`, tooltip „Im Browser anmelden“) and a remove button (staged, undone by
-  „Abbrechen“; none for „Standard“). While a sign-in is pending (hidden: until it ended; with
-  „Debug“: until the terminal opened) the same button turns into a spinning icon (accessible
-  name „<Name>: Anmeldung abbrechen“, `aria-busy`, tooltip „Anmeldung läuft · Abbrechen“) whose
-  click sends `cancel_profile_login`; a second sign-in of that profile waits for it. Success —
+  „Abbrechen“; none for „Standard“). While a hidden sign-in runs the same button turns into a
+  spinning icon (accessible name „<Name>: Anmeldung abbrechen“, `aria-busy`, tooltip „Anmeldung
+  läuft · Abbrechen“) whose click sends `cancel_profile_login`; the second click of a
+  multi-click and an auto-repeated Enter or Space never act (`rowStart.ts → repeatClick` /
+  `repeatKey`), so they cannot cancel the sign-in their first press started. Cancel exists for
+  the hidden sign-in only: with „Debug“ the button just waits until the terminal opened —
+  spinning, `aria-busy`, `aria-disabled`, name „<Name> anmelden“ and tooltip unchanged, no
+  action. A second sign-in of a pending profile is ignored in both modes. Success —
   only when the answer reads the profile signed in — shows the answer's statuses and the 3 s
   note „Angemeldet.“, and the focus moves from the gone button to the row's details toggle; a
   cancel ends quietly (when `cancel_profile_login` found nothing to end, a later failure is
@@ -553,7 +557,8 @@ Commands (Rust `#[tauri::command]`, German `Err` strings; panel calls only via `
     not start → „Anmeldung fehlgeschlagen.“; after 5 minutes the process tree is ended
     (`detect/runner.rs → kill_tree`: absolute `taskkill /T /F`, bounded wait, then the process)
     → „Anmeldung abgelaufen.“; `cancel_profile_login { agent, profile }` ends it the same way →
-    „Anmeldung abgebrochen.“ and answers whether one was registered. The sign-in is registered
+    „Anmeldung abgebrochen.“ and answers whether one was registered — never for a visible
+    sign-in, which has no ticket and no cancel. The sign-in is registered
     first thing in `profile_login`, before any work, so a cancel cannot miss it once the
     command runs; one per profile — a second one is refused with „Die Anmeldung läuft
     bereits.“; the registration ends with the worker, also when it panics. The app's exit
@@ -562,7 +567,8 @@ Commands (Rust `#[tauri::command]`, German `Err` strings; panel calls only via `
     input (stdin closed) and ends the CLI or reaches the limit — it never hangs.
   - **Visible** (`settings.debug` on): a terminal titled „<Agent> · <Label> anmelden“ runs the
     same lines and stays open like the install terminal (`-NoExit`), so every line of the CLI can
-    be read; the command resolves with the current snapshot once it opened. A status watch
+    be read; it is not registered and cannot be cancelled, and the command resolves with the
+    current snapshot once it opened. A status watch
     (thread `traygent-profile-watch`) then reads the agent's statuses every 3 s (`SyncPlan::read`,
     never a sync, never under the service lock) until that profile's sign-in facts (signed in,
     account, organization) differ from those shown at the click, or 10 minutes passed; only a

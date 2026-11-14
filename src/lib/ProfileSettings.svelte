@@ -170,6 +170,7 @@
         open={opened === row.id}
         {busy}
         running={actions.running(agent, row.id)}
+        cancellable={actions.cancellable(agent, row.id)}
         onToggle={() => (opened = opened === row.id ? '' : row.id)}
         onLogin={() => void login(row.id)}
         onCancel={() => void actions.cancel(agent, row.id)}

@@ -103,8 +103,8 @@ pub async fn sync_profiles(app: AppHandle) -> Result<Snapshot, String> {
 
 /// Signs the agent's profile in; only ever on an explicit click (#41). Hidden („Debug“
 /// off): resolves when the sign-in ended, with the statuses read anew after exit code 0, or
-/// rejects with the German reason. Visible („Debug“ on): resolves once the terminal opened
-/// and leaves a status watch behind it.
+/// rejects with the German reason; only it can be cancelled. Visible („Debug“ on): no
+/// ticket and no cancel; resolves once the terminal opened and leaves a status watch behind.
 #[tauri::command]
 pub async fn profile_login(
     app: AppHandle,
@@ -112,24 +112,40 @@ pub async fn profile_login(
     profile: String,
 ) -> Result<Snapshot, String> {
     let key = (agent, profile.clone());
-    // Registered before any work, so a cancel can never miss it; it also refuses a second
-    // sign-in of the profile while this one runs. It ends with the worker, also on a panic.
-    let ticket = login::begin(key.clone())?;
+    // A hidden sign-in is registered before any work, so a cancel can never miss it; it also
+    // refuses a second one of the profile while it runs and ends with the worker, also on a
+    // panic. The setting is read under a short lock, never behind blocking work.
+    let debug = app.state::<NativeState>().lock().settings().debug;
+    let early = if debug {
+        None
+    } else {
+        Some(login::begin(key.clone())?)
+    };
     let watcher = app.clone();
+    let late = key.clone();
     let id = profile.clone();
     let hidden = work(app.clone(), move |service| {
         match service.prepare_sign_in(agent, &id, &Host::current(), &RealFs)? {
             SignIn::Visible { plan, fallback } => {
+                // „Debug“ was switched on meanwhile: a visible sign-in keeps no ticket.
+                drop(early);
                 crate::desktop_agents::start(&plan, fallback.as_ref())?;
                 let before = service.profile_facts(agent, &id);
                 start_watch(&watcher, watch::start(key, before, Instant::now()));
                 Ok(None)
             }
-            SignIn::Hidden(plan) => Ok(Some(plan)),
+            SignIn::Hidden(plan) => {
+                // „Debug“ was switched off meanwhile: register now.
+                let ticket = match early {
+                    Some(ticket) => ticket,
+                    None => login::begin(late)?,
+                };
+                Ok(Some((plan, ticket)))
+            }
         }
     })
     .await?;
-    let Some(plan) = hidden else {
+    let Some((plan, ticket)) = hidden else {
         return work(app, |service| Ok(service.snapshot())).await;
     };
     tauri::async_runtime::spawn_blocking(move || {

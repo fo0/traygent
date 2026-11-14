@@ -95,8 +95,9 @@ export interface Commands {
     result: Snapshot;
   };
   /**
-   * Ends the profile's running hidden sign-in; false when none is
-   * registered (it already ended, or has not reached Rust yet).
+   * Ends the profile's running hidden sign-in — the only kind with a cancel;
+   * a visible one („Debug“) has none. False when none is registered (it
+   * already ended, has not reached Rust yet, or is visible).
    */
   cancel_profile_login: {
     args: { agent: AgentId; profile: string };

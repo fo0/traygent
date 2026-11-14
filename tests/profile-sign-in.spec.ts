@@ -69,7 +69,11 @@ test('only a signed-out row offers „Anmelden“; the demo sign-in flips it in 
 });
 
 /** A native mock whose `profile_login` waits until the test releases it. */
-async function heldSignIn(page: Page, found = true) {
+async function heldSignIn(
+  page: Page,
+  found = true,
+  arg: Snapshot = nativeSnapshot(),
+) {
   return installTauriMock<
     Snapshot,
     { release: '' | 'signedIn' | 'failed'; found: boolean }
@@ -109,7 +113,7 @@ async function heldSignIn(page: Page, found = true) {
         return null;
       };
     },
-    { arg: nativeSnapshot(), state: { release: '', found } },
+    { arg, state: { release: '', found } },
   );
 }
 
@@ -211,4 +215,50 @@ test('„Debug“ is a staged switch under App; with it the sign-in opens a term
   );
   // The status follows as an event, without a reload.
   await expect(team.locator('.profile-account')).toHaveText('Beispiel Team');
+});
+
+test('the rest of a double-click or a held Enter never cancels the sign-in it started', async ({
+  page,
+}) => {
+  await heldSignIn(page);
+  await page.goto('/');
+  await openAgents(page);
+  const button = rowOf(page, 'Team').locator('.profile-row .profile-login');
+  await button.dblclick();
+  await expect(button).toHaveAccessibleName('Team: Anmeldung abbrechen');
+  expect(await readCalls(page, 'cancel_profile_login')).toHaveLength(0);
+  expect(await readCalls(page, 'profile_login')).toHaveLength(1);
+  // A held Enter on the cancel: only its first press acts.
+  const standard = rowOf(page, 'Standard');
+  await standard.getByRole('button', { name: 'Standard Details' }).focus();
+  await button.focus();
+  await page.keyboard.down('Enter');
+  await page.keyboard.down('Enter');
+  await page.keyboard.up('Enter');
+  await expect(button).toHaveAccessibleName('Team anmelden');
+  expect(await readCalls(page, 'profile_login')).toHaveLength(1);
+});
+
+test('with „Debug“ the button only waits for the terminal: no cancel', async ({
+  page,
+}) => {
+  const snapshot = nativeSnapshot();
+  snapshot.settings.debug = true;
+  const mock = await heldSignIn(page, true, snapshot);
+  await page.goto('/');
+  const dialog = await openAgents(page);
+  const button = rowOf(page, 'Team').locator('.profile-row .profile-login');
+  await button.click();
+  await expect(button).toHaveAttribute('aria-busy', 'true');
+  await expect(button).toHaveAttribute('aria-disabled', 'true');
+  await expect(button).toHaveAccessibleName('Team anmelden');
+  await expect(button).toHaveAttribute('title', 'Im Browser anmelden');
+  // Off via aria-disabled: a click reaches it and does nothing.
+  await button.click({ force: true });
+  expect(await readCalls(page, 'cancel_profile_login')).toHaveLength(0);
+  expect(await readCalls(page, 'profile_login')).toHaveLength(1);
+  await mock.configure({ release: 'signedIn' });
+  await expect(dialog.locator('.profiles .install-note')).toHaveText(
+    'Anmeldung geöffnet.',
+  );
 });

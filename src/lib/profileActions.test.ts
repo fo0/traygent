@@ -57,6 +57,7 @@ describe('ProfileActions sign-in (#41)', () => {
     const { actions, shown, base, finish, profileLogin } = setup();
     const result = actions.login('claude', 'team');
     expect(actions.running('claude', 'team')).toBe(true);
+    expect(actions.cancellable('claude', 'team')).toBe(true);
     expect(actions.running('claude', 'default')).toBe(false);
     // A second click on the pending row starts nothing.
     expect(await actions.login('claude', 'team')).toBe('failed');
@@ -129,10 +130,15 @@ describe('ProfileActions sign-in (#41)', () => {
     expect(actions.failure?.text).toBe('Anmeldung fehlgeschlagen.');
   });
 
-  it('with „Debug“ the row waits until the terminal opened, no hint after', async () => {
-    const { actions, base, finish, fail, profileLogin } = setup(true);
+  it('with „Debug“ the row waits until the terminal opened: no cancel, no hint', async () => {
+    const { actions, base, finish, fail, profileLogin, cancelProfileLogin } =
+      setup(true);
     const opened = actions.login('claude', 'team');
     expect(actions.running('claude', 'team')).toBe(true);
+    // A visible sign-in has no cancel.
+    expect(actions.cancellable('claude', 'team')).toBe(false);
+    await actions.cancel('claude', 'team');
+    expect(cancelProfileLogin).not.toHaveBeenCalled();
     expect(await actions.login('claude', 'team')).toBe('failed');
     expect(profileLogin).toHaveBeenCalledTimes(1);
     finish(base(false));
