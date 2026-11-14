@@ -181,6 +181,7 @@ export function demoSettings(): AppSettings {
     },
     github: { cloneRoot: '' },
     agentUpdates: false,
+    debug: false,
     profiles: demoProfileSettings(),
     agentProfile: { claude: 'default', opencode: 'default', codex: 'default' },
     profileShare: demoProfileShare(),

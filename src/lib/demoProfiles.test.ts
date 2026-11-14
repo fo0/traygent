@@ -18,7 +18,7 @@ const start: LaunchRequest = {
 };
 
 describe('demo profiles', () => {
-  it('lists Claude Code’s „Standard“ and „Team“, signed in with invented accounts', () => {
+  it('lists Claude Code’s „Standard“, signed in with an invented account, and „Team“, signed out', () => {
     const snapshot = demoSnapshot();
     expect(snapshot.catalog.map((entry) => entry.profiles)).toEqual([
       true,
@@ -37,11 +37,18 @@ describe('demo profiles', () => {
       codex: { dirs: [], files: [] },
     });
     expect(
-      snapshot.profiles.map((p) => [p.id, p.label, p.signedIn, p.account]),
+      snapshot.profiles.map((p) => [
+        p.id,
+        p.label,
+        p.signedIn,
+        p.account,
+        p.organization,
+      ]),
     ).toEqual([
-      ['default', 'Standard', true, 'demo@example.com'],
-      ['team', 'Team', true, 'team@example.com'],
+      ['default', 'Standard', true, 'demo@example.com', 'Beispiel GmbH'],
+      ['team', 'Team', false, undefined, undefined],
     ]);
+    expect(snapshot.settings.debug).toBe(false);
     expect(snapshot.recents.filter((r) => r.profile)).toHaveLength(1);
   });
 
@@ -71,7 +78,7 @@ describe('demo profiles', () => {
     expect(saved.settings.agentProfile.claude).toBe('kunde');
     expect(saved.profiles.map((p) => [p.id, p.signedIn])).toEqual([
       ['default', true],
-      ['team', true],
+      ['team', false],
       ['kunde', false],
     ]);
     expect(saved.profiles[2]?.dir).toBe('C:\\Users\\demo\\.claude-kunde');
@@ -96,7 +103,7 @@ describe('demo profiles', () => {
     );
   });
 
-  it('syncs every extra profile and signs one in like a detection', async () => {
+  it('syncs every extra profile and signs one in hidden: it resolves signed in', async () => {
     const bridge = createDemoBridge(0, 10);
     const pushed: string[] = [];
     await bridge.observe((value) =>
@@ -108,18 +115,48 @@ describe('demo profiles', () => {
     const synced = (await bridge.syncProfiles()).profiles;
     expect(synced[0]).toEqual(before[0]);
     expect(synced.slice(1).every((p) => p.syncedAt && !p.syncError)).toBe(true);
-    await expect(
-      bridge.profileLogin('claude', 'kunde'),
-    ).resolves.toBeUndefined();
+    const signed = await bridge.profileLogin('claude', 'kunde');
+    // The same account as „Standard“, an organization of its own; no event.
+    expect(signed.profiles[2]).toMatchObject({
+      signedIn: true,
+      account: 'demo@example.com',
+      organization: 'Beispiel Kunde',
+    });
     expect(pushed).toEqual([]);
-    await vi.waitFor(() =>
-      expect(pushed).toEqual(['default:true team:true kunde:true']),
-    );
-    const after = await bridge.snapshot();
-    expect(after.profiles[2]?.account).toBe('kunde@example.com');
     await expect(bridge.profileLogin('codex', 'default')).rejects.toThrow(
       'Dieses Profil gibt es nicht.',
     );
+  });
+
+  it('refuses a second sign-in of a running profile and cancels one', async () => {
+    const bridge = createDemoBridge(0, 50);
+    const running = bridge.profileLogin('claude', 'team');
+    await new Promise((resolve) => setTimeout(resolve, 5));
+    await expect(bridge.profileLogin('claude', 'team')).rejects.toThrow(
+      'Die Anmeldung läuft bereits.',
+    );
+    await bridge.cancelProfileLogin('claude', 'team');
+    await expect(running).rejects.toThrow('Anmeldung abgebrochen.');
+    expect((await bridge.snapshot()).profiles[1]?.signedIn).toBe(false);
+    // Nothing runs: a cancel is a no-op, the next sign-in starts afresh.
+    await bridge.cancelProfileLogin('claude', 'team');
+    expect(
+      (await bridge.profileLogin('claude', 'team')).profiles[1],
+    ).toMatchObject({ signedIn: true, organization: 'Beispiel Team' });
+  });
+
+  it('with „Debug“ the terminal „opens“ at once and the sign-in follows as an event', async () => {
+    const bridge = createDemoBridge(0, 10);
+    const pushed: string[] = [];
+    await bridge.observe((value) =>
+      pushed.push(value.profiles.map((p) => `${p.id}:${p.signedIn}`).join(' ')),
+    );
+    const { settings } = await bridge.snapshot();
+    settings.debug = true;
+    await bridge.saveSettings(settings);
+    const opened = await bridge.profileLogin('claude', 'team');
+    expect(opened.profiles[1]?.signedIn).toBe(false);
+    await vi.waitFor(() => expect(pushed).toEqual(['default:true team:true']));
   });
 
   it('stores an edited profile as natively', async () => {
@@ -168,12 +205,11 @@ describe('demo profiles', () => {
     expect(draft.current().sharedWindow).toBe(true);
     expect(shown.profiles.map((p) => [p.id, p.signedIn])).toEqual([
       ['default', true],
-      ['team', true],
+      ['team', false],
       ['kunde', false],
     ]);
-    await expect(
-      bridge.profileLogin('claude', 'kunde'),
-    ).resolves.toBeUndefined();
+    const signed = await bridge.profileLogin('claude', 'kunde');
+    expect(signed.profiles[2]?.signedIn).toBe(true);
   });
 
   it('renames a profile on „Speichern“: id, folder and sign-in stay', async () => {
@@ -185,7 +221,7 @@ describe('demo profiles', () => {
       id: 'team',
       label: 'Kunde B',
       dir: 'C:\\Users\\demo\\.claude-team',
-      signedIn: true,
+      signedIn: false,
     });
   });
 });

@@ -175,6 +175,13 @@
 .theme-setting {
   margin-bottom: 18px;
 }
+/* „Fehlersuche“ (#41): the one „Debug“ switch, below „Autostart“. */
+.debug-setting {
+  margin-top: 18px;
+}
+.debug-setting h3 {
+  margin: 0 0 10px;
+}
 .theme-setting h3 {
   margin: 0 0 10px;
 }

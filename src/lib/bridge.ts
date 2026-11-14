@@ -28,6 +28,8 @@ const nativeBridge: Bridge = {
   updateAgents: () => call('update_agents'),
   syncProfiles: () => call('sync_profiles'),
   profileLogin: (agent, profile) => call('profile_login', { agent, profile }),
+  cancelProfileLogin: (agent, profile) =>
+    call('cancel_profile_login', { agent, profile }),
 };
 
 /** Snapshots the native shell pushes (`traygent:snapshot`). */

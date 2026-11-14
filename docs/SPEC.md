@@ -119,12 +119,21 @@ Brand top left: icon + „Traygent“. Window ~480×760, frameless, tray popup l
   Dateien werden wie die eingebauten abgeglichen.“): „Jetzt
   synchronisieren“ beside the heading (immediate, `sync_profiles`, tooltip „Automatisch alle 15
   Minuten“), „Standard-Profil“ (staged), one single-line row per profile — „Standard“ first —
-  with a chevron toggle and its name, the account or „Nicht angemeldet“ (tooltip: the account),
-  a warning icon after a failed sync, „Anmelden“ (immediate, `profile_login`) and a remove
-  button (staged, undone by „Abbrechen“; none for „Standard“). The toggle (`aria-expanded`) opens
+  with a chevron toggle and its name, the account or „Nicht angemeldet“ — when another signed-in
+  profile of the agent has the same account (ignoring case) but another organization, the
+  organization instead of the account (#41); tooltip: account · organization —, a warning icon
+  after a failed sync, „Anmelden“ only while the profile is signed out (immediate,
+  `profile_login`, tooltip „Im Browser anmelden“) and a remove button (staged, undone by
+  „Abbrechen“; none for „Standard“). While a hidden sign-in runs, the row's action is a spinning
+  icon button (accessible name „Anmeldung läuft“, tooltip „Abbrechen“) whose click sends
+  `cancel_profile_login`; success shows the answer's statuses and the 3 s note „Angemeldet.“, a
+  cancel ends quietly, a failure stays as the block's inline error until the next profile action
+  (tooltip „Mit Debug erneut versuchen“ after a hidden sign-in). The state lives in the panel
+  (`profileActions.svelte.ts`), so closing the dialog keeps a running sign-in. The toggle (`aria-expanded`) opens
   the row's details in place, one row at a time: „Name“ (for an extra profile a field holding a
   staged rename — the id and folder never change — checked by the list rules — a problem shows in the open detail, else under „Neues Profil“ as „<Name>: <problem>“, and in the toggle's description; read-only for
-  „Standard“), „Konto“, „Organisation“ (when reported), „Ordner“ (the folder, mono, with a copy
+  „Standard“), „Konto“, „Organisation“ (when reported; „Konto“ of a signed-in profile carries „Neu anmelden“ on the
+  right, the same action), „Ordner“ (the folder, mono, with a copy
   button), „Abgeglichen <time>“ and „Abgleich“ with the sync error when present. Then „Neues
   Profil“ + „+“ / Enter, whose tooltip shows the folder the name gives: adding is an explicit
   immediate action (#37) — it sends `save_settings` with the saved settings plus the new profile,
@@ -163,7 +172,10 @@ Brand top left: icon + „Traygent“. Window ~480×760, frameless, tray popup l
   Anmeldung prüfen“ (lists gh sign-ins, one consent line, „Übernehmen“) and a masked token field
   with „Verbinden“. Account actions apply at once; the clone root („Klon-Ordner“, placeholder
   the default) is staged like every setting.
-- **App**: theme (System/Hell/Dunkel), Mit Windows starten.
+- **App**: theme (System/Hell/Dunkel), Mit Windows starten, „Fehlersuche“ with the staged switch
+  „Debug“ (`settings.debug`, default off, tooltip „Anmeldung im sichtbaren Terminal, Fehler mit
+  Ausgabe“): a profile sign-in opens the visible terminal instead of running hidden (#41). The
+  panel shortens no error or `syncError` text, so „Debug“ changes the sign-in only.
 - **Updates**: in-app updates — „Nach Updates suchen“, changelog, „Installieren“ — as in RepoWatch.
   Below it „Agenten“: the staged checkbox „Automatisch aktualisieren“ (`settings.agentUpdates`,
   default off), „Jetzt aktualisieren“ and one line per agent with its last result; see
@@ -214,7 +226,8 @@ Commands (Rust `#[tauri::command]`, German `Err` strings; panel calls only via `
 | `github_disconnect`                | –                                                                                                | `Snapshot` (deletes the vault copy; gh stays signed in)       |
 | `github_refresh_repos`             | –                                                                                                | `Snapshot` (returns with `github.loading`, event follows)     |
 | `sync_profiles`                    | –                                                                                                | `Snapshot` (syncs every profile now, statuses in `profiles`)  |
-| `profile_login`                    | `{ agent, profile }`                                                                             | `void` (opens the terminal that signs that profile in)        |
+| `profile_login`                    | `{ agent, profile }`                                                                             | `Snapshot` (hidden: after the sign-in; „Debug“: once opened)  |
+| `cancel_profile_login`             | `{ agent, profile }`                                                                             | `void` (ends that profile's running hidden sign-in)           |
 | shell commands kept from RepoWatch | autostart_status, set_autostart, open_startup_settings, check_update, install_update, hide_panel | unchanged                                                     |
 
 ## Repositories (GitHub, [ADR-0005](adr/0005-start-from-a-github-repository.md))
@@ -515,14 +528,36 @@ Commands (Rust `#[tauri::command]`, German `Err` strings; panel calls only via `
 - **Statuses:** `Snapshot.profiles` per agent with `profiles`, „Standard“ first, then the
   settings' order; `syncError` = the last sync's errors joined by `·` (at most 400 characters). In
   memory only; read at every detection, after a sync and a settings save.
-- **Sign-in:** `profile_login { agent, profile }` („Standard“ included, only on a click) creates
-  the profile directory and opens a terminal in `%USERPROFILE%` (else `C:\`) titled „<Agent> ·
-  <Label> anmelden“ running the env line (for „Standard“ always the `Remove-Item`) and
-  `& '<cli>' 'auth' 'login'`; it stays open like the install terminal. Refused: „<Agent> wird
-  gerade aktualisiert.“, „<Agent> ist nicht installiert.“, „Profil nicht gefunden.“, and „Der
-  Profilordner gehört nicht zu Claude Code.“ for an existing foreign directory (the rule above,
-  with the agent's extra directories; also when that cannot be checked) — a sign-in never writes
-  credentials into it. The status follows with the next detection, sync or settings save.
+- **Sign-in (#41):** `profile_login { agent, profile }` („Standard“ included, only on a click)
+  creates the profile directory and runs, in `%USERPROFILE%` (else `C:\`), the env line (for
+  „Standard“ always the `Remove-Item`) and `& '<cli>' 'auth' 'login'` (an npm `.cmd` shim the
+  same way). Refused before anything runs: „<Agent> wird gerade aktualisiert.“, „<Agent> ist
+  nicht installiert.“, „Profil nicht gefunden.“, and „Der Profilordner gehört nicht zu Claude
+  Code.“ for an existing foreign directory (the rule above, with the agent's extra directories;
+  also when that cannot be checked) — a sign-in never writes credentials into it.
+  - **Hidden** (`settings.debug` off, the default): the script, preceded by `$LASTEXITCODE=$null`
+    and followed by `if ($null -eq $LASTEXITCODE) { exit 1 }; exit $LASTEXITCODE`, runs as
+    `powershell.exe -NoLogo -NoProfile -NonInteractive -EncodedCommand <Base64>` without a
+    window (`CREATE_NO_WINDOW`), stdin closed, stdout and stderr drained into one buffer capped
+    at 64 KiB, ANSI stripped, wiped afterwards — never logged, persisted or shown, it can hold the
+    sign-in URL or a code. The CLI opens the browser itself. The command resolves when the
+    process ended: exit code 0 → the agent's statuses are read anew (`SyncPlan::read`, without
+    the service lock), committed through `apply_profiles` and returned as the `Snapshot`; any
+    other code or a process that could not start → „Anmeldung fehlgeschlagen.“; after 5 minutes
+    the process tree is ended (`taskkill /T /F`, then the process) → „Anmeldung abgelaufen.“;
+    `cancel_profile_login { agent, profile }` ends it the same way → „Anmeldung abgebrochen.“
+    (a no-op when none runs). One hidden sign-in per profile: a second one is refused with „Die
+    Anmeldung läuft bereits.“ while it runs; the registration ends with the worker, also when it
+    panics. A prompt for a pasted code gets end of input (stdin closed) and ends the CLI or
+    reaches the limit — it never hangs.
+  - **Visible** (`settings.debug` on): a terminal titled „<Agent> · <Label> anmelden“ runs the
+    same lines and stays open like the install terminal (`-NoExit`), so every line of the CLI can
+    be read; the command resolves with the current snapshot once it opened. A status watch
+    (thread `traygent-profile-watch`) then reads the agent's statuses every 3 s (`SyncPlan::read`,
+    never a sync, never under the service lock) until that profile's sign-in facts (signed in,
+    account, organization) differ from those shown at the click, or 10 minutes passed; only a
+    change is committed through `apply_profiles` and emitted as `traygent:snapshot`. One watch
+    per profile: another click replaces it, a removed profile or a panicking read ends it.
 
 ## Ports (Docker sessions)
 
@@ -559,6 +594,9 @@ script>`; inside the script every argument is a PowerShell single-quoted literal
 - Profiles (local, an agent with a recipe): one `CLAUDE_CONFIG_DIR` line — set to the profile's
   directory, or removed for „Standard“ while extra profiles exist — before the agent call; see
   _Profiles_.
+- The hidden sign-in (#41) is the one process without a terminal: `powershell.exe -NoLogo
+-NoProfile -NonInteractive -EncodedCommand <Base64>`, the same argv rules (no `"`, no empty
+  element), the same env line and literal call; see _Profiles → Sign-in_.
 - Closing: `-NoExit` keeps errors before or at the start visible (missing folder, failed clone, a
   CLI that cannot start). After the agent call a normal end (exit code 0, 130, `0xC000013A`, or
   the call stopped by Ctrl+C) closes the terminal with `[Environment]::Exit(0)`, after the Docker

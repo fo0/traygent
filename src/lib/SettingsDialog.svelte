@@ -2,6 +2,7 @@
   import { onDestroy, untrack } from 'svelte';
   import AgentSettings from './AgentSettings.svelte';
   import AgentUpdates from './AgentUpdates.svelte';
+  import DebugSetting from './DebugSetting.svelte';
   import EnvSettings from './EnvSettings.svelte';
   import GithubSettings from './GithubSettings.svelte';
   import Icon from './Icon.svelte';
@@ -258,6 +259,7 @@
     {:else if tab === 'app'}
       <ThemeSetting bind:value={theme} />
       <StartupSettings {native} {autostart} />
+      <DebugSetting {draft} />
     {:else}
       <UpdatePanel
         currentVersion={appVersion}

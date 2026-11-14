@@ -79,8 +79,25 @@ export interface Commands {
    * profile now; the answer carries every profile's `syncedAt` / `syncError`.
    */
   sync_profiles: { args: undefined; result: Snapshot };
-  /** Opens a terminal that signs the profile in (`default` included). */
-  profile_login: { args: { agent: AgentId; profile: string }; result: void };
+  /**
+   * Signs the profile in (`default` included, #41). „Debug“ off: hidden;
+   * resolves when the sign-in ended with exit code 0, with the statuses read
+   * anew, or rejects with „Anmeldung fehlgeschlagen.“, „Anmeldung
+   * abgelaufen.“ (5 minutes) or „Anmeldung abgebrochen.“ (see
+   * `cancel_profile_login`); a second one for the same profile is refused
+   * while one runs. „Debug“ on: resolves with the current snapshot once the
+   * visible terminal opened; a changed sign-in follows as the
+   * `traygent:snapshot` event (watched for up to 10 minutes).
+   */
+  profile_login: {
+    args: { agent: AgentId; profile: string };
+    result: Snapshot;
+  };
+  /** Ends the profile's running hidden sign-in; nothing when none runs. */
+  cancel_profile_login: {
+    args: { agent: AgentId; profile: string };
+    result: void;
+  };
   autostart_status: { args: undefined; result: StartupStatus };
   set_autostart: { args: { enabled: boolean }; result: StartupStatus };
   open_startup_settings: { args: undefined; result: void };
@@ -118,6 +135,7 @@ const REGISTERED: Record<Command, true> = {
   update_agents: true,
   sync_profiles: true,
   profile_login: true,
+  cancel_profile_login: true,
   autostart_status: true,
   set_autostart: true,
   open_startup_settings: true,

@@ -139,6 +139,7 @@ pub fn run() {
             crate::desktop_agent_updates::update_agents,
             crate::desktop_profiles::sync_profiles,
             crate::desktop_profiles::profile_login,
+            crate::desktop_profiles::cancel_profile_login,
             crate::desktop_github::github_connect_token,
             crate::desktop_github::github_local_accounts,
             crate::desktop_github::github_import_local,

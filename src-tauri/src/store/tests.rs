@@ -21,6 +21,7 @@ fn sample() -> Persisted {
         terminal: TerminalId::Console,
         shared_window: true,
         agent_updates: true,
+        debug: true,
         ..AppSettings::default()
     };
     settings.docker.gh_token = true;
@@ -93,6 +94,7 @@ fn save_then_load_round_trips_with_a_version() {
     assert_eq!(value["settings"]["terminal"], "console");
     assert_eq!(value["settings"]["sharedWindow"], true);
     assert_eq!(value["settings"]["agentUpdates"], true);
+    assert_eq!(value["settings"]["debug"], true);
     assert_eq!(
         value["settings"]["profiles"],
         json!({

@@ -225,6 +225,11 @@ fn repository_fields_are_optional_and_camel_case() {
     );
     let updating: AppSettings = serde_json::from_value(json!({ "agentUpdates": true })).unwrap();
     assert!(updating.agent_updates);
+    // Settings from before „Debug“ (#41) load with it off.
+    assert!(!settings.debug && !updating.debug);
+    assert_eq!(serde_json::to_value(&settings).unwrap()["debug"], false);
+    let debug: AppSettings = serde_json::from_value(json!({ "debug": true })).unwrap();
+    assert!(debug.debug);
     assert_eq!(
         serde_json::to_value(&settings).unwrap()["github"],
         json!({ "cloneRoot": "" })

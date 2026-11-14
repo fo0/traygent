@@ -94,6 +94,7 @@ describe('golden snapshot fixture', () => {
           'profiles',
           'agentProfile',
           'profileShare',
+          'debug',
         ],
       },
       'settings',
@@ -113,6 +114,8 @@ describe('golden snapshot fixture', () => {
     }
     // Agent CLIs update automatically only after the user opted in.
     expect(settings.agentUpdates).toBe(false);
+    // Sign-ins run hidden until „Debug“ is switched on.
+    expect(settings.debug).toBe(false);
     expectShape(settings.github, { required: ['cloneRoot'] }, 'github');
     expect(settings.github.cloneRoot).toBeTypeOf('string');
     expect(AGENTS).toContain(settings.defaultAgent);

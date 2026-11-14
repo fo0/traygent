@@ -49,6 +49,7 @@ impl Default for AppSettings {
             profiles: PerAgent::default(),
             agent_profile: PerAgent::from_fn(|_| crate::models::DEFAULT_PROFILE.to_string()),
             profile_share: PerAgent::default(),
+            debug: false,
         }
     }
 }

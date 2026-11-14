@@ -40,7 +40,8 @@ function bridgeWith(overrides: Partial<Bridge> = {}): Bridge {
     githubRefreshRepos: async () => snapshot(),
     updateAgents: async () => snapshot(),
     syncProfiles: async () => snapshot(),
-    profileLogin: async () => {},
+    profileLogin: async () => snapshot(),
+    cancelProfileLogin: async () => {},
     ...overrides,
   };
 }
@@ -243,7 +244,7 @@ describe('Panel', () => {
     const syncProfiles = vi.fn(
       () => new Promise<Snapshot>((done) => (resolve = done)),
     );
-    const profileLogin = vi.fn(async () => {});
+    const profileLogin = vi.fn(async () => snapshot({ revision: 9 }));
     const panel = panelWith({ syncProfiles, profileLogin });
     const first = panel.profiles.sync();
     expect(panel.profiles.syncing).toBe(true);
@@ -254,8 +255,9 @@ describe('Panel', () => {
     expect(panel.snapshot).toBe(synced);
     expect(panel.profiles.syncing).toBe(false);
     expect(syncProfiles).toHaveBeenCalledTimes(1);
-    await panel.profiles.login('claude', 'team');
+    expect(await panel.profiles.login('claude', 'team')).toBe('signedIn');
     expect(profileLogin).toHaveBeenCalledWith('claude', 'team');
+    expect(panel.snapshot?.revision).toBe(9);
     syncProfiles.mockRejectedValueOnce('Profil ist gesperrt.');
     await expect(panel.profiles.sync()).rejects.toBe('Profil ist gesperrt.');
     expect(panel.profiles.syncing).toBe(false);

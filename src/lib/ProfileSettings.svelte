@@ -5,7 +5,7 @@
   import ProfileRow from './ProfileRow.svelte';
   import ProfileShareFields from './ProfileShareFields.svelte';
   import { errorMessage } from './format';
-  import type { ProfileActions } from './profileActions.svelte';
+  import { DEBUG_HINT, type ProfileActions } from './profileActions.svelte';
   import {
     DEFAULT_PROFILE,
     STANDARD_LABEL,
@@ -17,9 +17,10 @@
   import type { SettingsDraft } from './settingsDraft.svelte';
   import type { AgentCatalogEntry, Snapshot } from './types';
 
-  // „Profile“ of one agent (#33, #37): adding a profile saves it at once, so
-  // it signs in right away; the default, removals and renames are staged
-  // with „Speichern“; „Anmelden“ and „Jetzt synchronisieren“ act at once.
+  // „Profile“ of one agent (#33, #37, #41): adding a profile saves it at
+  // once, so it signs in right away; the default, removals and renames are
+  // staged with „Speichern“; „Anmelden“ and „Jetzt synchronisieren“ act at
+  // once. A hidden sign-in runs in `actions`, so closing the dialog keeps it.
   let {
     entry,
     snapshot,
@@ -82,10 +83,15 @@
     clearTimeout(timer);
     timer = setTimeout(() => (note = ''), 3000);
   }
+  /** The failed sign-in of this agent, kept by the panel. */
+  const loginFailure = $derived(
+    actions.failure?.agent === agent ? actions.failure : null,
+  );
   async function act(run: () => Promise<unknown>, text: string) {
     if (busy) return;
     busy = true;
     note = failure = '';
+    actions.failure = null;
     try {
       if ((await run()) !== false) done(text);
     } catch (cause) {
@@ -94,9 +100,19 @@
       busy = false;
     }
   }
+  /** Signs a profile in; success notes go away, a failure stays inline. */
+  async function login(id: string) {
+    note = failure = '';
+    const result = await actions.login(agent, id);
+    if (result === 'signedIn')
+      done(demo ? 'Angemeldet (Demo).' : 'Angemeldet.');
+    else if (result === 'opened')
+      done(demo ? 'Demo: kein Terminal geöffnet.' : 'Anmeldung geöffnet.');
+  }
   /** Saves the typed profile at once; a refusal keeps the name typed. */
   async function add() {
     if (!name.trim() || draft.busy) return;
+    actions.failure = null;
     const result = await draft.addProfile(agent, name, actions.save);
     if (result === null) return;
     typed = result;
@@ -142,14 +158,13 @@
         id={row.id}
         {draft}
         status={statuses.find((item) => item.id === row.id)}
+        {statuses}
         open={opened === row.id}
         {busy}
+        running={actions.running(agent, row.id)}
         onToggle={() => (opened = opened === row.id ? '' : row.id)}
-        onLogin={() =>
-          void act(
-            () => actions.login(agent, row.id),
-            demo ? 'Demo: kein Terminal geöffnet.' : 'Anmeldung geöffnet.',
-          )}
+        onLogin={() => void login(row.id)}
+        onCancel={() => void actions.cancel(agent, row.id)}
       />
     {/each}
   </ul>
@@ -202,5 +217,11 @@
     </p>{/if}
   {#if failure}<div class="alert danger" role="alert">
       <Icon name="warning" size={16} /><span>{failure}</span>
+    </div>{:else if loginFailure}<div
+      class="alert danger"
+      role="alert"
+      title={loginFailure.hint ? DEBUG_HINT : undefined}
+    >
+      <Icon name="warning" size={16} /><span>{loginFailure.text}</span>
     </div>{/if}
 </section>

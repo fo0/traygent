@@ -75,6 +75,7 @@ export class Panel {
       bridge,
       accept: (value) => this.accept(value),
       saveSettings: (value) => this.saveSettings(value),
+      current: () => this.snapshot,
     });
   }
 

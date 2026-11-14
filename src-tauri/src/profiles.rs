@@ -12,6 +12,7 @@ pub mod foreign;
 pub mod history;
 pub mod json;
 pub mod links;
+pub mod login;
 pub mod marker;
 pub mod merge;
 pub mod node;
@@ -21,6 +22,7 @@ pub mod share;
 pub mod state;
 pub mod status;
 pub mod sync;
+pub mod watch;
 
 pub use links::{system_linker, Linker};
 pub use sync::{ProfileReport, SyncOutcome, SyncPlan};

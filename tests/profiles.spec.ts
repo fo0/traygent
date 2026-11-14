@@ -42,9 +42,15 @@ test('the „Profil“ chip: Claude Code in Lokal only, for the next start', asy
 
   await chip(page).click();
   const list = page.getByRole('listbox', { name: 'Profil' });
-  await expect(list.getByRole('option')).toHaveText(['Standard', 'Team']);
+  // „Team“ of the demo is signed out until „Anmelden“ (#41).
+  await expect(list.getByRole('option')).toHaveText([
+    /^Standard\s*$/,
+    /^Team\s*Nicht angemeldet/,
+  ]);
   await list.getByRole('option', { name: 'Team' }).click();
-  await expect(chip(page)).toHaveAccessibleName('Profil: Team');
+  await expect(chip(page)).toHaveAccessibleName(
+    'Profil: Team (Nicht angemeldet)',
+  );
   await expect(chip(page)).toHaveText('T');
 
   await composer(page)
@@ -116,7 +122,7 @@ test('natively: ▶ restarts with the stored profile, a warning stays, sign-in n
           snapshot,
           warning: 'Profil „Team“ ist nicht abgeglichen.',
         };
-      if (cmd === 'sync_profiles') return snapshot;
+      if (cmd === 'sync_profiles' || cmd === 'profile_login') return snapshot;
       return null;
     },
     { arg: snapshot, state: {} },
@@ -136,7 +142,7 @@ test('natively: ▶ restarts with the stored profile, a warning stays, sign-in n
 
   const dialog = await openAgents(page);
   await dialog.getByRole('button', { name: 'Team anmelden' }).click();
-  await expect(noteIn(dialog)).toHaveText('Anmeldung geöffnet.');
+  await expect(noteIn(dialog)).toHaveText('Angemeldet.');
   expect((await readCalls(page, 'profile_login'))[0]?.args).toEqual({
     agent: 'claude',
     profile: 'team',

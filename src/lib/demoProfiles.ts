@@ -1,6 +1,8 @@
 /*
- * Synthetic profiles of the browser preview (#33): Claude Code's „Standard“
- * and „Team“, both signed in with invented `example.com` accounts, and the
+ * Synthetic profiles of the browser preview (#33, #41): Claude Code's
+ * „Standard“, signed in with an invented `example.com` account, and „Team“,
+ * signed out until „Anmelden“; a demo sign-in reports the same account with
+ * an organization of its own, like one person in two organizations. Also the
  * extra names they share (#35). Folders and times are invented and never
  * read from the machine.
  */
@@ -29,9 +31,12 @@ export function demoProfileShare(): Record<AgentId, ProfileShare> {
   };
 }
 
-/** The invented account a demo sign-in of `id` reports. */
-export const demoAccount = (id: string) =>
-  `${id === DEFAULT_PROFILE ? 'demo' : id}@example.com`;
+/** The invented account every demo sign-in reports. */
+export const DEMO_PROFILE_ACCOUNT = 'demo@example.com';
+
+/** The invented organization a demo sign-in of a profile reports. */
+export const demoOrganization = (id: string, label: string) =>
+  id === DEFAULT_PROFILE ? 'Beispiel GmbH' : `Beispiel ${label}`;
 
 /**
  * The statuses of the saved profiles, „Standard“ first; a profile already
@@ -58,21 +63,22 @@ export function demoProfiles(
     );
 }
 
-/** The demo's first statuses: every profile signed in, synced `now`. */
+/** The demo's first statuses: „Standard“ signed in, „Team“ synced `now`. */
 export function demoProfileStatuses(
   settings: Pick<AppSettings, 'profiles'>,
   catalog: readonly AgentCatalogEntry[],
   now: number,
 ): ProfileStatus[] {
-  return demoProfiles(settings, catalog, []).map((status) => ({
-    ...status,
-    signedIn: true,
-    account: demoAccount(status.id),
-    ...(status.id !== DEFAULT_PROFILE && {
-      organization: 'Beispiel GmbH',
-      syncedAt: new Date(now - 20 * 60_000).toISOString(),
-    }),
-  }));
+  return demoProfiles(settings, catalog, []).map((status) =>
+    status.id === DEFAULT_PROFILE
+      ? {
+          ...status,
+          signedIn: true,
+          account: DEMO_PROFILE_ACCOUNT,
+          organization: demoOrganization(status.id, status.label),
+        }
+      : { ...status, syncedAt: new Date(now - 20 * 60_000).toISOString() },
+  );
 }
 
 /** A finished sync: every extra profile synced `now`, without an error. */
@@ -96,7 +102,40 @@ export function signedIn(
 ): ProfileStatus[] {
   return statuses.map((status) =>
     status.agent === agent && status.id === id
-      ? { ...status, signedIn: true, account: demoAccount(id) }
+      ? {
+          ...status,
+          signedIn: true,
+          account: DEMO_PROFILE_ACCOUNT,
+          organization: demoOrganization(id, status.label),
+        }
       : status,
   );
+}
+
+/**
+ * The demo's hidden sign-ins (#41): each ends after `wait` ms with
+ * `finish()`, one per key at a time; a cancel rejects it as natively.
+ */
+export function demoLogins(wait: number) {
+  const running = new Map<string, () => void>();
+  return {
+    run<T>(key: string, finish: () => T): Promise<T> {
+      if (running.has(key))
+        return Promise.reject(new Error('Die Anmeldung läuft bereits.'));
+      return new Promise((resolve, reject) => {
+        const timer = setTimeout(() => {
+          running.delete(key);
+          resolve(finish());
+        }, wait);
+        running.set(key, () => {
+          clearTimeout(timer);
+          running.delete(key);
+          reject(new Error('Anmeldung abgebrochen.'));
+        });
+      });
+    },
+    cancel(key: string) {
+      running.get(key)?.();
+    },
+  };
 }
