@@ -79,8 +79,9 @@ Brand top left: icon + „Traygent“. Window ~480×760, frameless, tray popup l
    its corner as its initial on a small round accent tile („Profil <label>“, also in the row's
    tooltip), so it takes no width from the folder name — folder name (primary) + parent path
    (secondary, ellipsized), then fixed columns at the right edge so every icon lines up from
-   row to row (`RecentMeta.svelte`; an absent part leaves an empty, `aria-hidden` slot): ports
-   chip (the one variable width, first), GitHub mark, env icon (Lokal/Docker), the options as
+   row to row (`RecentMeta.svelte`; an absent part leaves an empty, `aria-hidden` slot): a `</>`
+   mark („Extra-Argumente“) when a restart passes extra arguments and the ports chip (together
+   the one variable width, first), GitHub mark, env icon (Lokal/Docker), the options as
    symbols — a chosen model
    as a one-letter badge (`optionMarks.ts → modelLetter`: Opus O, Sonnet S, Haiku H, Fable F,
    Opus Plan P; Codex by the word after `gpt-…`: Sol S, Astra A, Terra T, Luna L; else the
