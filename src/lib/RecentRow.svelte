@@ -193,6 +193,7 @@
       >{/if}</span
   >
   <RecentMeta
+    args={!!args}
     {repo}
     {env}
     model={options.model}

@@ -113,8 +113,9 @@
  * from row to row: ports · repo · environment · model · thinking ·
  * permission · time (6em: the longest relative time, „gerade eben“ or a
  * date). An absent part keeps its column as an empty `.recent-slot`. The
- * ports chip alone varies in width: it goes first, so it only takes room
- * from the folder name and never moves the other columns.
+ * lead column (extra-arguments mark, ports chip) alone varies in width: it
+ * goes first, so it only takes room from the folder name and never moves
+ * the other columns.
  */
 .recent-meta {
   display: grid;
@@ -124,6 +125,18 @@
   column-gap: 5px;
   color: var(--text-3);
   font-size: var(--font-size-meta);
+}
+/* The lead column: the extra-arguments mark, then the ports chip. */
+.recent-lead {
+  display: inline-flex;
+  justify-self: end;
+  align-items: center;
+  gap: 4px;
+  min-width: 0;
+}
+.recent-args {
+  display: inline-flex;
+  color: var(--text-2);
 }
 /* Each part, or an absent part's empty slot, fills its column. */
 .recent-env,

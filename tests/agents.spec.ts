@@ -214,6 +214,12 @@ test('a restart names the extra arguments it passes', async ({ page }) => {
   // Assistive tech hears the arguments once, in the name; the description
   // is the folder alone, not the long tooltip.
   await expect(restart).toHaveAccessibleDescription(recent.folder);
+  // A mark in the row says a restart passes more than the chips show; only
+  // the row with extra arguments carries it (#31 in BACKLOG.md).
+  await expect(
+    target.getByRole('img', { name: 'Extra-Argumente', exact: true }),
+  ).toBeVisible();
+  await expect(page.locator('.recent-args')).toHaveCount(1);
   await restart.click();
   await expect
     .poll(async () =>

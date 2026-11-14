@@ -145,6 +145,12 @@
       wire('8.5,11.5 5,15 8.5,18.5'),
     ],
     plus: [line(12, 5, 12, 19), line(5, 12, 19, 12)],
+    // Extra arguments a recent session passes: code brackets.
+    code: [
+      wire('8.5,7 3.5,12 8.5,17'),
+      wire('15.5,7 20.5,12 15.5,17'),
+      line(13.5, 6, 10.5, 18),
+    ],
     // A repository: a branch off its main line.
     repo: [
       ring(7, 5.5, 2),

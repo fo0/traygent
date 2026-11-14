@@ -18,7 +18,7 @@ Everything the panel does, control by control. The UI labels are German; each on
 One composer, no prose:
 
 - **Agent** — **Claude Code · OpenCode · Codex**; each carries a status dot for the selected environment (ready or missing).
-- **Folder or repository** („Ordner oder Repo“) — the field starts empty, its placeholder names both forms. Type a folder, browse with the native folder dialog or pick one of the recent folders — or name a GitHub repository: paste its URL, type `owner/name`, or type a few letters to get suggestions from your connected account ([below](#start-from-a-github-repository)). **Ctrl+L** jumps to the field and selects its text.
+- **Folder or repository** („Ordner oder Repo“) — the field starts empty, its placeholder names both forms. Type a folder, browse with the native folder dialog or pick one of the recent folders — or name a GitHub repository: paste its URL, type `owner/name`, or type a few letters to get suggestions from your connected account ([below](#start-from-a-github-repository)). **Ctrl+L** jumps to the field and selects its text. **Escape** clears it (an open suggestion list closes first).
 - **Environment** — **Lokal** (local) or **Docker**; **WSL** is shown disabled („Bald verfügbar“, coming soon). Environments you hide under **Einstellungen → Umgebung → Umgebungen** leave the composer; with just one, the row disappears.
 - **Option chips** — start from the saved defaults and change the next start only:
   - **Modell** — the model.
@@ -32,7 +32,7 @@ One composer, no prose:
 ## Recent sessions — „Zuletzt“
 
 - One single-line row per folder, agent and environment, newest first, at most 20.
-- Each row shows the agent icon (with the profile's initial on its corner when it started with a profile other than **Standard**), folder name and parent path, then fixed columns at the right edge, so every icon sits in the same column from row to row (an absent part leaves its column empty): published ports, a repository icon when it was started from GitHub, the environment icon, the options as symbols and a relative time.
+- Each row shows the agent icon (with the profile's initial on its corner when it started with a profile other than **Standard**), folder name and parent path, then fixed columns at the right edge, so every icon sits in the same column from row to row (an absent part leaves its column empty): a `</>` mark when a restart passes extra arguments (the arguments are in the tooltip), published ports, a repository icon when it was started from GitHub, the environment icon, the options as symbols and a relative time.
 - Options as symbols: the chosen model as a one-letter badge (Opus **O**, Sonnet **S**, Haiku **H**; Codex models by their own word: Sol **S**, Astra **A**, Terra **T**, Luna **L**), the thinking level as signal bars, the permission as a symbol.
 - A click anywhere on the row (or **▶**) starts that session again with exactly those settings — once per press, so a double-click never starts it twice.
 - The **⋯** menu offers **In Composer übernehmen** (copy into the composer), **Bearbeiten …** (edit the model, thinking level, permission, extra arguments and Docker ports the row starts with, without starting it), **Ordner öffnen** (open the folder in Explorer), **Pfad kopieren** (copy the folder path) and **Entfernen** (remove) with **Rückgängig** (undo) for 8 seconds.

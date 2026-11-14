@@ -10,10 +10,12 @@
    * A recent row's fixed-size parts in fixed columns (owner request, #20):
    * ports · repo · environment · model · thinking · permission · time. An
    * absent part keeps its column as an empty, hidden slot, so every icon
-   * sits in the same column from row to row. The ports chip is the only
-   * part of variable width: it goes first, so it never moves the others.
+   * sits in the same column from row to row. The lead column is the only
+   * one of variable width (the extra-arguments mark and the ports chip): it
+   * goes first, so it never moves the others.
    */
   let {
+    args,
     repo,
     env,
     model,
@@ -28,6 +30,8 @@
     lastStartedAt,
     now,
   }: {
+    /** Whether a restart passes extra arguments (#31 in BACKLOG.md). */
+    args: boolean;
     /** The repository's accessible name, or `''`. */
     repo: string;
     env: EnvInfo;
@@ -49,12 +53,20 @@
 </script>
 
 <span class="recent-meta">
-  {#if portsText}<span
-      class="chip chip-static recent-ports"
-      data-warn={exposed ? 'true' : undefined}
-      role="img"
-      aria-label={portsTitle}
-      ><Icon name="ports" size={11} /><span>{portsText}</span></span
+  <!-- The values stay in the start's tooltip and name; the mark only says
+       that a one-click restart passes more than the chips show. -->
+  {#if args || portsText}<span class="recent-lead"
+      >{#if args}<span
+          class="recent-args"
+          role="img"
+          aria-label="Extra-Argumente"><Icon name="code" size={13} /></span
+        >{/if}{#if portsText}<span
+          class="chip chip-static recent-ports"
+          data-warn={exposed ? 'true' : undefined}
+          role="img"
+          aria-label={portsTitle}
+          ><Icon name="ports" size={11} /><span>{portsText}</span></span
+        >{/if}</span
     >{:else}<span class="recent-slot" aria-hidden="true"></span>{/if}
   {#if repo}<span class="recent-repo" role="img" aria-label={repo}
       ><Icon name="github" size={13} /></span
