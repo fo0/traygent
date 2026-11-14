@@ -18,7 +18,7 @@ Everything the panel does, control by control. The UI labels are German; each on
 One composer, no prose:
 
 - **Agent** — **Claude Code · OpenCode · Codex**; each carries a status dot for the selected environment (ready or missing).
-- **Folder or repository** („Ordner oder Repo“) — the field starts empty, its placeholder names both forms. Type a folder, browse with the native folder dialog or pick one of the recent folders — or name a GitHub repository: paste its URL, type `owner/name`, or type a few letters to get suggestions from your connected account ([below](#start-from-a-github-repository)). **Ctrl+L** jumps to the field and selects its text.
+- **Folder or repository** („Ordner oder Repo“) — the field starts empty, its placeholder names both forms. Type a folder, browse with the native folder dialog or pick one of the recent folders — or name a GitHub repository: paste its URL, type `owner/name`, or type a few letters to get suggestions from your connected account ([below](#start-from-a-github-repository)). **Ctrl+L** jumps to the field and selects its text. **Escape** clears it (an open suggestion list closes first).
 - **Environment** — **Lokal** (local) or **Docker**; **WSL** is shown disabled („Bald verfügbar“, coming soon). Environments you hide under **Einstellungen → Umgebung → Umgebungen** leave the composer; with just one, the row disappears.
 - **Option chips** — start from the saved defaults and change the next start only:
   - **Modell** — the model.

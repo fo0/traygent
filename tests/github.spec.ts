@@ -100,7 +100,7 @@ test('search text suggests repositories; ↓ and Enter pick one, which starts', 
   ).toBeVisible();
 });
 
-test('a click picks, Escape closes, private repositories carry a lock', async ({
+test('a click picks, Escape closes then clears, private repositories carry a lock', async ({
   page,
 }) => {
   await page.goto('/');
@@ -124,6 +124,10 @@ test('a click picks, Escape closes, private repositories carry a lock', async ({
   await expect(input).toHaveValue('demo-org/design-system');
   await expect(input).toBeFocused();
   await expect(start(page)).not.toHaveAttribute('aria-disabled');
+  // With no list open, Escape clears the field for the next target.
+  await input.press('Escape');
+  await expect(input).toHaveValue('');
+  await expect(input).toBeFocused();
 });
 
 test('a pasted URL is a repository; a recent from one adopts as owner/name', async ({

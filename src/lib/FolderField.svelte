@@ -94,7 +94,11 @@
     const repo = matches[index];
     if (repo) value = repoLabel(repo);
   }
-  /** Combobox keys; Enter on an open list picks instead of starting. */
+  /**
+   * Combobox keys; Enter on an open list picks instead of starting. Escape
+   * closes an open list first and clears the field on the next press (the
+   * combobox pattern's optional clear), so a new target needs no Ctrl+A.
+   */
   function keydown(event: KeyboardEvent) {
     const step =
       event.key === 'ArrowDown' ? 1 : event.key === 'ArrowUp' ? -1 : 0;
@@ -111,6 +115,9 @@
       event.preventDefault();
       event.stopPropagation();
       suggest = false;
+    } else if (event.key === 'Escape' && value && !event.isComposing) {
+      event.preventDefault();
+      value = '';
     }
   }
 </script>
