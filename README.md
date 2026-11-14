@@ -34,16 +34,16 @@ Every start lands in **Zuletzt** (recent), so the next one is a single click.
 
 ## Features
 
-| Feature                               | What you get                                                                                                                  |
-| ------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------- |
-| ⚡ **One-click starts**               | Agent, folder, environment, Enter. Model, effort and permission default to your settings; the session mode starts at **Neu**. |
-| 🕘 **Recent sessions**                | Up to 20 folder · agent · environment combinations as compact rows; a click restarts one with exactly the same settings.      |
-| 🐳 **Local or Docker**                | Run the agent on the host or in a container with named volumes for its state and optional port publishing.                    |
-| 🐙 **Start from a GitHub repository** | Paste a URL, type `owner/name` or search your repositories; Traygent clones it on first use and reuses the folder afterwards. |
-| 👥 **Several Claude accounts**        | One profile per sign-in; skills, plugins, settings, MCP servers and history stay the same in all of them.                     |
-| 🔍 **Detects what is installed**      | Agent CLIs, their versions and Docker are detected; a missing CLI offers its install command instead of a dead start.         |
-| 🔄 **Updates in the app**             | Check, read the changelog and install without leaving the app.                                                                |
-| 🌗 **Small and native**               | Rust + Tauri, light and dark theme, starts with Windows if you want it to.                                                    |
+| Feature                               | What you get                                                                                                                                             |
+| ------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| ⚡ **One-click starts**               | Agent, folder, environment, Enter. Model, effort and permission default to your settings; the session mode starts at **Neu**.                            |
+| 🕘 **Recent sessions**                | Up to 20 folder · agent · environment combinations as compact rows; a click restarts one with exactly the same settings.                                 |
+| 🐳 **Local or Docker**                | Run the agent on the host or in a container with named volumes for its state and optional port publishing.                                               |
+| 🐙 **Start from a GitHub repository** | Paste a URL, type `owner/name` or search your repositories; Traygent clones it on first use and reuses the folder afterwards.                            |
+| 👥 **Several Claude accounts**        | One profile per sign-in; skills, plugins, settings, MCP servers and history stay the same in all of them, synced in the background every 15 minutes too. |
+| 🔍 **Detects what is installed**      | Agent CLIs, their versions and Docker are detected; a missing CLI offers its install command instead of a dead start.                                    |
+| 🔄 **Updates in the app**             | Check, read the changelog and install without leaving the app.                                                                                           |
+| 🌗 **Small and native**               | Rust + Tauri, light and dark theme, starts with Windows if you want it to.                                                                               |
 
 Every control is described in the [user guide](docs/USAGE.md).
 

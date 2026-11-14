@@ -13,9 +13,13 @@ const NAME = /^[A-Za-z0-9._-]{1,64}$/;
 const DEVICE = /^(?:con|prn|aux|nul|com[0-9]|lpt[0-9])(?:\.|$)/i;
 /** Traygent's own files in a profile folder start with this. */
 const OWN_PREFIX = '.traygent';
-/** What the sync already shares, copies or keeps per profile. */
-const HANDLED = new Set(
-  [
+/**
+ * What the sync already shares, copies or keeps per profile, as the native
+ * side spells and splits them (`share.rs → name_lists`): the folders it
+ * links and the files it syncs, shown under „Bereits abgeglichen“.
+ */
+export const BUILT_IN_SHARE: Readonly<ProfileShare> = {
+  dirs: [
     'skills',
     'agents',
     'commands',
@@ -33,11 +37,13 @@ const HANDLED = new Set(
     'hooks',
     'todos',
     'session-env',
-    'settings.json',
-    'CLAUDE.md',
-    'keybindings.json',
-    'history.jsonl',
-  ].map((name) => name.toLowerCase()),
+  ],
+  files: ['CLAUDE.md', 'keybindings.json', 'history.jsonl', 'settings.json'],
+};
+const HANDLED = new Set(
+  [...BUILT_IN_SHARE.dirs, ...BUILT_IN_SHARE.files].map((name) =>
+    name.toLowerCase(),
+  ),
 );
 /** The state and sign-in files and anything named after them, e.g. a backup copy. */
 export const PROTECTED_PREFIXES = ['.claude.json', '.credentials.json'];

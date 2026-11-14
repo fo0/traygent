@@ -1,6 +1,8 @@
 import { describe, expect, it } from 'vitest';
 import { demoSnapshot } from './demoData';
 import {
+  editedProfile,
+  recentProfileItems,
   MAX_PROFILES,
   agentProfiles,
   defaultProfile,
@@ -11,6 +13,7 @@ import {
   profileInitial,
   profileLabel,
   profilesProblem,
+  renameProblem,
 } from './profiles';
 import type { AgentProfile } from './types';
 import { settingsProblems } from './validation';
@@ -108,6 +111,27 @@ describe('a saved profile list', () => {
     );
   });
 
+  it('checks a rename in place by the same rules, unprefixed', () => {
+    const list = [team, { id: 'kunde', label: 'Kunde' }];
+    expect(renameProblem(list, 0)).toBe('');
+    expect(renameProblem([{ id: 'team', label: 'Kunde B' }], 0)).toBe('');
+    expect(renameProblem([{ id: 'team', label: '' }], 0)).toBe('Name fehlt.');
+    expect(renameProblem([{ id: 'team', label: 'STANDARD' }], 0)).toBe(
+      '„STANDARD“ ist reserviert.',
+    );
+    expect(renameProblem([team, { id: 'kunde', label: 'TEAM' }], 1)).toBe(
+      'Profil gibt es schon.',
+    );
+    // Against every other profile, not only the earlier ones.
+    expect(renameProblem([{ id: 'kunde', label: 'team' }, team], 0)).toBe(
+      'Profil gibt es schon.',
+    );
+    expect(renameProblem([{ id: 'team', label: ' Team' }], 0)).toBe(
+      'Ungültiger Name.',
+    );
+    expect(renameProblem(list, 5)).toBe('');
+  });
+
   it('marks the field in the settings problems', () => {
     const settings = demoSnapshot().settings;
     expect(settingsProblems(settings)).toEqual({});
@@ -149,29 +173,66 @@ describe('profiles of a snapshot', () => {
     expect(defaultProfile(settings, 'claude')).toBe('default');
   });
 
-  it('refuse a start with a profile that is gone, outside Lokal or the agent', () => {
+  it('refuse a start only with a Lokal profile the agent does not list', () => {
     const snapshot = demoSnapshot();
     const start = { agent: 'claude' as const, env: 'local' as const };
     expect(launchProfileProblem(snapshot, start)).toBe('');
-    expect(launchProfileProblem(snapshot, { ...start, profile: 'team' })).toBe(
-      '',
-    );
+    for (const profile of ['team', ' team ', 'default', ''])
+      expect(launchProfileProblem(snapshot, { ...start, profile })).toBe('');
     expect(launchProfileProblem(snapshot, { ...start, profile: 'alt' })).toBe(
-      'Profil „alt“ gibt es nicht mehr.',
+      'Profil nicht gefunden.',
     );
-    expect(
-      launchProfileProblem(snapshot, {
-        ...start,
-        env: 'docker',
-        profile: 'team',
-      }),
-    ).toBe('Profile gelten nur lokal.');
     expect(
       launchProfileProblem(snapshot, {
         ...start,
         agent: 'codex',
         profile: 'team',
       }),
-    ).toBe('Dieser Agent hat keine Profile.');
+    ).toBe('Profil nicht gefunden.');
+    // A container has its own home: any profile is dropped, never refused.
+    expect(
+      launchProfileProblem(snapshot, {
+        ...start,
+        env: 'docker',
+        profile: 'alt',
+      }),
+    ).toBe('');
+  });
+});
+
+describe('the profile of an edited recent', () => {
+  it('is offered for a Lokal entry of an agent with an extra profile', () => {
+    const snapshot = demoSnapshot();
+    const items = (
+      agent: 'claude' | 'codex',
+      env: 'local' | 'docker',
+      stored?: string,
+    ) => recentProfileItems(snapshot, agent, env, stored);
+    expect(items('claude', 'local')).toEqual([
+      { id: 'default', label: 'Standard' },
+      { id: 'team', label: 'Team' },
+    ]);
+    expect(items('claude', 'docker', 'team')).toEqual([]);
+    expect(items('codex', 'local')).toEqual([]);
+    snapshot.settings.profiles.claude = [];
+    snapshot.profiles = [];
+    expect(items('claude', 'local')).toEqual([]);
+    expect(items('claude', 'local', 'default')).toEqual([]);
+    // A profile the entry still stores keeps the field, with „Standard“ only.
+    expect(items('claude', 'local', 'team')).toEqual([
+      { id: 'default', label: 'Standard' },
+    ]);
+  });
+
+  it('is stored as natively: none for „Standard“ and outside Lokal', () => {
+    const { settings } = demoSnapshot();
+    expect(editedProfile(settings, 'claude', 'local', ' team ')).toBe('team');
+    for (const standard of [undefined, '', '  ', 'default'])
+      expect(
+        editedProfile(settings, 'claude', 'local', standard),
+      ).toBeUndefined();
+    expect(editedProfile(settings, 'claude', 'docker', 'team')).toBeUndefined();
+    expect(editedProfile(settings, 'claude', 'local', 'gone')).toBeNull();
+    expect(editedProfile(settings, 'codex', 'local', 'team')).toBeNull();
   });
 });

@@ -24,7 +24,7 @@ use crate::models::{AgentId, AgentProfile, AppSettings, PerAgent, ProfileShare, 
 use chrono::{DateTime, Utc};
 use std::collections::HashMap;
 use std::path::{Path, PathBuf};
-use std::sync::{Mutex, PoisonError};
+use std::sync::{Mutex, PoisonError, TryLockError};
 
 pub const NO_HOME: &str = "Benutzerordner nicht verfügbar";
 pub const PROFILE_DIR_FAILED: &str = "Profilordner konnte nicht angelegt werden";
@@ -33,6 +33,12 @@ const IS_DEFAULT_HOME: &str = "Profilordner ist der Ordner des Standard-Profils"
 const DIR_UNCHECKED: &str = "Profilordner konnte nicht geprüft werden";
 
 static RUNNING: Mutex<()> = Mutex::new(());
+
+/// True while a sync holds the turn, so another one would wait behind it. A poisoned turn
+/// that nobody holds is free, as it is for [`sync_agent`].
+pub fn busy() -> bool {
+    matches!(RUNNING.try_lock(), Err(TryLockError::WouldBlock))
+}
 
 /// How the sync of one profile went.
 #[derive(Clone, Debug, Default, PartialEq, Eq)]

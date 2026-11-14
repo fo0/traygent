@@ -14,7 +14,11 @@ import {
   demoRepos,
 } from './demoGithub';
 import { demoProfiles, signedIn, syncedProfiles } from './demoProfiles';
-import { launchProfileProblem } from './profiles';
+import {
+  PROFILE_MISSING,
+  editedProfile,
+  launchProfileProblem,
+} from './profiles';
 import {
   editRecent,
   recordStart,
@@ -147,9 +151,22 @@ export function createDemoBridge(latency = 150, detection = 600): DemoBridge {
       const root =
         data.settings.github.cloneRoot.trim() || data.github.defaultCloneRoot;
       const folder = repo && !given ? cloneFolder(root, repo) : request.folder;
-      // Normalized like natively: the recent stores what the start published.
+      // Normalized like natively: the recent stores what the start published
+      // (no profile outside Lokal or for „Standard“).
       const ports = normalizePorts(request.ports);
-      const recent = recordStart(data.recents, { ...request, folder, ports });
+      const { profile: wanted, ...rest } = request;
+      const profile = editedProfile(
+        data.settings,
+        rest.agent,
+        rest.env,
+        wanted,
+      );
+      const recent = recordStart(data.recents, {
+        ...rest,
+        folder,
+        ports,
+        ...(profile && { profile }),
+      });
       change({ recents: upsertRecent(data.recents, recent) });
       return { recent: structuredClone(recent), snapshot: copy() };
     },
@@ -166,7 +183,7 @@ export function createDemoBridge(latency = 150, detection = 600): DemoBridge {
       change({ recents: restored });
       return copy();
     },
-    async updateRecent(id, options, ports) {
+    async updateRecent(id, options, ports, profile) {
       await delay();
       const recent = data.recents.find((item) => item.id === id);
       if (!recent)
@@ -177,11 +194,15 @@ export function createDemoBridge(latency = 150, detection = 600): DemoBridge {
         effortProblem(entry, options) ||
         launchPortsProblem({ env: recent.env, ports });
       if (problem) throw new Error(problem);
+      const { agent, env } = recent;
+      const stored = editedProfile(data.settings, agent, env, profile);
+      if (stored === null) throw new Error(PROFILE_MISSING);
       const edited = editRecent(
         data.recents,
         id,
         structuredClone(options),
         normalizePorts(ports),
+        stored,
       );
       if (edited) change({ recents: edited });
       return copy();

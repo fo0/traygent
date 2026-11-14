@@ -3,6 +3,7 @@ import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
 import { demoSettings } from './demoData';
 import {
+  BUILT_IN_SHARE,
   HANDLED_NAMES,
   MAX_SHARED,
   NEVER_SHARED,
@@ -159,7 +160,9 @@ describe('shared names: the rules', () => {
     ).claude;
     const lower = (list: string[]) =>
       list.map((name) => name.toLowerCase()).sort();
-    expect([...HANDLED_NAMES].sort()).toEqual(lower(native.handled));
+    expect([...HANDLED_NAMES].sort()).toEqual(
+      lower([...native.handledDirs, ...native.handledFiles]),
+    );
     expect([...NEVER_SHARED].sort()).toEqual(lower(native.neverShared));
     expect([...PROTECTED_PREFIXES].sort()).toEqual(
       lower(native.protectedPrefixes),
@@ -167,6 +170,11 @@ describe('shared names: the rules', () => {
     expect(native.ownPrefix).toBe('.traygent');
     expect(native.maxPerList).toBe(MAX_SHARED);
     expect(native.maxNameChars).toBe(64);
+    // „Bereits abgeglichen“ shows the native lists as spelled and split.
+    expect(BUILT_IN_SHARE).toEqual({
+      dirs: native.handledDirs,
+      files: native.handledFiles,
+    });
   });
 
   it('refuse a name twice, ignoring case, within and across both lists', () => {

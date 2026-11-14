@@ -19,6 +19,8 @@ export const DEFAULT_PROFILE = 'default';
 /** The label of `default`, reserved for it. */
 export const STANDARD_LABEL = 'Standard';
 export const MAX_PROFILES = 8;
+/** A start or an edit names a profile the agent does not list, as natively. */
+export const PROFILE_MISSING = 'Profil nicht gefunden.';
 const MAX_LABEL_CHARS = 24;
 const ID = /^[a-z0-9][a-z0-9-]{0,23}$/;
 // eslint-disable-next-line no-control-regex
@@ -79,16 +81,43 @@ export function newProfileProblem(name: string, list: readonly AgentProfile[]) {
   return '';
 }
 
+/**
+ * Why a saved profile is refused next to `others` (the profiles its id and
+ * label must differ from), unprefixed; `''` when it passes.
+ */
+function savedProblem(
+  { id, label }: AgentProfile,
+  others: readonly AgentProfile[],
+) {
+  return (
+    (label !== label.trim() && 'Ungültiger Name.') ||
+    labelProblem(label) ||
+    ((!ID.test(id) || id === DEFAULT_PROFILE) && 'Ungültige Kennung.') ||
+    (taken(others, id, label) && 'Profil gibt es schon.') ||
+    ''
+  );
+}
+
+/**
+ * Why `list[index]` is refused after a rename in place (the id and folder
+ * stay): the rules of `profilesProblem` against every other profile,
+ * unprefixed.
+ */
+export function renameProblem(list: readonly AgentProfile[], index: number) {
+  const item = list[index];
+  if (!item) return '';
+  return savedProblem(
+    item,
+    list.filter((_, other) => other !== index),
+  );
+}
+
 /** Why a saved list and its default are refused, as natively; `''` when valid. */
 export function profilesProblem(list: readonly AgentProfile[], chosen: string) {
   if (list.length > MAX_PROFILES) return `Höchstens ${MAX_PROFILES} Profile.`;
-  for (const [index, { id, label }] of list.entries()) {
-    const problem =
-      (label !== label.trim() && 'Ungültiger Name.') ||
-      labelProblem(label) ||
-      ((!ID.test(id) || id === DEFAULT_PROFILE) && 'Ungültige Kennung.') ||
-      (taken(list.slice(0, index), id, label) && 'Profil gibt es schon.');
-    if (problem) return `${label}: ${problem}`;
+  for (const [index, item] of list.entries()) {
+    const problem = savedProblem(item, list.slice(0, index));
+    if (problem) return `${item.label}: ${problem}`;
   }
   if (chosen !== DEFAULT_PROFILE && !list.some((p) => p.id === chosen))
     return 'Standard-Profil gibt es nicht.';
@@ -163,17 +192,51 @@ export function profileInitial(label: string) {
   return ([...label.trim()][0] ?? '?').toUpperCase();
 }
 
-/** Why a start's profile is refused, as natively; `''` when it is fine. */
+/**
+ * Why a start's profile is refused, as natively (launch_prep.rs →
+ * launch_profile, by `editedProfile`): only an id the agent does not list, in
+ * Lokal; „Standard“ and every other environment start without one.
+ */
 export function launchProfileProblem(
-  snapshot: Pick<Snapshot, 'catalog' | 'settings'>,
+  snapshot: Pick<Snapshot, 'settings'>,
   request: Pick<LaunchRequest, 'agent' | 'env' | 'profile'>,
 ) {
   const { agent, env, profile } = request;
-  if (profile === undefined || profile === DEFAULT_PROFILE) return '';
-  if (!profilesApply(snapshot, agent, 'local'))
-    return 'Dieser Agent hat keine Profile.';
-  if (env !== 'local') return 'Profile gelten nur lokal.';
-  return knownProfile(snapshot.settings, agent, profile)
-    ? ''
-    : `Profil „${profile}“ gibt es nicht mehr.`;
+  return editedProfile(snapshot.settings, agent, env, profile) === null
+    ? PROFILE_MISSING
+    : '';
+}
+
+/**
+ * The „Profil“ choices of a recent's „Bearbeiten …“: „Standard“ and the
+ * agent's profiles; none (no field) outside Lokal, or without an extra one
+ * unless the entry still stores a profile (then just „Standard“, so the
+ * change a save makes is visible).
+ */
+export function recentProfileItems(
+  snapshot: Pick<Snapshot, 'catalog' | 'profiles' | 'settings'>,
+  agent: AgentId,
+  env: EnvId,
+  stored: string | undefined,
+): { id: string; label: string }[] {
+  if (!profilesApply(snapshot, agent, env)) return [];
+  const list = agentProfiles(snapshot, agent);
+  const shown = list.length > 1 || (!!stored && stored !== DEFAULT_PROFILE);
+  return shown ? list.map(({ id, label }) => ({ id, label })) : [];
+}
+
+/**
+ * The profile a start uses and an edited recent stores, as natively
+ * (launch_prep.rs → launch_profile): none for „Standard“ (absent, blank, `default`) and
+ * outside Lokal; `null` for an id the agent does not list.
+ */
+export function editedProfile(
+  settings: Pick<AppSettings, 'profiles'>,
+  agent: AgentId,
+  env: EnvId,
+  profile: string | undefined,
+): string | undefined | null {
+  const id = profile?.trim();
+  if (!id || id === DEFAULT_PROFILE || env !== 'local') return undefined;
+  return knownProfile(settings, agent, id) ? id : null;
 }

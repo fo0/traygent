@@ -455,4 +455,5 @@ fn a_prepared_start_is_confirmed_before_it_spawns() {
     assert_eq!(service.confirm_launch(&docker), Ok(()));
 }
 
+mod schedule;
 mod sync;

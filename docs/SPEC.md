@@ -96,9 +96,13 @@ Brand top left: icon + „Traygent“. Window ~480×760, frameless, tray popup l
    „Ports“ popover, the folder suggestions). Hiding an environment is a display preference, not
    a ban: its recents keep their environment and ▶ restarts them unchanged. „Bearbeiten …“
    (#3) opens a staged dialog with the row's model, thinking level, permission, extra
-   arguments and (Docker) ports; „Speichern“ stores them on the entry without a start
+   arguments, (Docker) ports and (Lokal, an agent with at least one extra profile or an entry
+   that still stores one, #37) „Profil“ — „Standard“ and the agent's profiles; a stored profile
+   removed since shows as „Standard“, and saving stores that. „Speichern“ stores them on the entry without a start
    (`update_recent`, validated like a start; the dialog also applies the npm-shim argument rule) — place, start time and count stay, the next ▶
-   sends them. The agent, environment and folder define the entry and are not editable.
+   sends them. The profile follows the start rule (_Profiles_): absent, blank or `default`
+   and every Docker entry store none, an id the agent does not list is refused („Profil nicht
+   gefunden.“). The agent, environment and folder define the entry and are not editable.
    A row's profile: ▶ restarts with it (one removed since is refused natively, „Profil nicht
    gefunden.“); „In Composer übernehmen“ takes it over, or the saved „Standard-Profil“ when it
    is gone. A start of the same folder with another profile updates the row's profile.
@@ -113,19 +117,32 @@ Brand top left: icon + „Traygent“. Window ~480×760, frameless, tray popup l
   permission, extra CLI args (free text, validated). For an agent with `profiles` a „Profile“
   block (info tip „Eigene Anmeldung je Profil, alles andere wird abgeglichen. Weitere Ordner und
   Dateien werden wie die eingebauten abgeglichen.“): „Jetzt
-  synchronisieren“ beside the heading (immediate, `sync_profiles`), „Standard-Profil“ (staged),
-  one row per profile — „Standard“ first — with its name, the account or „Nicht angemeldet“
-  (tooltip: account, organisation, folder, „Abgeglichen <time>“, the sync error), a warning
-  icon after a failed sync, „Anmelden“ (immediate, `profile_login`; „Erst speichern“ while the
-  profile is only staged) and a remove button (staged; none for „Standard“); then „Neues
-  Profil“ + „+“ / Enter, whose tooltip shows the folder the name gives. Inline errors: „Name
-  fehlt.“, „Höchstens 24 Zeichen.“, „Keine Steuerzeichen.“, „„<Name>“ ist reserviert.“,
-  „Mindestens ein Buchstabe oder eine Ziffer.“, „Profil gibt es schon.“, „Höchstens 8
-  Profile.“ With at least one extra profile staged, „Weitere Ordner“ and „Weitere Dateien“
-  (`profileShare`, staged; names split at commas and whitespace, repeats once, tooltip „Durch
-  Komma oder Leerzeichen getrennt“, placeholders `.caveman-sessions` / `orca-state.json`) with
-  the native errors of _Profiles → Extra entries_ inline, the first problem per field. Removing
-  the last extra profile hides them; a list that is then invalid goes back to its saved value.
+  synchronisieren“ beside the heading (immediate, `sync_profiles`, tooltip „Automatisch alle 15
+  Minuten“), „Standard-Profil“ (staged), one single-line row per profile — „Standard“ first —
+  with a chevron toggle and its name, the account or „Nicht angemeldet“ (tooltip: the account),
+  a warning icon after a failed sync, „Anmelden“ (immediate, `profile_login`) and a remove
+  button (staged, undone by „Abbrechen“; none for „Standard“). The toggle (`aria-expanded`) opens
+  the row's details in place, one row at a time: „Name“ (for an extra profile a field holding a
+  staged rename — the id and folder never change — checked by the list rules — a problem shows in the open detail, else under „Neues Profil“ as „<Name>: <problem>“, and in the toggle's description; read-only for
+  „Standard“), „Konto“, „Organisation“ (when reported), „Ordner“ (the folder, mono, with a copy
+  button), „Abgeglichen <time>“ and „Abgleich“ with the sync error when present. Then „Neues
+  Profil“ + „+“ / Enter, whose tooltip shows the folder the name gives: adding is an explicit
+  immediate action (#37) — it sends `save_settings` with the saved settings plus the new profile,
+  never the other staged edits, takes the answer as the new baseline and keeps every staged edit
+  staged, so the row signs in at once; meanwhile the field is busy, „+“ turns into a spinning
+  „Wird hinzugefügt …“, and „Speichern“, „Abbrechen“, Escape and the close button wait (the
+  dialog cannot close on a half-applied add). A name whose id the saved list still holds (a staged removal) brings that
+  profile back without a save, and the saved default with it when it was that one. Inline errors: „Name fehlt.“, „Höchstens 24 Zeichen.“, „Keine
+  Steuerzeichen.“, „„<Name>“ ist reserviert.“, „Mindestens ein Buchstabe oder eine Ziffer.“,
+  „Profil gibt es schon.“, „Höchstens 8 Profile.“ (with „ Erst speichern.“ appended when only
+  a staged removal or rename frees the name or the place), and a native refusal verbatim; the
+  name stays typed. With at least one extra profile staged, „Weitere Ordner“ and „Weitere
+  Dateien“ (`profileShare`, staged; names split at commas and whitespace, repeats once, tooltip
+  „Durch Komma oder Leerzeichen getrennt“, placeholders `.caveman-sessions` / `orca-state.json`)
+  with the native errors of _Profiles → Extra entries_ inline, the first problem per field, and
+  below them „Bereits abgeglichen“, collapsed by default: the built-in folders and files, mono
+  (`profileShare.ts → BUILT_IN_SHARE`, as `share.rs → name_lists` splits them). Removing the last
+  extra profile hides them; a list that is then invalid goes back to its saved value.
 - **Umgebung**: „Umgebungen“ — one checkbox per environment the composer shows (Lokal / Docker /
   WSL, all on by default; the last of Lokal and Docker cannot be turned off and says why in its
   tooltip), default environment (one of the shown ones, WSL disabled; it moves to the first shown
@@ -186,7 +203,7 @@ Commands (Rust `#[tauri::command]`, German `Err` strings; panel calls only via `
 | `launch_session`                   | `{ request }`                                                                                    | `LaunchOutcome` (validates, opens terminal, records recent)   |
 | `remove_recent`                    | `{ id }`                                                                                         | `Snapshot`                                                    |
 | `restore_recent`                   | `{ recent }`                                                                                     | `Snapshot` (undo of remove)                                   |
-| `update_recent`                    | `{ id, options, ports }`                                                                         | `Snapshot` (edit, no start)                                   |
+| `update_recent`                    | `{ id, options, ports, profile: string \| null }`                                                | `Snapshot` (edit, no start)                                   |
 | `pick_folder`                      | `{ initial?: string }`                                                                           | `string \| null` (native folder dialog)                       |
 | `install_agent`                    | `{ agent }`                                                                                      | `void` (opens a terminal running the catalog install command) |
 | `open_folder`                      | `{ path }`                                                                                       | `void` (Explorer)                                             |
@@ -336,9 +353,17 @@ Commands (Rust `#[tauri::command]`, German `Err` strings; panel calls only via `
   characters).
 - **Triggers:** the first detection after the app started (later detections only read the
   statuses), `save_settings` when `profiles` or `profileShare` changed (otherwise a re-read),
-  `sync_profiles` and a local start (that agent only). An agent without an extra profile is never
-  touched. One sync runs at a time; every run's file system work happens without the service
-  lock.
+  `sync_profiles`, a local start (that agent only) and a background sync every 15 minutes
+  (`PROFILE_SYNC_INTERVAL`, fixed, no setting): the `traygent-profile-sync` thread checks once a
+  minute and syncs every profile once 15 minutes have passed since the last sync of any kind
+  finished (before the first one, since the app started), only while some agent has an extra
+  profile and the user profile is known, also during an agent update (a sync never runs the CLI).
+  It is silent apart from each profile's `syncedAt` / `syncError`, which reach an open panel as
+  a `traygent:snapshot` event; a run that broke down also waits the full interval. A tick while
+  another sync is in flight is skipped (that sync restarts the interval); a sync that starts
+  between that check and the tick's own run is waited for, and the tick then runs the plan it took
+  before. An agent without an extra profile is never touched. One sync runs at a time; every
+  run's file system work happens without the service lock.
 - **Profile directory:** created when missing; a new or empty one gets the initial marker
   `{"version":1,"done":[]}` before anything is linked into it. An existing, non-empty one is
   adopted only when it holds `.claude.json`, `.credentials.json` or the marker, or nothing but

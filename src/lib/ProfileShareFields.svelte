@@ -1,6 +1,8 @@
 <script lang="ts">
   import { untrack } from 'svelte';
+  import Icon from './Icon.svelte';
   import {
+    BUILT_IN_SHARE,
     agentShare,
     parseShareNames,
     shareText,
@@ -10,12 +12,23 @@
   import type { AgentId } from './types';
 
   // The extra names the profiles of one agent share (#35), staged like
-  // every setting; the native side checks them again on „Speichern“.
+  // every setting; the native side checks them again on „Speichern“. Below
+  // them, collapsed, the names the sync handles itself (#37).
   let { agent, draft }: { agent: AgentId; draft: SettingsDraft } = $props();
 
   const FIELDS = [
-    { kind: 'dirs', label: 'Weitere Ordner', example: '.caveman-sessions' },
-    { kind: 'files', label: 'Weitere Dateien', example: 'orca-state.json' },
+    {
+      kind: 'dirs',
+      label: 'Weitere Ordner',
+      noun: 'Ordner',
+      example: '.caveman-sessions',
+    },
+    {
+      kind: 'files',
+      label: 'Weitere Dateien',
+      noun: 'Dateien',
+      example: 'orca-state.json',
+    },
   ] as const;
   const same = (a: readonly string[], b: readonly string[]) =>
     a.length === b.length && a.every((name, index) => name === b[index]);
@@ -66,4 +79,19 @@
         </p>{/if}
     </div>
   {/each}
+  <details class="profile-builtin">
+    <summary>
+      <Icon name="down" size={12} />Bereits abgeglichen
+    </summary>
+    <dl>
+      {#each FIELDS as field (field.kind)}
+        <dt>{field.noun}</dt>
+        <dd class="mono">
+          {#each BUILT_IN_SHARE[field.kind] as name, index (name)}{index
+              ? ', '
+              : ''}<span>{name}</span>{/each}
+        </dd>
+      {/each}
+    </dl>
+  </details>
 </div>

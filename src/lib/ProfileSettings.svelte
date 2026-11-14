@@ -2,8 +2,9 @@
   import { onDestroy } from 'svelte';
   import Dropdown from './Dropdown.svelte';
   import Icon from './Icon.svelte';
+  import ProfileRow from './ProfileRow.svelte';
   import ProfileShareFields from './ProfileShareFields.svelte';
-  import { dateTime, errorMessage } from './format';
+  import { errorMessage } from './format';
   import type { ProfileActions } from './profileActions.svelte';
   import {
     DEFAULT_PROFILE,
@@ -11,12 +12,14 @@
     agentProfiles,
     profileFolder,
     profileId,
+    renameProblem,
   } from './profiles';
   import type { SettingsDraft } from './settingsDraft.svelte';
   import type { AgentCatalogEntry, Snapshot } from './types';
 
-  // „Profile“ of one agent (#33): the default and the list are staged with
-  // „Speichern“; „Anmelden“ and „Jetzt synchronisieren“ act at once.
+  // „Profile“ of one agent (#33, #37): adding a profile saves it at once, so
+  // it signs in right away; the default, removals and renames are staged
+  // with „Speichern“; „Anmelden“ and „Jetzt synchronisieren“ act at once.
   let {
     entry,
     snapshot,
@@ -31,20 +34,42 @@
     actions: ProfileActions;
   } = $props();
 
-  const OUT = 'Nicht angemeldet';
   const HELP =
     'Eigene Anmeldung je Profil, alles andere wird abgeglichen. Weitere Ordner und Dateien werden wie die eingebauten abgeglichen.';
   const agent = $derived(entry.id);
   const statuses = $derived(agentProfiles(snapshot, agent));
+  const extra = $derived(draft.value.profiles[agent] ?? []);
   const rows = $derived([
     { id: DEFAULT_PROFILE, label: STANDARD_LABEL },
-    ...(draft.value.profiles[agent] ?? []),
+    ...extra,
   ]);
-  const problem = $derived(draft.problem(`agents.${agent}.profiles`));
+  /** Invalid renames, each named as its row shows it. */
+  const renames = $derived(
+    extra.flatMap((item, index) => {
+      const why = renameProblem(extra, index);
+      const saved = statuses.find((status) => status.id === item.id);
+      return why
+        ? [
+            {
+              id: item.id,
+              text: `${item.label || saved?.label || item.id}: ${why}`,
+            },
+          ]
+        : [];
+    }),
+  );
+  // An open row shows its rename problem itself; a closed one's shows here,
+  // so a blocked „Speichern“ always has a visible reason.
+  const problem = $derived(
+    renames.find((rename) => rename.id !== opened)?.text ??
+      (renames.length ? '' : draft.problem(`agents.${agent}.profiles`)),
+  );
 
   let name = $state('');
-  /** Why the typed name cannot be added; cleared on every keystroke. */
+  /** Why the typed name was not added; cleared on every keystroke. */
   let typed = $state('');
+  /** The one profile whose details are open. */
+  let opened = $state('');
   let busy = $state(false);
   let note = $state('');
   let failure = $state('');
@@ -69,23 +94,13 @@
       busy = false;
     }
   }
-  function add() {
-    if (!name.trim()) return;
-    typed = draft.addProfile(agent, name);
-    if (!typed) name = '';
-  }
-  function statusTitle(id: string) {
-    const status = statuses.find((item) => item.id === id);
-    if (!status) return 'Erst speichern';
-    return [
-      status.account ?? OUT,
-      status.organization,
-      status.dir,
-      status.syncedAt && `Abgeglichen ${dateTime(status.syncedAt)}`,
-      status.syncError,
-    ]
-      .filter(Boolean)
-      .join(' · ');
+  /** Saves the typed profile at once; a refusal keeps the name typed. */
+  async function add() {
+    if (!name.trim() || draft.busy) return;
+    const result = await draft.addProfile(agent, name, actions.save);
+    if (result === null) return;
+    typed = result;
+    if (!result) name = '';
   }
 </script>
 
@@ -100,6 +115,7 @@
     <!-- Off via aria-disabled: it keeps focus while the sync runs. --><button
       type="button"
       class="text-button profile-sync"
+      title="Automatisch alle 15 Minuten"
       aria-disabled={busy || actions.syncing ? 'true' : undefined}
       onclick={() =>
         void act(
@@ -121,47 +137,20 @@
   </div>
   <ul class="profile-list" aria-label="Profile">
     {#each rows as row (row.id)}
-      {@const status = statuses.find((item) => item.id === row.id)}
-      {@const saved = draft.savedProfile(agent, row.id) && !!status}
-      <li>
-        <span class="profile-name">{row.label}</span>
-        <span
-          class="profile-account"
-          data-out={status?.signedIn ? undefined : 'true'}
-          title={statusTitle(row.id)}
-          >{status?.signedIn ? (status.account ?? 'Angemeldet') : OUT}</span
-        >
-        {#if status?.syncError}<span
-            class="profile-warn"
-            role="img"
-            aria-label={`Abgleich fehlgeschlagen: ${status.syncError}`}
-            title={status.syncError}><Icon name="warning" size={13} /></span
-          >{/if}
-        <button
-          type="button"
-          class="text-button profile-login"
-          aria-label={`${row.label} anmelden`}
-          aria-disabled={!saved || busy ? 'true' : undefined}
-          title={saved ? 'Öffnet ein Terminal zum Anmelden' : 'Erst speichern'}
-          onclick={() =>
-            saved &&
-            void act(
-              () => actions.login(agent, row.id),
-              demo ? 'Demo: kein Terminal geöffnet.' : 'Anmeldung geöffnet.',
-            )}>Anmelden</button
-        >
-        {#if row.id === DEFAULT_PROFILE}<span
-            class="profile-slot"
-            aria-hidden="true"
-          ></span>{:else}<button
-            type="button"
-            class="icon-button small profile-remove"
-            aria-label={`${row.label} entfernen`}
-            title="Entfernen"
-            onclick={() => draft.removeProfile(agent, row.id)}
-            ><Icon name="trash" size={14} /></button
-          >{/if}
-      </li>
+      <ProfileRow
+        {agent}
+        id={row.id}
+        {draft}
+        status={statuses.find((item) => item.id === row.id)}
+        open={opened === row.id}
+        {busy}
+        onToggle={() => (opened = opened === row.id ? '' : row.id)}
+        onLogin={() =>
+          void act(
+            () => actions.login(agent, row.id),
+            demo ? 'Demo: kein Terminal geöffnet.' : 'Anmeldung geöffnet.',
+          )}
+      />
     {/each}
   </ul>
   <div class="port-add profile-add">
@@ -176,6 +165,8 @@
         : 'Name, z. B. Team'}
       spellcheck="false"
       autocomplete="off"
+      readonly={draft.adding}
+      aria-busy={draft.adding ? 'true' : undefined}
       aria-invalid={typed ? 'true' : undefined}
       aria-describedby={typed || problem ? 'profile-error' : undefined}
       oninput={() => (typed = '')}
@@ -183,14 +174,19 @@
         if (event.key !== 'Enter') return;
         event.preventDefault();
         event.stopPropagation();
-        add();
+        void add();
       }}
     /><button
       type="button"
       class="icon-button small"
-      aria-label="Profil hinzufügen"
-      title="Hinzufügen (Enter)"
-      onclick={add}><Icon name="plus" size={14} /></button
+      class:spinning={draft.adding}
+      aria-label={draft.adding
+        ? 'Profil wird hinzugefügt'
+        : 'Profil hinzufügen'}
+      aria-disabled={draft.busy ? 'true' : undefined}
+      title={draft.adding ? 'Wird hinzugefügt …' : 'Hinzufügen (Enter)'}
+      onclick={() => void add()}
+      ><Icon name={draft.adding ? 'refresh' : 'plus'} size={14} /></button
     >
   </div>
   {#if typed || problem}<p id="profile-error" class="field-error">

@@ -1,17 +1,19 @@
 import type { Bridge } from './bridgeTypes';
-import type { AgentId, Snapshot } from './types';
+import type { AgentId, AppSettings, Snapshot } from './types';
 
 export interface ProfileDeps {
   bridge: Pick<Bridge, 'syncProfiles' | 'profileLogin'>;
   /** Shows a snapshot unless an older one; see `Panel.accept`. */
   accept: (snapshot: Snapshot) => boolean;
+  /** `Panel.saveSettings`: saves and shows the answer. */
+  saveSettings: (settings: AppSettings) => Promise<Snapshot>;
 }
 
 /**
- * The immediate profile actions of Settings → Agenten (#33): „Jetzt
- * synchronisieren“ and „Anmelden“. They live in the panel, so a closed
- * dialog never drops a result; both reject with the German message, which
- * the dialog shows inline.
+ * The immediate profile actions of Settings → Agenten (#33, #37): „Jetzt
+ * synchronisieren“, „Anmelden“ and the save of a new profile. They live in
+ * the panel, so a closed dialog never drops a result; each rejects with the
+ * German message, which the dialog shows inline.
  */
 export class ProfileActions {
   /** A sync runs; its button waits. */
@@ -33,6 +35,13 @@ export class ProfileActions {
       this.syncing = false;
     }
   }
+
+  /**
+   * Saves `settings` at once for a new profile (`SettingsDraft.addProfile`
+   * sends the baseline plus that profile); resolves to the saved settings.
+   */
+  save = async (settings: AppSettings) =>
+    (await this.#deps.saveSettings(settings)).settings;
 
   /** Opens the terminal that signs `profile` in; the status follows later. */
   login(agent: AgentId, profile: string) {

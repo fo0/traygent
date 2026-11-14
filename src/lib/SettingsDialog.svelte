@@ -84,7 +84,8 @@
     ),
   );
   let error = $state('');
-  let saving = $state(false);
+  // In the draft: an add at once (#37) and this save or a close wait for each other.
+  const saving = $derived(draft.saving);
   let alive = true;
   // main.ts applied the saved theme; the choice only previews until saved.
   let savedTheme = $state(appliedTheme());
@@ -104,7 +105,9 @@
     autostart: autostart.pending !== null,
   });
   const dirty = $derived(Object.values(changed).some(Boolean));
-  const saveBlocked = $derived(!dirty || saving || draft.invalid);
+  const saveBlocked = $derived(
+    !dirty || saving || draft.adding || draft.invalid,
+  );
   /**
    * Tab states: a dot whose text is part of the tab's name. An invalid value
    * marks its tab with `tone: 'danger'`, so a blocked „Speichern“ is
@@ -133,7 +136,7 @@
   async function save() {
     if (saveBlocked) return;
     const pending = changed;
-    saving = true;
+    draft.saving = true;
     error = '';
     try {
       if (pending.settings) {
@@ -153,7 +156,7 @@
     } catch (cause) {
       if (alive) error = errorMessage(cause);
     } finally {
-      if (alive) saving = false;
+      if (alive) draft.saving = false;
     }
   }
 
@@ -201,8 +204,8 @@
   eyebrow={`TRAYGENT · ${demo ? 'DEMO' : 'LOKAL'}`}
   wide
   {returnFocus}
-  closeDisabled={saving}
-  onClose={() => !saving && onClose()}
+  closeDisabled={draft.busy}
+  onClose={() => !draft.busy && onClose()}
 >
   <div
     class="settings-tabs"
@@ -277,7 +280,7 @@
     <button
       type="button"
       class="secondary-button"
-      disabled={saving}
+      disabled={draft.busy}
       onclick={() => onClose()}>Abbrechen</button
     ><!-- Off via aria-disabled: it keeps focus while saving. --><button
       type="button"
@@ -285,9 +288,11 @@
       aria-disabled={saveBlocked ? 'true' : undefined}
       title={draft.invalid
         ? 'Ungültige Eingabe'
-        : dirty || saving
-          ? undefined
-          : 'Keine Änderungen'}
+        : draft.adding
+          ? 'Profil wird hinzugefügt …'
+          : dirty || saving
+            ? undefined
+            : 'Keine Änderungen'}
       onclick={() => void save()}
       >{saving ? 'Wird gespeichert …' : 'Speichern'}</button
     >

@@ -1,5 +1,6 @@
 import { describe, expect, it, vi } from 'vitest';
 import { createDemoBridge, demoSnapshot } from './demo';
+import { SettingsDraft } from './settingsDraft.svelte';
 import type { LaunchRequest } from './types';
 
 const start: LaunchRequest = {
@@ -44,14 +45,21 @@ describe('demo profiles', () => {
     expect(snapshot.recents.filter((r) => r.profile)).toHaveLength(1);
   });
 
-  it('records a start’s profile and refuses one that is gone', async () => {
+  it('records a start’s profile and refuses one that is gone, as natively', async () => {
     const bridge = createDemoBridge(0);
-    const outcome = await bridge.launchSession({ ...start, profile: 'team' });
+    const outcome = await bridge.launchSession({ ...start, profile: ' team ' });
     expect(outcome.recent.profile).toBe('team');
     expect(outcome).not.toHaveProperty('warning');
     await expect(
       bridge.launchSession({ ...start, profile: 'weg' }),
-    ).rejects.toThrow('Profil „weg“ gibt es nicht mehr.');
+    ).rejects.toThrow('Profil nicht gefunden.');
+    // A container has its own home: the profile is dropped, not refused.
+    const docker = await bridge.launchSession({
+      ...start,
+      env: 'docker',
+      profile: 'team',
+    });
+    expect(docker.recent).not.toHaveProperty('profile');
   });
 
   it('saves a new profile signed out and keeps the others’ sign-in', async () => {
@@ -112,5 +120,72 @@ describe('demo profiles', () => {
     await expect(bridge.profileLogin('codex', 'default')).rejects.toThrow(
       'Dieses Profil gibt es nicht.',
     );
+  });
+
+  it('stores an edited profile as natively', async () => {
+    const bridge = createDemoBridge(0);
+    const before = (await bridge.snapshot()).recents;
+    const local = before.find(
+      (r) => r.agent === 'claude' && r.env === 'local',
+    )!;
+    const docker = before.find((r) => r.env === 'docker')!;
+    const codex = before.find((r) => r.agent === 'codex')!;
+    const stored = async (id: string, profile?: string) => {
+      const { options } = before.find((r) => r.id === id)!;
+      const { recents } = await bridge.updateRecent(id, options, [], profile);
+      return recents.find((r) => r.id === id)!.profile;
+    };
+    expect(local.profile).toBeUndefined();
+    expect(await stored(local.id, ' team ')).toBe('team');
+    expect(await stored(local.id, 'default')).toBeUndefined();
+    await stored(local.id, 'team');
+    expect(await stored(local.id)).toBeUndefined();
+    // A container has its own home: the profile is dropped, not refused.
+    expect(await stored(docker.id, 'team')).toBeUndefined();
+    for (const [recent, profile] of [
+      [local, 'gone'],
+      [codex, 'team'],
+    ] as const)
+      await expect(
+        bridge.updateRecent(recent.id, recent.options, [], profile),
+      ).rejects.toThrow('Profil nicht gefunden.');
+  });
+
+  it('adds a profile at once through the draft: it signs in before „Speichern“', async () => {
+    const bridge = createDemoBridge(0, 10);
+    const draft = new SettingsDraft((await bridge.snapshot()).settings);
+    draft.value.sharedWindow = true;
+    const save = async (value: typeof draft.saved) =>
+      (await bridge.saveSettings(value)).settings;
+    expect(await draft.addProfile('claude', 'Kunde', save)).toBe('');
+    const shown = await bridge.snapshot();
+    expect(shown.settings.profiles.claude.map((p) => p.id)).toEqual([
+      'team',
+      'kunde',
+    ]);
+    // The staged edit was not sent and stays staged.
+    expect(shown.settings.sharedWindow).toBe(false);
+    expect(draft.current().sharedWindow).toBe(true);
+    expect(shown.profiles.map((p) => [p.id, p.signedIn])).toEqual([
+      ['default', true],
+      ['team', true],
+      ['kunde', false],
+    ]);
+    await expect(
+      bridge.profileLogin('claude', 'kunde'),
+    ).resolves.toBeUndefined();
+  });
+
+  it('renames a profile on „Speichern“: id, folder and sign-in stay', async () => {
+    const bridge = createDemoBridge(0);
+    const { settings } = await bridge.snapshot();
+    settings.profiles.claude[0]!.label = 'Kunde B';
+    const saved = await bridge.saveSettings(settings);
+    expect(saved.profiles[1]).toMatchObject({
+      id: 'team',
+      label: 'Kunde B',
+      dir: 'C:\\Users\\demo\\.claude-team',
+      signedIn: true,
+    });
   });
 });

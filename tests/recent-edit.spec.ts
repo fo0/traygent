@@ -1,4 +1,7 @@
+import { nativeSnapshot } from './support/snapshot';
+import { installTauriMock, readCalls } from './support/tauriMock';
 import { expect, test, type Page } from './support/test';
+import type { Snapshot } from '../src/lib/types';
 
 /*
  * „Bearbeiten …“ of a „Zuletzt“ row (#3): the options and ports its ▶ sends,
@@ -59,3 +62,96 @@ test('an invalid entry blocks „Speichern“; „Abbrechen“ keeps the row', a
     row(page, 'kunden-portal').getByLabel('Freigabe: Bypass'),
   ).toBeVisible();
 });
+
+test('changes a Lokal row’s profile; a Docker row has none', async ({
+  page,
+}) => {
+  await page.goto('/');
+  const target = row(page, 'traygent');
+  const mark = target.getByRole('img', { name: 'Profil Team' });
+  await expect(mark).toHaveCount(0);
+  const dialog = await openEdit(page, 'traygent');
+  const field = dialog.getByRole('combobox', { name: 'Profil' });
+  await expect(field).toHaveText('Standard');
+  await field.click();
+  const list = dialog.getByRole('listbox', { name: 'Profil' });
+  await expect(list.getByRole('option')).toHaveText(['Standard', 'Team']);
+  await list.getByRole('option', { name: 'Team' }).click();
+  await dialog.getByRole('button', { name: 'Speichern' }).click();
+  await expect(dialog).toBeHidden();
+  await expect(mark).toBeVisible();
+  // Back to „Standard“: the mark goes.
+  const again = await openEdit(page, 'traygent');
+  await expect(again.getByRole('combobox', { name: 'Profil' })).toHaveText(
+    'Team',
+  );
+  // A still-listed profile opens clean.
+  await expect(
+    again.getByRole('button', { name: 'Speichern' }),
+  ).toHaveAttribute('aria-disabled', 'true');
+  await again.getByRole('combobox', { name: 'Profil' }).click();
+  await again.getByRole('option', { name: 'Standard' }).click();
+  await again.getByRole('button', { name: 'Speichern' }).click();
+  await expect(again).toBeHidden();
+  await expect(mark).toHaveCount(0);
+  const docker = await openEdit(page, 'kunden-portal');
+  await expect(docker.getByRole('combobox', { name: 'Profil' })).toHaveCount(0);
+});
+
+const STALE: [string, (snapshot: Snapshot) => string[]][] = [
+  [
+    'a profile removed since',
+    (snapshot) => {
+      const notes = snapshot.recents.find((r) => r.folder.endsWith('Notizen'));
+      notes!.profile = 'gone';
+      return ['Standard', 'Team'];
+    },
+  ],
+  [
+    'no extra profile left',
+    (snapshot) => {
+      snapshot.settings.profiles.claude = [];
+      snapshot.profiles = snapshot.profiles.filter(
+        (p) => p.agent !== 'claude' || p.id === 'default',
+      );
+      return ['Standard'];
+    },
+  ],
+];
+
+for (const [name, stale] of STALE)
+  test(`natively: ${name} shows and saves as „Standard“`, async ({ page }) => {
+    const snapshot = nativeSnapshot();
+    const options = stale(snapshot);
+    const notes = snapshot.recents.find((r) => r.folder.endsWith('Notizen'))!;
+    expect(notes.profile).toBeTruthy();
+    await installTauriMock<Snapshot, Record<string, never>>(
+      page,
+      (snapshot) => async (cmd) =>
+        ['snapshot', 'refresh_detection', 'update_recent'].includes(cmd)
+          ? snapshot
+          : null,
+      { arg: snapshot, state: {} },
+    );
+    await page.goto('/');
+    const dialog = await openEdit(page, 'Notizen');
+    const field = dialog.getByRole('combobox', { name: 'Profil' });
+    await expect(field).toHaveText('Standard');
+    await field.click();
+    await expect(
+      dialog.getByRole('listbox', { name: 'Profil' }).getByRole('option'),
+    ).toHaveText(options);
+    await field.press('Escape');
+    // What „Speichern“ would store differs from the row: it is enabled.
+    const save = dialog.getByRole('button', { name: 'Speichern' });
+    await expect(save).not.toHaveAttribute('aria-disabled');
+    await save.click();
+    await expect(dialog).toBeHidden();
+    const [call] = await readCalls(page, 'update_recent');
+    expect(call?.args).toEqual({
+      id: notes.id,
+      options: notes.options,
+      ports: [],
+      profile: null,
+    });
+  });

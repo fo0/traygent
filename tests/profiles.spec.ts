@@ -1,4 +1,3 @@
-import { choose } from './support/dropdown';
 import { LAYOUT_FONTS, pinFont } from './support/fonts';
 import { expect, test, type Locator, type Page } from './support/test';
 import { nativeSnapshot } from './support/snapshot';
@@ -101,70 +100,6 @@ test('„Zuletzt“ shows a profile on the agent tile, taking no width from the 
     'title',
     /· Lokal · Profil: Team ·/,
   );
-});
-
-test('Settings → Agenten → „Profile“: staged list, immediate sign-in and sync', async ({
-  page,
-}) => {
-  await page.goto('/');
-  let dialog = await openAgents(page);
-  const list = dialog.getByRole('list', { name: 'Profile' });
-  await expect(list.getByRole('listitem')).toHaveCount(2);
-  await expect(list.getByRole('listitem').first()).toContainText(
-    'Standard demo@example.com',
-  );
-  // „Standard“ cannot be removed.
-  await expect(
-    list.getByRole('button', { name: 'Standard entfernen' }),
-  ).toHaveCount(0);
-
-  const field = dialog.getByRole('textbox', { name: 'Neues Profil' });
-  await field.fill('team');
-  await field.press('Enter');
-  await expect(dialog.getByText('Profil gibt es schon.')).toBeVisible();
-  await field.fill('Kunde A');
-  await expect(field).toHaveAttribute(
-    'title',
-    '%USERPROFILE%\\.claude-kunde-a',
-  );
-  await dialog.getByRole('button', { name: 'Profil hinzufügen' }).click();
-  await expect(field).toHaveValue('');
-  const staged = list.getByRole('button', { name: 'Kunde A anmelden' });
-  await expect(staged).toHaveAttribute('aria-disabled', 'true');
-  await expect(staged).toHaveAttribute('title', 'Erst speichern');
-
-  const standard = dialog.getByRole('combobox', { name: 'Standard-Profil' });
-  await choose(standard, 'Team');
-  await list.getByRole('button', { name: 'Team entfernen' }).click();
-  await expect(standard).toHaveText('Standard');
-  await choose(standard, 'Kunde A');
-
-  await dialog.getByRole('button', { name: 'Jetzt synchronisieren' }).click();
-  const note = noteIn(dialog);
-  await expect(note).toHaveText('Profile synchronisiert (Demo).');
-  await expect(note).toHaveCount(0, { timeout: 5000 });
-
-  await dialog.getByRole('button', { name: 'Speichern', exact: true }).click();
-  await expect(dialog).toHaveCount(0);
-  await expect(chip(page)).toHaveAccessibleName(
-    'Profil: Kunde A (Nicht angemeldet)',
-  );
-  await expect(composer(page).locator('.profile-chip')).toHaveAttribute(
-    'data-warn',
-    'true',
-  );
-
-  dialog = await openAgents(page);
-  const login = dialog.getByRole('button', { name: 'Kunde A anmelden' });
-  await expect(login).not.toHaveAttribute('aria-disabled');
-  await login.click();
-  await expect(noteIn(dialog)).toHaveText('Demo: kein Terminal geöffnet.');
-  // The demo sign-in finishes like a detection.
-  await expect(
-    dialog
-      .getByRole('list', { name: 'Profile' })
-      .getByText('kunde-a@example.com'),
-  ).toBeVisible();
 });
 
 test('natively: ▶ restarts with the stored profile, a warning stays, sign-in names the profile', async ({

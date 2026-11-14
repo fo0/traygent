@@ -277,7 +277,7 @@ fn the_name_lists_match_their_fixture() {
     // Every listed name is refused by the rule the lists describe.
     let claude = recipe(CLAUDE).unwrap();
     let lists = name_lists(claude);
-    for name in &lists.handled {
+    for name in lists.handled_dirs.iter().chain(&lists.handled_files) {
         assert_eq!(check_name(claude, name), Err(NameError::Handled), "{name}");
     }
     let prefixed = lists

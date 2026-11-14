@@ -91,21 +91,48 @@
   font-size: var(--font-size-meta);
 }
 .profile-list li {
+  border-radius: 6px;
+  background: var(--raised);
+}
+/* The row stays one line; its details open in place below it (#37). */
+.profile-row {
   display: flex;
   align-items: center;
   gap: 8px;
   min-height: var(--row-height);
-  padding: 2px 4px 2px 10px;
-  border-radius: 6px;
-  background: var(--raised);
+  padding: 2px 4px 2px 6px;
   white-space: nowrap;
 }
-.profile-name {
+/* Chevron and name toggle the details; the chevron turns where it is. */
+.profile-toggle {
+  display: inline-flex;
   flex: 0 0 28%;
+  align-items: center;
+  gap: 4px;
+  min-width: 0;
+  padding: 2px 0;
+  border-radius: 4px;
+  background: transparent;
+  text-align: left;
+}
+.profile-toggle svg,
+.profile-builtin summary svg {
+  color: var(--text-3);
+  transform: rotate(-90deg);
+  transition: transform 0.12s ease;
+}
+.profile-toggle[aria-expanded='true'] svg,
+.profile-builtin[open] summary svg {
+  transform: none;
+}
+.profile-name {
   min-width: 0;
   overflow: hidden;
   text-overflow: ellipsis;
   font-weight: 500;
+}
+.profile-name[data-invalid='true'] {
+  color: var(--fail);
 }
 .profile-account {
   flex: 1 1 auto;
@@ -142,9 +169,75 @@
 .profiles .field-error {
   margin: 4px 0 0;
 }
+/* The open details: labels and values, under the name, in the meta size. */
+.profiles .profile-detail {
+  grid-template-columns: max-content minmax(0, 1fr);
+  gap: 4px 12px;
+  margin: 0;
+  padding: 2px 8px 8px 22px;
+}
+.profile-value {
+  min-width: 0;
+  color: var(--text-2);
+  overflow-wrap: anywhere;
+}
+.profile-value[data-out='true'] {
+  color: var(--text-3);
+}
+.profile-value[data-warn='true'] {
+  color: var(--wait);
+}
 /* The extra shared names, below the list and its add row. */
 .profiles .profile-share {
   margin: 10px 0 0;
+}
+/* „Bereits abgeglichen“: the built-in names, collapsed, under the fields. */
+.profile-builtin {
+  grid-column: 2;
+  font-size: var(--font-size-meta);
+}
+.profile-builtin summary {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 2px 4px 2px 0;
+  border-radius: 4px;
+  color: var(--text-2);
+  cursor: pointer;
+  list-style: none;
+}
+.profile-builtin summary::-webkit-details-marker {
+  display: none;
+}
+.profile-builtin dl {
+  display: grid;
+  grid-template-columns: max-content minmax(0, 1fr);
+  gap: 4px 8px;
+  margin: 4px 0 0;
+}
+.profile-builtin dt {
+  color: var(--text-3);
+}
+.profile-builtin dd {
+  margin: 0;
+  color: var(--text-2);
+  overflow-wrap: anywhere;
+}
+.profile-builtin dd > span {
+  white-space: nowrap;
+}
+@media (max-width: 420px) {
+  .profile-builtin {
+    grid-column: 1;
+  }
+  /* The details stay label beside value: they are short. */
+  .profiles .profile-detail {
+    grid-template-columns: max-content minmax(0, 1fr);
+    gap: 4px 10px;
+  }
+  .profiles .profile-detail > :is(label, .field-label) {
+    margin-top: 0;
+  }
 }
 
 @media (forced-colors: active) {

@@ -92,6 +92,7 @@ pub fn run() {
             crate::desktop_github::start_listing(app.handle(), &mut service);
             drop(service);
             crate::desktop_agent_updates::start_schedule(app.handle());
+            crate::desktop_profiles::start_schedule(app.handle());
             let show = MenuItem::with_id(
                 app,
                 "toggle",
