@@ -161,6 +161,7 @@
   background: transparent;
 }
 .profile-list .profile-remove,
+.profile-list .icon-button.profile-login,
 .profile-slot {
   flex: none;
   min-width: 24px;
@@ -180,6 +181,20 @@
   min-width: 0;
   color: var(--text-2);
   overflow-wrap: anywhere;
+}
+/* „Konto“ in the details: the account, „Neu anmelden“ on the right. */
+.profile-account-value {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.profile-account-value > span {
+  min-width: 0;
+}
+/* Level with the row's „Anmelden“, left of the remove slot. */
+.profile-account-value .text-button {
+  flex: none;
+  margin: 0 28px 0 auto;
 }
 .profile-value[data-out='true'] {
   color: var(--text-3);
@@ -229,6 +244,10 @@
 @media (max-width: 420px) {
   .profile-builtin {
     grid-column: 1;
+  }
+  /* Narrow: the account keeps the room, „Neu anmelden“ the right edge. */
+  .profile-account-value .text-button {
+    margin-right: 0;
   }
   /* The details stay label beside value: they are short. */
   .profiles .profile-detail {

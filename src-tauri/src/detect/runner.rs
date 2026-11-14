@@ -111,7 +111,7 @@ impl Runner for SystemRunner {
 /// Ends the process `pid` and its descendants: `taskkill /T /F` by absolute path, no window,
 /// waited for at most [`KILL_TREE_WAIT`]. Best effort; the caller still kills the child.
 #[cfg(windows)]
-fn kill_tree(pid: u32) {
+pub(crate) fn kill_tree(pid: u32) {
     use std::os::windows::process::CommandExt;
     let host = super::Host {
         windows: true,

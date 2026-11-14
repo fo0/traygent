@@ -15,10 +15,12 @@ use crate::{ports, settings};
 pub mod agents;
 pub mod docker;
 pub mod folder;
+mod login;
 pub mod quote;
 
 pub(crate) use folder::is_windows_absolute;
 pub use folder::{is_network_path, normalize_folder};
+pub use login::{hidden_login_plan, login_plan, HiddenLogin};
 
 use quote::{encode_command, invoke, ps_literal, set_env_base64};
 
@@ -259,47 +261,6 @@ fn profile_env(agent: AgentId, resolved: &Resolved, clear: bool) -> Result<Optio
         ))),
         None => Ok(None),
     }
-}
-
-/// Opens a terminal in `home` that signs the agent's profile in: the CLI by absolute path
-/// with the recipe's login arguments, in the profile's environment. Stays open like the
-/// install terminal.
-pub fn login_plan(
-    agent: AgentId,
-    profile_label: &str,
-    settings: &AppSettings,
-    resolved: &Resolved,
-    home: &str,
-) -> Result<LaunchPlan, String> {
-    let label = agent.label();
-    let recipe = crate::profiles::recipe(agent)
-        .ok_or_else(|| format!("{label} unterstützt keine Profile."))?;
-    let cli = resolved
-        .cli
-        .as_ref()
-        .ok_or_else(|| format!("{label} ist nicht installiert."))?;
-    if !is_windows_absolute(&cli.path) {
-        return Err(format!(
-            "Der Pfad zu {label} ist kein absoluter Windows-Pfad."
-        ));
-    }
-    let title = format!("{label} · {profile_label} anmelden");
-    let args: Vec<String> = recipe
-        .login_args
-        .iter()
-        .map(|arg| arg.to_string())
-        .collect();
-    let mut script = vec![format!("$Host.UI.RawUI.WindowTitle={}", ps_literal(&title))];
-    script.extend(profile_env(agent, resolved, true)?);
-    script.push(invoke(&cli.path, &args));
-    wrap(
-        &title,
-        home,
-        &script.join("; "),
-        &resolved.powershell,
-        tab(settings, resolved),
-        false,
-    )
 }
 
 /// `git clone -- <url> <folder>` by absolute path, then a stop on a non-zero exit (also when

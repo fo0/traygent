@@ -1,4 +1,4 @@
-//! The profile's environment line of a local start and the sign-in terminal (#33).
+//! The profile's environment line of a local start and both sign-ins (#33, #41).
 use super::*;
 use crate::models::AgentProfile;
 
@@ -126,7 +126,7 @@ fn a_docker_start_never_carries_the_profile() {
 }
 
 #[test]
-fn the_login_terminal_signs_a_profile_in_and_stays_open() {
+fn the_debug_login_terminal_signs_a_profile_in_and_stays_open() {
     let plan = login_plan(
         AgentId::Claude,
         "Team; %X% 'A'",
@@ -178,5 +178,70 @@ fn the_login_terminal_signs_a_profile_in_and_stays_open() {
     assert_eq!(
         refused(AgentId::Opencode, &resolved(Some((CLAUDE, false)))),
         "OpenCode unterstützt keine Profile."
+    );
+}
+
+#[test]
+fn the_hidden_login_runs_the_same_call_and_exits_with_the_clis_code() {
+    let hidden =
+        hidden_login_plan(AgentId::Claude, &in_profile(TEAM_DIR), r"C:\Users\max").unwrap();
+    assert_eq!(hidden.program, PS);
+    assert_eq!(hidden.cwd, r"C:\Users\max");
+    assert_eq!(
+        hidden.args[..4],
+        [
+            "-NoLogo",
+            "-NoProfile",
+            "-NonInteractive",
+            "-EncodedCommand"
+        ]
+    );
+    assert_eq!(hidden.args.len(), 5);
+    // ADR-0003: no `"` and no empty element in the argv; no prompt is kept open.
+    assert!(hidden
+        .args
+        .iter()
+        .all(|arg| !arg.is_empty() && !arg.contains('"')));
+    assert!(!hidden.args.contains(&"-NoExit".to_string()));
+    let script = decode_command(&hidden.args[4]);
+    assert_eq!(
+        script.split("; ").collect::<Vec<_>>(),
+        [
+            "$LASTEXITCODE=$null",
+            r"$env:CLAUDE_CONFIG_DIR='C:\Users\Max O''Neil\.claude-team'",
+            &format!("& '{CLAUDE}' 'auth' 'login'"),
+            // A CLI that could not run leaves no code: that is a failure, never a success.
+            "if ($null -eq $LASTEXITCODE) { exit 1 }",
+            "exit $LASTEXITCODE",
+        ]
+    );
+    // The default profile clears a stray variable; an npm shim is called the same way.
+    let shim = r"C:\Users\max\AppData\Roaming\npm\claude.cmd";
+    let default = hidden_login_plan(
+        AgentId::Claude,
+        &resolved(Some((shim, true))),
+        r"C:\Users\max",
+    )
+    .unwrap();
+    let script = decode_command(&default.args[4]);
+    assert!(script.contains(&format!("; {CLEAR}; & '{shim}' 'auth' 'login'; ")));
+    let refused = |agent, resolved: &Resolved| {
+        hidden_login_plan(agent, resolved, r"C:\Users\max").unwrap_err()
+    };
+    assert_eq!(
+        refused(AgentId::Claude, &resolved(None)),
+        "Claude Code ist nicht installiert."
+    );
+    assert_eq!(
+        refused(AgentId::Codex, &resolved(Some((CLAUDE, false)))),
+        "Codex unterstützt keine Profile."
+    );
+    let relative = Resolved {
+        powershell: "powershell.exe".into(),
+        ..in_profile(TEAM_DIR)
+    };
+    assert_eq!(
+        refused(AgentId::Claude, &relative),
+        "Der Pfad zu PowerShell ist kein absoluter Windows-Pfad."
     );
 }

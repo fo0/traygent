@@ -22,6 +22,10 @@ fn a_file_without_profiles_loads_with_their_defaults() {
     let settings = &loaded.state.settings;
     assert_eq!(settings.terminal, TerminalId::Console);
     assert!(settings.agent_updates);
+    assert!(
+        !settings.debug,
+        "a file from before „Debug“ loads with it off"
+    );
     for agent in AgentId::ALL {
         assert!(settings.profiles.get(agent).is_empty());
         assert_eq!(settings.agent_profile.get(agent), "default");

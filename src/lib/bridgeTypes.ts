@@ -60,8 +60,13 @@ export interface Bridge {
   updateAgents(): Promise<Snapshot>;
   /** Syncs every profile now; rejects with a German message. */
   syncProfiles(): Promise<Snapshot>;
-  /** Opens the sign-in of one profile; rejects with a German message. */
-  profileLogin(agent: AgentId, profile: string): Promise<void>;
+  /**
+   * Signs one profile in: hidden it resolves when done, with „Debug“ once
+   * the terminal opened; rejects with a German message.
+   */
+  profileLogin(agent: AgentId, profile: string): Promise<Snapshot>;
+  /** Ends the profile's running hidden sign-in; false when none ran. */
+  cancelProfileLogin(agent: AgentId, profile: string): Promise<boolean>;
 }
 
 /** Pushed snapshots, e.g. a finished detection; resolves to the unsubscribe. */

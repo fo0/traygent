@@ -27,7 +27,7 @@ flowchart TD
         DesktopAgents("desktop_agents.rs agent commands, start_detection")
         DesktopGithub("desktop_github.rs GitHub commands, start_listing")
         DesktopAgentUpdates("desktop_agent_updates.rs update_agents, schedule thread")
-        DesktopProfiles("desktop_profiles.rs sync_profiles, profile_login, detection step, background sync thread")
+        DesktopProfiles("desktop_profiles.rs sync_profiles, profile_login, cancel_profile_login, detection step, background sync and status watch threads")
         DesktopStartup["desktop_startup.rs Run value adapter"]
         DesktopUpdates["desktop_updates.rs update commands"]
         TrayPopup["tray_popup.rs and windows.rs Win32"]
@@ -39,7 +39,7 @@ flowchart TD
         LaunchPrepRs["service/launch_prep.rs resolve, repo folder, clone or reuse"]
         ServiceGithubRs["service/github.rs account and listing commits"]
         ServiceProfilesRs["service/profiles.rs statuses, sync before a local start, background sync due"]
-        ProfilesRs["profiles.rs and profiles/* recipe, Homes, links, three-way merge, file sync, status"]
+        ProfilesRs["profiles.rs and profiles/* recipe, Homes, links, three-way merge, file sync, status, hidden sign-in, status watch"]
         AgentUpdatesRs["agent_updates.rs in-use check, update commands, schedule rule"]
         RepoRs["repo.rs classification, clone folder and URL"]
         GithubRs["github.rs and github/* api, http, gh, discover, process, vault, secret"]

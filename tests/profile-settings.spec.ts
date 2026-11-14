@@ -58,8 +58,9 @@ test('Settings → Agenten → „Profile“: an added profile signs in before �
     list.getByRole('listitem').filter({ hasText: 'Kunde A' }),
   ).toContainText('Nicht angemeldet');
   await login.click();
-  await expect(noteIn(dialog)).toHaveText('Demo: kein Terminal geöffnet.');
-  await expect(list.getByText('kunde-a@example.com')).toBeVisible();
+  await expect(noteIn(dialog)).toHaveText('Angemeldet (Demo).');
+  // The same account as „Standard“: each row names its organization.
+  await expect(list.getByText('Beispiel Kunde A')).toBeVisible();
   // The note goes after 3 s; wait, so nothing shifts under the next clicks.
   await expect(noteIn(dialog)).toHaveCount(0, { timeout: 5000 });
 
@@ -122,8 +123,7 @@ test('a profile row opens its details in place, one at a time', async ({
   const detail = list.locator('.profile-detail');
   await expect(detail).toHaveCount(1);
   await expect(detail).toContainText('Konto');
-  await expect(detail).toContainText('team@example.com');
-  await expect(detail).toContainText('Beispiel GmbH');
+  await expect(detail).toContainText('Nicht angemeldet');
   await expect(detail).toContainText('Abgeglichen');
   await expect(
     detail.getByRole('textbox', { name: 'Ordner von Team' }),
@@ -148,6 +148,10 @@ test('a profile row opens its details in place, one at a time', async ({
   await standard.focus();
   await page.keyboard.press('Enter');
   await expect(standard).toHaveAttribute('aria-expanded', 'true');
+  // A signed-in profile's details: the account and its organization.
+  const open = list.locator('.profile-detail');
+  await expect(open).toContainText('Kontodemo@example.com');
+  await expect(open).toContainText('OrganisationBeispiel GmbH');
   await expect(
     list.getByRole('button', { name: 'Kunde B Details' }),
   ).toHaveAttribute('aria-expanded', 'false');

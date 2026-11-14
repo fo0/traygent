@@ -456,4 +456,5 @@ fn a_prepared_start_is_confirmed_before_it_spawns() {
 }
 
 mod schedule;
+mod sign_in;
 mod sync;

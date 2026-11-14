@@ -62,7 +62,8 @@
         "dirs": [],
         "files": []
       }
-    }
+    },
+    "debug": false
   },
   "catalog": [
     {

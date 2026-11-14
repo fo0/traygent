@@ -1,13 +1,15 @@
-//! Agent profiles (#33): the `sync_profiles` and `profile_login` commands, the profile
-//! step of a detection and the background sync thread. Names and arguments are the contract
+//! Agent profiles (#33, #41): the `sync_profiles`, `profile_login` and
+//! `cancel_profile_login` commands, the profile step of a detection, the background sync
+//! thread and the status watch after a visible sign-in. Names and arguments are the contract
 //! with `src/lib/ipc.ts` (docs/SPEC.md → IPC contract).
 use crate::desktop::{work, NativeState, FAILED};
 use crate::desktop_agents::SNAPSHOT_EVENT;
 use std::time::Instant;
 use tauri::{AppHandle, Emitter, Manager};
 use traygent_core::detect::{Host, RealFs};
-use traygent_core::profiles::{system_linker, SyncOutcome, SyncPlan};
-use traygent_core::service::PROFILE_SYNC_TICK;
+use traygent_core::profiles::watch::{self, Watch, WatchHost};
+use traygent_core::profiles::{login, system_linker, SyncOutcome, SyncPlan};
+use traygent_core::service::{SignIn, PROFILE_SYNC_TICK};
 use traygent_core::{AgentId, Snapshot};
 
 /// The profile step of a detection: every profile's status is read anew, and the first
@@ -99,12 +101,112 @@ pub async fn sync_profiles(app: AppHandle) -> Result<Snapshot, String> {
     .await
 }
 
-/// Opens a terminal that signs the agent's profile in; only ever on an explicit click.
+/// Signs the agent's profile in; only ever on an explicit click (#41). Hidden („Debug“
+/// off): resolves when the sign-in ended, with the statuses read anew after exit code 0, or
+/// rejects with the German reason; only it can be cancelled. Visible („Debug“ on): no
+/// ticket and no cancel; resolves once the terminal opened and leaves a status watch behind.
 #[tauri::command]
-pub async fn profile_login(app: AppHandle, agent: AgentId, profile: String) -> Result<(), String> {
-    work(app, move |service| {
-        let (plan, fallback) = service.prepare_login(agent, &profile, &Host::current(), &RealFs)?;
-        crate::desktop_agents::start(&plan, fallback.as_ref())
+pub async fn profile_login(
+    app: AppHandle,
+    agent: AgentId,
+    profile: String,
+) -> Result<Snapshot, String> {
+    let key = (agent, profile.clone());
+    // A hidden sign-in is registered before any work, so a cancel can never miss it; it also
+    // refuses a second one of the profile while it runs and ends with the worker, also on a
+    // panic. The setting is read under a short lock, never behind blocking work.
+    let debug = app.state::<NativeState>().lock().settings().debug;
+    let early = if debug {
+        None
+    } else {
+        Some(login::begin(key.clone())?)
+    };
+    let watcher = app.clone();
+    let late = key.clone();
+    let id = profile.clone();
+    let hidden = work(app.clone(), move |service| {
+        match service.prepare_sign_in(agent, &id, &Host::current(), &RealFs)? {
+            SignIn::Visible { plan, fallback } => {
+                // „Debug“ was switched on meanwhile: a visible sign-in keeps no ticket.
+                drop(early);
+                crate::desktop_agents::start(&plan, fallback.as_ref())?;
+                let before = service.profile_facts(agent, &id);
+                start_watch(&watcher, watch::start(key, before, Instant::now()));
+                Ok(None)
+            }
+            SignIn::Hidden(plan) => {
+                // „Debug“ was switched off meanwhile: register now.
+                let ticket = match early {
+                    Some(ticket) => ticket,
+                    None => login::begin(late)?,
+                };
+                Ok(Some((plan, ticket)))
+            }
+        }
+    })
+    .await?;
+    let Some((plan, ticket)) = hidden else {
+        return work(app, |service| Ok(service.snapshot())).await;
+    };
+    tauri::async_runtime::spawn_blocking(move || {
+        login::sign_in(&login::ProcessLoginRunner, &plan, &ticket)
     })
     .await
+    .map_err(|_| FAILED.to_string())??;
+    let plan = work(app.clone(), move |service| {
+        Ok(service.profile_plan().only(agent))
+    })
+    .await?;
+    let outcome = run_plan(plan, false).await?;
+    work(app, move |service| {
+        service.finish_sign_in(agent, &profile, outcome)
+    })
+    .await
+}
+
+/// Ends the running hidden sign-in of the profile; false when none is registered. Its
+/// `profile_login` then rejects with „Anmeldung abgebrochen.“
+#[tauri::command]
+pub fn cancel_profile_login(agent: AgentId, profile: String) -> bool {
+    login::cancel(&(agent, profile))
+}
+
+/// The watch's thread; a watch that cannot start just does not run.
+fn start_watch(app: &AppHandle, watch: Watch) {
+    let app = app.clone();
+    let spawned = std::thread::Builder::new()
+        .name("traygent-profile-watch".into())
+        .spawn(move || watch::run(watch, &Shell(app)));
+    if let Err(error) = spawned {
+        eprintln!("Traygent: {error}");
+    }
+}
+
+/// The real side of a watch: the service lock only for the plan and the commit.
+struct Shell(AppHandle);
+
+impl WatchHost for Shell {
+    fn sleep(&self, duration: std::time::Duration) {
+        std::thread::sleep(duration);
+    }
+    fn now(&self) -> Instant {
+        Instant::now()
+    }
+    fn plan(&self, agent: AgentId) -> SyncPlan {
+        self.0
+            .state::<NativeState>()
+            .lock()
+            .profile_plan()
+            .only(agent)
+    }
+    fn commit(&self, outcome: SyncOutcome) {
+        let state = self.0.state::<NativeState>();
+        let mut service = state.lock();
+        service.apply_profiles(outcome);
+        let snapshot = service.snapshot();
+        drop(service);
+        if let Err(error) = self.0.emit(SNAPSHOT_EVENT, &snapshot) {
+            eprintln!("Traygent: {error}");
+        }
+    }
 }

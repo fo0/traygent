@@ -13,7 +13,7 @@ import {
   demoLocalAccounts,
   demoRepos,
 } from './demoGithub';
-import { demoProfiles, signedIn, syncedProfiles } from './demoProfiles';
+import { demoProfiles, demoSignIns, syncedProfiles } from './demoProfiles';
 import {
   PROFILE_MISSING,
   editedProfile,
@@ -71,6 +71,16 @@ export function createDemoBridge(latency = 150, detection = 600): DemoBridge {
   const emit = () => {
     for (const listener of listeners) listener(copy());
   };
+  const signIns = demoSignIns(
+    {
+      profiles: () => data.profiles,
+      debug: () => data.settings.debug,
+      commit: (profiles) => change({ profiles }),
+      snapshot: copy,
+      emit,
+    },
+    detection,
+  );
   /** The account's listing, just read: no error, not loading. */
   const listed = (account: GithubAccount) => {
     change({
@@ -274,13 +284,10 @@ export function createDemoBridge(latency = 150, detection = 600): DemoBridge {
     },
     async profileLogin(agent, profile) {
       await delay();
-      if (!data.profiles.some((p) => p.agent === agent && p.id === profile))
-        throw new Error('Dieses Profil gibt es nicht.');
-      // No terminal opens; the sign-in „finishes“ like a detection.
-      setTimeout(() => {
-        change({ profiles: signedIn(data.profiles, agent, profile) });
-        emit();
-      }, detection);
+      return signIns.login(agent, profile);
+    },
+    async cancelProfileLogin(agent, profile) {
+      return signIns.cancel(agent, profile);
     },
     async observe(callback) {
       listeners.add(callback);

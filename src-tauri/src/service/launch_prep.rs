@@ -4,7 +4,7 @@
 //! clones first when that folder does not exist (docs/SPEC.md → Repositories).
 use super::Service;
 use crate::detect::{host, Detection, Fs, Host};
-use crate::launch::{self, LaunchPlan, Resolved};
+use crate::launch::{self, HiddenLogin, LaunchPlan, Resolved};
 use crate::models::{
     AgentId, AgentStatus, EnvId, LaunchRequest, ProbeState, TerminalId, DEFAULT_PROFILE,
 };
@@ -170,7 +170,8 @@ impl Service {
     }
 
     /// The terminal that signs the agent's profile in (`<cli> auth login`), with its console
-    /// fallback. The profile's directory is created, so the CLI finds its home.
+    /// fallback („Debug“ on, #41). The profile's directory is created, so the CLI finds its
+    /// home.
     pub fn prepare_login(
         &self,
         agent: AgentId,
@@ -178,6 +179,48 @@ impl Service {
         host: &Host,
         fs: &dyn Fs,
     ) -> Result<(LaunchPlan, Option<LaunchPlan>), String> {
+        let (label, resolved, home) = self.sign_in_target(agent, profile, host, fs)?;
+        let settings = &self.state.settings;
+        let plan = launch::login_plan(agent, &label, settings, &resolved, &home)?;
+        let fallback = (plan.terminal == TerminalId::WindowsTerminal)
+            .then(|| {
+                launch::login_plan(
+                    agent,
+                    &label,
+                    settings,
+                    &console_only(resolved.clone()),
+                    &home,
+                )
+                .ok()
+            })
+            .flatten();
+        create_profile_dir(&resolved, fs)?;
+        Ok((plan, fallback))
+    }
+
+    /// The same sign-in without a window („Debug“ off, #41); the directory is created too.
+    pub fn prepare_hidden_login(
+        &self,
+        agent: AgentId,
+        profile: &str,
+        host: &Host,
+        fs: &dyn Fs,
+    ) -> Result<HiddenLogin, String> {
+        let (_, resolved, home) = self.sign_in_target(agent, profile, host, fs)?;
+        let plan = launch::hidden_login_plan(agent, &resolved, &home)?;
+        create_profile_dir(&resolved, fs)?;
+        Ok(plan)
+    }
+
+    /// What both sign-ins check and resolve: the profile's label, the CLI and the profile's
+    /// directory, and the user profile the process starts in. Creates nothing.
+    fn sign_in_target(
+        &self,
+        agent: AgentId,
+        profile: &str,
+        host: &Host,
+        fs: &dyn Fs,
+    ) -> Result<(String, Resolved, String), String> {
         let name = agent.label();
         if crate::profiles::recipe(agent).is_none() {
             return Err(format!("{name} unterstützt keine Profile."));
@@ -187,8 +230,8 @@ impl Service {
         }
         let listed = self.state.settings.profiles.get(agent);
         let label = match listed.iter().find(|listed| listed.id == profile) {
-            Some(listed) => listed.label.as_str(),
-            None if profile == DEFAULT_PROFILE => crate::models::DEFAULT_PROFILE_LABEL,
+            Some(listed) => listed.label.clone(),
+            None if profile == DEFAULT_PROFILE => crate::models::DEFAULT_PROFILE_LABEL.into(),
             None => return Err(PROFILE_MISSING.into()),
         };
         let mut resolved = self.resolve(agent, EnvId::Local, false, host, fs, "");
@@ -214,24 +257,7 @@ impl Service {
             .clone()
             .filter(|dir| fs.is_dir(dir))
             .unwrap_or_else(|| "C:\\".into());
-        let settings = &self.state.settings;
-        let plan = launch::login_plan(agent, label, settings, &resolved, &home)?;
-        let fallback = (plan.terminal == TerminalId::WindowsTerminal)
-            .then(|| {
-                launch::login_plan(
-                    agent,
-                    label,
-                    settings,
-                    &console_only(resolved.clone()),
-                    &home,
-                )
-                .ok()
-            })
-            .flatten();
-        if let Some(dir) = &resolved.profile_dir {
-            fs.create_dir_all(dir).map_err(|_| PROFILE_DIR_FAILED)?;
-        }
-        Ok((plan, fallback))
+        Ok((label, resolved, home))
     }
 
     /// The install terminal for `agent`, with its console fallback.
@@ -315,6 +341,16 @@ fn profile_dir(agent: AgentId, id: Option<&str>, host: &Host) -> Result<Option<S
     };
     let dir = Homes::of(host).and_then(|homes| homes.dir(agent, id));
     dir.map(Some).ok_or_else(|| NO_PROFILE_HOME.into())
+}
+
+/// The profile's directory, so the CLI finds its home; the default one is the CLI's own.
+fn create_profile_dir(resolved: &Resolved, fs: &dyn Fs) -> Result<(), String> {
+    match &resolved.profile_dir {
+        Some(dir) => fs
+            .create_dir_all(dir)
+            .map_err(|_| PROFILE_DIR_FAILED.into()),
+        None => Ok(()),
+    }
 }
 
 fn console_only(resolved: Resolved) -> Resolved {

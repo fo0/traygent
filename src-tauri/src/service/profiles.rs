@@ -1,6 +1,8 @@
 //! Agent profiles in the service (#33): the statuses the snapshot shows and the sync runs.
 //! The file system work is a [`SyncPlan`], so the shell can run it without the service lock.
 use super::Service;
+use crate::detect::{Fs, Host};
+use crate::launch::{HiddenLogin, LaunchPlan};
 use crate::models::{AgentId, EnvId, LaunchRequest, ProfileStatus};
 use crate::profiles::status::{self, Facts, Key};
 use crate::profiles::{recipe, Homes, Linker, ProfileReport, SyncOutcome, SyncPlan};
@@ -35,6 +37,19 @@ pub(super) struct ProfileState {
     last_sync: Option<Instant>,
 }
 
+/// How a profile signs in (#41): hidden unless „Debug“ is on.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub enum SignIn {
+    /// „Debug“ off: run [`HiddenLogin`] to its end, then read the statuses.
+    Hidden(HiddenLogin),
+    /// „Debug“ on: spawn the terminal (console `fallback` when wt.exe fails) and watch the
+    /// status ([`crate::profiles::watch`]).
+    Visible {
+        plan: LaunchPlan,
+        fallback: Option<LaunchPlan>,
+    },
+}
+
 fn capped(text: String) -> String {
     if text.chars().count() <= MAX_ERROR_CHARS {
         return text;
@@ -66,6 +81,46 @@ impl Service {
             &self.profiles.facts,
             &self.profiles.errors,
         )
+    }
+
+    /// The sign-in of `profile` as the „Debug“ setting asks for it; checks and creates like
+    /// [`Service::prepare_login`].
+    pub fn prepare_sign_in(
+        &self,
+        agent: AgentId,
+        profile: &str,
+        host: &Host,
+        fs: &dyn Fs,
+    ) -> Result<SignIn, String> {
+        if self.state.settings.debug {
+            let (plan, fallback) = self.prepare_login(agent, profile, host, fs)?;
+            return Ok(SignIn::Visible { plan, fallback });
+        }
+        self.prepare_hidden_login(agent, profile, host, fs)
+            .map(SignIn::Hidden)
+    }
+
+    /// Commits the statuses read after a hidden sign-in that exited with code 0 and returns
+    /// the snapshot — or „Anmeldung fehlgeschlagen.“ when the profile still reads signed out
+    /// (the CLI ended without a sign-in).
+    pub fn finish_sign_in(
+        &mut self,
+        agent: AgentId,
+        profile: &str,
+        outcome: SyncOutcome,
+    ) -> Result<crate::models::Snapshot, String> {
+        self.apply_profiles(outcome);
+        if self.profile_facts(agent, profile).signed_in {
+            Ok(self.snapshot())
+        } else {
+            Err(crate::profiles::login::LOGIN_FAILED.into())
+        }
+    }
+
+    /// The facts the snapshot shows for one profile now; unknown ones read as signed out.
+    pub fn profile_facts(&self, agent: AgentId, id: &str) -> Facts {
+        let key = (agent, id.to_string());
+        self.profiles.facts.get(&key).cloned().unwrap_or_default()
     }
 
     /// Every agent with profiles and its current list; run it without the service lock.

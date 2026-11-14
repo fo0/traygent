@@ -211,6 +211,8 @@ export interface AppSettings {
   agentProfile: Record<AgentId, string>;
   /** Extra shared names per agent; empty lists by default. */
   profileShare: Record<AgentId, ProfileShare>;
+  /** „Debug“ (#41): a profile sign-in opens the visible terminal. */
+  debug: boolean;
 }
 
 /** Mirrors `Snapshot` in src-tauri/src/models.rs; replaced wholesale on every change. */
