@@ -23,7 +23,9 @@ const newestFirst = (a: RecentSession, b: RecentSession) =>
 
 /**
  * The entry a start records: a new one, or the bumped existing one. A
- * repository start passes the folder derived from it.
+ * repository start passes the folder derived from it. As natively
+ * (src-tauri/src/recents.rs → upsert), `keepAgentModel` stays the entry's,
+ * and a start that kept the agent's model keeps the stored model and effort.
  */
 export function recordStart(
   list: readonly RecentSession[],
@@ -32,18 +34,23 @@ export function recordStart(
 ): RecentSession {
   const id = recentId(request.folder, request.agent, request.env);
   const previous = list.find((recent) => recent.id === id);
+  const kept = request.keepAgentModel ? previous?.options : undefined;
   return {
     id,
     agent: request.agent,
     env: request.env,
     folder: request.folder.trim(),
     ...(request.repo && { repo: { ...request.repo } }),
-    options: { ...request.options },
+    options: {
+      ...request.options,
+      ...(kept && { model: kept.model, effort: kept.effort }),
+    },
     ports: [...request.ports],
     lastStartedAt: now.toISOString(),
     starts: (previous?.starts ?? 0) + 1,
     ...(request.profile &&
       request.profile !== 'default' && { profile: request.profile }),
+    ...(previous?.keepAgentModel && { keepAgentModel: true }),
   };
 }
 
@@ -87,9 +94,10 @@ export function restoreRecent(
 
 /**
  * „Bearbeiten …“, as natively (src-tauri/src/service.rs → update_recent): new
- * options (trimmed, a blank model or effort `default`), ports and profile
- * (already normalized, `undefined` for „Standard“) on the entry; its place,
- * start time and count stay. Null when the id is no longer listed.
+ * options (trimmed, a blank model or effort `default`), ports, profile
+ * (already normalized, `undefined` for „Standard“) and „Modell & Effort“
+ * mode on the entry; its place, start time and count stay. Null when the id
+ * is no longer listed.
  */
 export function editRecent(
   list: readonly RecentSession[],
@@ -97,6 +105,7 @@ export function editRecent(
   options: LaunchOptions,
   ports: readonly string[],
   profile?: string,
+  keepAgentModel = false,
 ): RecentSession[] | null {
   if (!list.some((item) => item.id === id)) return null;
   const trimmed = {
@@ -114,6 +123,8 @@ export function editRecent(
     };
     if (profile) edited.profile = profile;
     else delete edited.profile;
+    if (keepAgentModel) edited.keepAgentModel = true;
+    else delete edited.keepAgentModel;
     return edited;
   });
 }

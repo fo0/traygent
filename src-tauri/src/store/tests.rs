@@ -51,6 +51,7 @@ fn sample() -> Persisted {
         options: Default::default(),
         session: SessionMode::Continue,
         profile: None,
+        keep_agent_model: false,
         ports: vec!["3000".into(), "0.0.0.0:8080:80/udp".into()],
     };
     recents::upsert(&mut recents, &request, chrono::Utc::now());

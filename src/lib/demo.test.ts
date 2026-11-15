@@ -200,7 +200,13 @@ describe('demo bridge', () => {
       expect(await revision(bridge.restoreRecent(recent))).toBe(start + 6);
       expect(
         await revision(
-          bridge.updateRecent(recent.id, recent.options, [], recent.profile),
+          bridge.updateRecent(
+            recent.id,
+            recent.options,
+            [],
+            recent.profile,
+            false,
+          ),
         ),
       ).toBe(start + 7);
     } finally {
@@ -255,6 +261,7 @@ describe('demo bridge', () => {
       options,
       [' 3000 '],
       undefined,
+      false,
     );
     expect(after.recents.map((r) => r.id)).toEqual(before.map((r) => r.id));
     const edited = after.recents.find((r) => r.id === docker.id)!;
@@ -263,7 +270,13 @@ describe('demo bridge', () => {
     expect(edited.lastStartedAt).toBe(docker.lastStartedAt);
     expect(edited.starts).toBe(docker.starts);
     await expect(
-      bridge.updateRecent(local.id, local.options, ['3000'], local.profile),
+      bridge.updateRecent(
+        local.id,
+        local.options,
+        ['3000'],
+        local.profile,
+        false,
+      ),
     ).rejects.toThrow('Ports lassen sich nur für Docker-Sessions freigeben.');
     await expect(
       bridge.updateRecent(
@@ -271,6 +284,7 @@ describe('demo bridge', () => {
         { ...local.options, extraArgs: '"x"' },
         [],
         local.profile,
+        false,
       ),
     ).rejects.toThrow('Extra-Argumente: Keine Anführungszeichen.');
     await expect(
@@ -279,11 +293,40 @@ describe('demo bridge', () => {
         { ...local.options, effort: 'turbo' },
         [],
         local.profile,
+        false,
       ),
     ).rejects.toThrow('Unbekannte Denkstufe für Claude Code.');
     await expect(
-      bridge.updateRecent('weg', local.options, [], undefined),
+      bridge.updateRecent('weg', local.options, [], undefined, false),
     ).rejects.toThrow('Dieser Workspace steht nicht mehr in „Workspaces“.');
+  });
+
+  it('stores the „Modell & Effort“ mode; a row start keeps the stored model', async () => {
+    const bridge = createDemoBridge(0);
+    const before = (await bridge.snapshot()).recents;
+    const local = before.find((r) => r.env === 'local')!;
+    const options = { ...local.options, model: 'opus', effort: 'high' };
+    const after = await bridge.updateRecent(
+      local.id,
+      options,
+      [],
+      local.profile,
+      true,
+    );
+    const edited = after.recents.find((r) => r.id === local.id)!;
+    expect(edited.keepAgentModel).toBe(true);
+    const { recent } = await bridge.launchSession(
+      request({
+        agent: local.agent,
+        env: local.env,
+        folder: local.folder,
+        options: { ...options, model: 'default', effort: 'default' },
+        keepAgentModel: true,
+        ...(local.profile && { profile: local.profile }),
+      }),
+    );
+    expect(recent.keepAgentModel).toBe(true);
+    expect(recent.options).toMatchObject({ model: 'opus', effort: 'high' });
   });
 
   it('saves settings, picks a fake folder and opens nothing', async () => {

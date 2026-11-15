@@ -193,7 +193,7 @@ export function createDemoBridge(latency = 150, detection = 600): DemoBridge {
       change({ recents: restored });
       return copy();
     },
-    async updateRecent(id, options, ports, profile) {
+    async updateRecent(id, options, ports, profile, keepAgentModel) {
       await delay();
       const recent = data.recents.find((item) => item.id === id);
       if (!recent)
@@ -213,6 +213,7 @@ export function createDemoBridge(latency = 150, detection = 600): DemoBridge {
         structuredClone(options),
         normalizePorts(ports),
         stored,
+        keepAgentModel,
       );
       if (edited) change({ recents: edited });
       return copy();

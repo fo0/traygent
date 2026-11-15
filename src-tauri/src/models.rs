@@ -198,6 +198,10 @@ pub struct RepoRef {
     pub name: String,
 }
 
+fn is_false(value: &bool) -> bool {
+    !*value
+}
+
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct LaunchRequest {
@@ -220,6 +224,10 @@ pub struct LaunchRequest {
     /// (normalized to none) outside the local environment.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub profile: Option<String>,
+    /// A workspace row's start of a recent set to „Agent“ (#43): no model or effort flags,
+    /// so the agent continues with what it last used. The composer always sends false.
+    #[serde(default, skip_serializing_if = "is_false")]
+    pub keep_agent_model: bool,
 }
 
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
@@ -240,6 +248,10 @@ pub struct RecentSession {
     /// The profile the last start used; absent for the default one.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub profile: Option<String>,
+    /// „Modell & Effort“ „Agent“ (#43): a row start sends no model or effort and keeps the
+    /// stored ones; only „Bearbeiten …“ changes it. Absent (false) = Traygent sets them.
+    #[serde(default, skip_serializing_if = "is_false")]
+    pub keep_agent_model: bool,
     /// RFC 3339.
     pub last_started_at: String,
     pub starts: u32,

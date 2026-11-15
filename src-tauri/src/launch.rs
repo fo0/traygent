@@ -134,6 +134,10 @@ fn build(
     let folder = normalize_folder(&request.folder)?;
     let options = settings::normalize_options(request.options.clone());
     settings::validate_options(agent, &options)?;
+    let options = match request.keep_agent_model {
+        true => agents::without_model(&options),
+        false => options,
+    };
     let extra = settings::extra_args(agent, &options.extra_args)?;
     let ports = request_ports(request)?;
     let title = title(agent, &folder);

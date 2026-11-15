@@ -37,7 +37,7 @@ Every start lands in **Workspaces**, so the next one is a single click.
 | Feature                               | What you get                                                                                                                                             |
 | ------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | ⚡ **One-click starts**               | Agent, folder, environment, Enter. Model, effort and permission default to your settings; the session mode starts at **Neu**.                            |
-| 🕘 **Recent sessions**                | Up to 20 folder · agent · environment combinations as compact rows; a click restarts one with exactly the same settings.                                 |
+| 🕘 **Workspaces**                     | Up to 20 folder · agent · environment rows; a click restarts one as it was, or lets the agent keep its own model and effort.                             |
 | 🐳 **Local or Docker**                | Run the agent on the host or in a container with named volumes for its state and optional port publishing.                                               |
 | 🐙 **Start from a GitHub repository** | Paste a URL, type `owner/name` or search your repositories; Traygent clones it on first use and reuses the folder afterwards.                            |
 | 👥 **Several Claude accounts**        | One profile per sign-in; skills, plugins, settings, MCP servers and history stay the same in all of them, synced in the background every 15 minutes too. |

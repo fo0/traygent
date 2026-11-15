@@ -163,4 +163,51 @@ describe('recents', () => {
     expect(standard).not.toHaveProperty('profile');
     expect(standard).toEqual({ ...entry, profile: undefined });
   });
+
+  it('keeps the „Modell & Effort“ mode on a start, and a kept start keeps model and effort', () => {
+    const start: LaunchRequest = {
+      agent: 'claude',
+      env: 'local',
+      folder: 'C:\\a',
+      options: { ...options, model: 'opus', effort: 'high' },
+      session: 'new',
+      ports: [],
+    };
+    const entry = recordStart([], start);
+    expect(entry).not.toHaveProperty('keepAgentModel');
+    // A request flag never sets the mode: only „Bearbeiten …“ does.
+    const row = {
+      ...start,
+      keepAgentModel: true,
+      options: { ...options, permission: 'bypass' as const },
+    };
+    const kept = recordStart([entry], row);
+    expect(kept).not.toHaveProperty('keepAgentModel');
+    expect(kept.options).toEqual({
+      ...options,
+      permission: 'bypass',
+      model: 'opus',
+      effort: 'high',
+    });
+    const flagged = editRecent(
+      [entry],
+      entry.id,
+      entry.options,
+      [],
+      undefined,
+      true,
+    )![0]!;
+    expect(flagged.keepAgentModel).toBe(true);
+    expect(recordStart([flagged], row).keepAgentModel).toBe(true);
+    // A composer start keeps the mode and stores its own options.
+    const composed = recordStart([flagged], {
+      ...start,
+      options: { ...options, model: 'sonnet' },
+    });
+    expect(composed.keepAgentModel).toBe(true);
+    expect(composed.options.model).toBe('sonnet');
+    expect(
+      editRecent([flagged], entry.id, entry.options, [])![0],
+    ).not.toHaveProperty('keepAgentModel');
+  });
 });

@@ -35,7 +35,7 @@ One composer, no prose:
 - Each row shows the agent icon (with the profile's initial on its corner when it started with a profile other than **Standard**), folder name and parent path, then fixed columns at the right edge, so every icon sits in the same column from row to row (an absent part leaves its column empty): a `</>` mark when a restart passes extra arguments (the arguments are in the tooltip), published ports, a repository icon when it was started from GitHub, the environment icon, the options as symbols and a relative time.
 - Options as symbols: the chosen model as a one-letter badge (Opus **O**, Sonnet **S**, Haiku **H**; Codex models by their own word: Sol **S**, Astra **A**, Terra **T**, Luna **L**), the thinking level as signal bars, the permission as a symbol.
 - A click anywhere on the row (or **▶**) starts that session again with exactly those settings — once per press, so a double-click never starts it twice.
-- The **⋯** menu offers **In Composer übernehmen** (copy into the composer), **Bearbeiten …** (edit the model, thinking level, permission, extra arguments, Docker ports and — in Lokal, for an agent with profiles — the **Profil** the row starts with, without starting it; a profile removed meanwhile shows as **Standard**), **Ordner öffnen** (open the folder in Explorer), **Pfad kopieren** (copy the folder path) and **Entfernen** (remove) with **Rückgängig** (undo) for 8 seconds.
+- The **⋯** menu offers **In Composer übernehmen** (copy into the composer), **Bearbeiten …** (edit the model, thinking level, permission, extra arguments, Docker ports and — in Lokal, for an agent with profiles — the **Profil** the row starts with, without starting it; a profile removed meanwhile shows as **Standard**; **Modell & Effort**: **Traygent** sets the stored model and thinking level on every start, **Agent** passes neither so the agent keeps what it last used, e.g. after `/model`), **Ordner öffnen** (open the folder in Explorer), **Pfad kopieren** (copy the folder path) and **Entfernen** (remove) with **Rückgängig** (undo) for 8 seconds.
 
 ## Status and refresh
 
@@ -66,7 +66,7 @@ Traygent maps one permission choice to each agent's own flags and launches the C
 | OpenCode V2 | the user's config rules / `--auto` / `--auto` plus an allow-all rule in `OPENCODE_CONFIG_CONTENT`; always `--standalone`                                                        | Neu · Fortsetzen           | `traygent-opencode-bin`, `traygent-opencode-data`, `traygent-opencode-config` |
 | Codex       | `--sandbox read-only --ask-for-approval on-request` / `--approve-for-me` / `--dangerously-bypass-approvals-and-sandbox` (in Docker the sandbox is `danger-full-access`)         | Neu · Fortsetzen · Auswahl | `traygent-codex-tools`, `traygent-codex-home`                                 |
 
-Model and effort travel as `--model` / `--effort` (Claude), in `OPENCODE_CONFIG_CONTENT` as `provider/model#variant` (OpenCode) and as `-m` / `-c model_reasoning_effort=…` (Codex). Extra arguments follow last, one literal each.
+Model and effort travel as `--model` / `--effort` (Claude), in `OPENCODE_CONFIG_CONTENT` as `provider/model#variant` (OpenCode) and as `-m` / `-c model_reasoning_effort=…` (Codex) — none of them for a workspace set to **Modell & Effort** → **Agent**. Extra arguments follow last, one literal each.
 
 ## Start from a GitHub repository
 

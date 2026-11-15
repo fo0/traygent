@@ -141,6 +141,7 @@ fn struct_fields_are_camel_case() {
         options: LaunchOptions::default(),
         ports: vec!["127.0.0.1:3000:3000".into()],
         profile: None,
+        keep_agent_model: false,
         last_started_at: "2026-11-03T09:00:00Z".into(),
         starts: 2,
     };
@@ -406,5 +407,38 @@ fn profile_fields_follow_the_contract() {
     assert_eq!(
         serde_json::to_value(&warned).unwrap()["warning"],
         "Profile konnten nicht …"
+    );
+}
+
+#[test]
+fn keep_agent_model_defaults_to_false_and_is_written_only_when_set() {
+    // A state file or panel from before #43 has no key.
+    let old = json!({
+        "id": "abc", "agent": "claude", "env": "local", "folder": "C:\\x",
+        "options": {}, "lastStartedAt": "2026-11-03T09:00:00Z", "starts": 1
+    });
+    let recent = serde_json::from_value::<RecentSession>(old.clone()).unwrap();
+    assert!(!recent.keep_agent_model);
+    assert!(serde_json::to_value(&recent)
+        .unwrap()
+        .get("keepAgentModel")
+        .is_none());
+    let kept = RecentSession {
+        keep_agent_model: true,
+        ..recent
+    };
+    assert_eq!(serde_json::to_value(&kept).unwrap()["keepAgentModel"], true);
+    let request = json!({
+        "agent": "claude", "env": "local", "folder": "C:\\x",
+        "options": {}, "session": "new"
+    });
+    let parsed = serde_json::from_value::<LaunchRequest>(request.clone()).unwrap();
+    assert!(!parsed.keep_agent_model);
+    let mut flagged = request;
+    flagged["keepAgentModel"] = json!(true);
+    assert!(
+        serde_json::from_value::<LaunchRequest>(flagged)
+            .unwrap()
+            .keep_agent_model
     );
 }

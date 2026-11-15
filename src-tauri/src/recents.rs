@@ -38,7 +38,9 @@ fn sort(list: &mut [RecentSession]) {
 
 /// Records a start: bumps `starts` and `lastStartedAt`, replaces the options, ports and
 /// profile (stored normalized), moves it first. A start of the same folder by path keeps the repository the
-/// entry was cloned from.
+/// entry was cloned from. The entry's `keep_agent_model` never changes here (only
+/// „Bearbeiten …“ sets it); a start that kept the agent's model keeps the stored model and
+/// effort too (#43).
 pub fn upsert(
     list: &mut Vec<RecentSession>,
     request: &LaunchRequest,
@@ -50,6 +52,14 @@ pub fn upsert(
         .position(|recent| recent.id == id)
         .map(|index| list.remove(index));
     let starts = previous.as_ref().map_or(0, |recent| recent.starts);
+    let keep_agent_model = previous
+        .as_ref()
+        .is_some_and(|recent| recent.keep_agent_model);
+    let mut options = request.options.clone();
+    if let Some(stored) = previous.as_ref().filter(|_| request.keep_agent_model) {
+        options.model = stored.options.model.clone();
+        options.effort = stored.options.effort.clone();
+    }
     let repo = stored_repo(request.repo.as_ref())
         .or_else(|| previous.and_then(|recent| stored_repo(recent.repo.as_ref())));
     let recent = RecentSession {
@@ -58,9 +68,10 @@ pub fn upsert(
         env: request.env,
         folder: request.folder.clone(),
         repo,
-        options: request.options.clone(),
+        options,
         ports: stored_ports(request.env, &request.ports),
         profile: stored_profile(request.env, request.profile.as_deref()),
+        keep_agent_model,
         last_started_at: timestamp(now),
         starts: starts.saturating_add(1),
     };

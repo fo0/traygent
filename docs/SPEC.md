@@ -106,6 +106,20 @@ Brand top left: icon + „Traygent“. Window ~480×760, frameless, tray popup l
    A row's profile: ▶ restarts with it (one removed since is refused natively, „Profil nicht
    gefunden.“); „In Composer übernehmen“ takes it over, or the saved „Standard-Profil“ when it
    is gone. A start of the same folder with another profile updates the row's profile.
+   „Modell & Effort“ (#43, a `Segmented` at the top of „Bearbeiten …“, explanation in the
+   tooltips): „Traygent“ (default) — every ▶ sends the stored model and thinking level as
+   today; „Agent“ — ▶ sends `keepAgentModel: true` and the launch builder passes no model or
+   effort to any agent (Claude `--model` / `--effort`, Codex `-m` /
+   `-c model_reasoning_effort`, OpenCode's `model` key in `OPENCODE_CONFIG_CONTENT`), so the
+   agent continues with what it last used (e.g. after `/model` in Claude Code); permission,
+   session, extra arguments, profile and ports are unchanged. While „Agent“ is chosen the
+   model and thinking fields are off with their values kept, and the row shows one mark
+   („Modell & Effort vom Agent“, also in ▶'s tooltip) in the model column instead of the model
+   badge and the signal bars. `RecentSession.keepAgentModel` changes only through
+   `update_recent`; a start never changes it, and a flagged start keeps the stored model and
+   thinking level (it never overwrites them). A composer start always sends the composer's
+   model and thinking level (no `keepAgentModel`); on the same workspace it keeps the mode and
+   stores those options as today.
 4. Footer: Docker state („Docker 27.5 bereit“ / „Docker nicht erreichbar“, only while Docker is
    shown) · „Stand hh:mm“.
 
@@ -210,6 +224,8 @@ Profiles in the contract (`profileTypes.ts` ↔ `models/profiles.rs`): `AgentCat
 `AppSettings.profileShare` (`Record<AgentId, ProfileShare>`, `{ dirs: string[], files: string[] }`,
 empty lists by default and for an agent without `profiles`),
 `LaunchRequest.profile` and `RecentSession.profile` (optional, absent for `default`),
+`LaunchRequest.keepAgentModel` and `RecentSession.keepAgentModel` (optional, absent = false,
+#43 — _Dashboard_ → Workspaces),
 `Snapshot.profiles` (`ProfileStatus[]`: `agent`, `id`, `label`, `dir`, `signedIn`, optional
 `account`, `organization`, `syncedAt`, `syncError`) and `LaunchOutcome.warning` (optional,
 German: the session started, the profile sync before it was incomplete).
@@ -224,7 +240,7 @@ Commands (Rust `#[tauri::command]`, German `Err` strings; panel calls only via `
 | `launch_session`                   | `{ request }`                                                                                    | `LaunchOutcome` (validates, opens terminal, records recent)   |
 | `remove_recent`                    | `{ id }`                                                                                         | `Snapshot`                                                    |
 | `restore_recent`                   | `{ recent }`                                                                                     | `Snapshot` (undo of remove)                                   |
-| `update_recent`                    | `{ id, options, ports, profile: string \| null }`                                                | `Snapshot` (edit, no start)                                   |
+| `update_recent`                    | `{ id, options, ports, profile: string \| null, keepAgentModel }`                                | `Snapshot` (edit, no start)                                   |
 | `pick_folder`                      | `{ initial?: string }`                                                                           | `string \| null` (native folder dialog)                       |
 | `install_agent`                    | `{ agent }`                                                                                      | `void` (opens a terminal running the catalog install command) |
 | `open_folder`                      | `{ path }`                                                                                       | `void` (Explorer)                                             |

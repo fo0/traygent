@@ -64,6 +64,7 @@
         session: 'new',
         ports: [...recent.ports],
         ...(recent.profile && { profile: recent.profile }),
+        ...(recent.keepAgentModel && { keepAgentModel: true }),
       }),
     );
   }

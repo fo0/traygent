@@ -23,7 +23,13 @@ fn an_edited_recent_keeps_its_place_time_and_count_and_is_saved() {
     );
     let before = service.snapshot().revision;
     let snapshot = service
-        .update_recent(&older.id, bypass(" opus "), vec![" 3000 ".into()], None)
+        .update_recent(
+            &older.id,
+            bypass(" opus "),
+            vec![" 3000 ".into()],
+            None,
+            false,
+        )
         .unwrap();
     assert!(snapshot.revision > before);
     let ids: Vec<_> = snapshot.recents.iter().map(|r| r.id.clone()).collect();
@@ -47,22 +53,23 @@ fn an_invalid_edit_or_a_gone_entry_changes_nothing() {
             &local.id,
             LaunchOptions::default(),
             vec!["3000".into()],
-            None
+            None,
+            false,
         ),
         Err(crate::ports::DOCKER_ONLY.into())
     );
     assert!(service
-        .update_recent(&local.id, bypass("-p"), Vec::new(), None)
+        .update_recent(&local.id, bypass("-p"), Vec::new(), None, false)
         .is_err());
     let quoted = LaunchOptions {
         extra_args: "\"x\"".into(),
         ..LaunchOptions::default()
     };
     assert!(service
-        .update_recent(&local.id, quoted, Vec::new(), None)
+        .update_recent(&local.id, quoted, Vec::new(), None, false)
         .is_err());
     assert_eq!(
-        service.update_recent("unknown", LaunchOptions::default(), Vec::new(), None),
+        service.update_recent("unknown", LaunchOptions::default(), Vec::new(), None, false),
         Err(RECENT_GONE.into())
     );
     assert_eq!(service.snapshot().recents, before);
@@ -93,6 +100,7 @@ fn an_edit_stores_the_profile_normalized_like_a_start() {
                 LaunchOptions::default(),
                 Vec::new(),
                 profile.map(Into::into),
+                false,
             )
             .unwrap();
         snapshot.recents[0].profile.clone()
@@ -120,6 +128,7 @@ fn an_edit_stores_the_profile_normalized_like_a_start() {
             LaunchOptions::default(),
             Vec::new(),
             Some("team".into()),
+            false,
         )
         .unwrap();
     let edited = snapshot.recents.iter().find(|r| r.id == docker.id).unwrap();
@@ -140,7 +149,7 @@ fn an_unlisted_profile_is_refused_and_changes_nothing() {
         (&codex.id, "team"),
     ] {
         assert_eq!(
-            service.update_recent(id, bypass("opus"), Vec::new(), Some(profile.into())),
+            service.update_recent(id, bypass("opus"), Vec::new(), Some(profile.into()), false),
             Err(PROFILE_MISSING.into()),
             "{profile}"
         );
@@ -148,8 +157,37 @@ fn an_unlisted_profile_is_refused_and_changes_nothing() {
     assert_eq!(service.snapshot().recents, before);
     // An agent without profiles stores none, as before.
     let snapshot = service
-        .update_recent(&codex.id, LaunchOptions::default(), Vec::new(), None)
+        .update_recent(&codex.id, LaunchOptions::default(), Vec::new(), None, false)
         .unwrap();
     let edited = snapshot.recents.iter().find(|r| r.id == codex.id).unwrap();
     assert_eq!(edited.profile, None);
+}
+
+#[test]
+fn an_edit_sets_the_agent_model_mode_and_a_row_start_keeps_it_and_the_stored_model() {
+    let dir = TempDir::new("service-recents-edit-agent-model");
+    let mut service = Service::open(&dir.0);
+    let local = service.record_launch(&request(AgentId::Claude, EnvId::Local, r"C:\a"), Utc::now());
+    let snapshot = service
+        .update_recent(&local.id, bypass("opus"), Vec::new(), None, true)
+        .unwrap();
+    assert!(snapshot.recents[0].keep_agent_model);
+    let saved = Service::open(&dir.0).snapshot().recents;
+    assert!(saved[0].keep_agent_model, "saved");
+    // The row's start: flagged, it sends the stored options; neither changes.
+    let row = LaunchRequest {
+        options: bypass("opus"),
+        keep_agent_model: true,
+        ..request(AgentId::Claude, EnvId::Local, r"C:\a")
+    };
+    let started = service.record_launch(&row, Utc::now());
+    assert!(started.keep_agent_model);
+    assert_eq!(started.options, bypass("opus"));
+    let snapshot = service
+        .update_recent(&local.id, bypass("opus"), Vec::new(), None, false)
+        .unwrap();
+    assert!(
+        !snapshot.recents[0].keep_agent_model,
+        "only an edit clears it"
+    );
 }

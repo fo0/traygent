@@ -1,7 +1,7 @@
 import { nativeSnapshot } from './support/snapshot';
 import { installTauriMock, readCalls } from './support/tauriMock';
 import { expect, test, type Page } from './support/test';
-import type { Snapshot } from '../src/lib/types';
+import type { LaunchRequest, Snapshot } from '../src/lib/types';
 
 /*
  * „Bearbeiten …“ of a „Workspaces“ row (#3): the options and ports its ▶ sends,
@@ -32,7 +32,7 @@ test('edits a local row: Bypass by default, saved without a start', async ({
   const save = dialog.getByRole('button', { name: 'Speichern' });
   await expect(save).toHaveAttribute('aria-disabled', 'true');
   await dialog.getByRole('radio', { name: 'Bypass' }).check();
-  await dialog.getByLabel('Modell').fill('opus');
+  await dialog.getByLabel('Modell', { exact: true }).fill('opus');
   await save.click();
   await expect(dialog).toBeHidden();
   await expect(target.getByLabel('Freigabe: Bypass')).toBeVisible();
@@ -153,5 +153,69 @@ for (const [name, stale] of STALE)
       options: notes.options,
       ports: [],
       profile: null,
+      keepAgentModel: false,
     });
   });
+
+test('„Modell & Effort“ „Agent“: fields off, a mark on the row, saved without a start', async ({
+  page,
+}) => {
+  await page.goto('/');
+  const target = row(page, 'Notizen');
+  const dialog = await openEdit(page, 'Notizen');
+  const model = dialog.getByRole('combobox', { name: 'Modell', exact: true });
+  await model.fill('opus');
+  await expect(model).toBeEnabled();
+  await dialog.getByRole('radio', { name: 'Agent' }).check();
+  // The values stay, only off.
+  await expect(model).toBeDisabled();
+  await expect(model).toHaveValue('opus');
+  await expect(dialog.getByRole('combobox', { name: 'Denken' })).toBeDisabled();
+  await dialog.getByRole('button', { name: 'Speichern' }).click();
+  await expect(dialog).toBeHidden();
+  const mark = target.getByRole('img', { name: 'Modell & Effort vom Agent' });
+  await expect(mark).toBeVisible();
+  await expect(target.getByRole('img', { name: /^Modell: / })).toHaveCount(0);
+  await expect(
+    target.getByRole('button', { name: /starten$/ }),
+  ).toHaveAttribute('title', /Modell & Effort vom Agent/);
+  // Back to „Traygent“: the stored model shows again.
+  const again = await openEdit(page, 'Notizen');
+  await expect(again.getByRole('radio', { name: 'Agent' })).toBeChecked();
+  await again.getByRole('radio', { name: 'Traygent' }).check();
+  await again.getByRole('button', { name: 'Speichern' }).click();
+  await expect(mark).toHaveCount(0);
+  await expect(target.getByRole('img', { name: /^Modell: / })).toBeVisible();
+});
+
+test('natively: a row set to „Agent“ starts with keepAgentModel', async ({
+  page,
+}) => {
+  const snapshot = nativeSnapshot();
+  const notes = snapshot.recents.find((r) => r.folder.endsWith('Notizen'))!;
+  notes.keepAgentModel = true;
+  await installTauriMock<Snapshot, Record<string, never>>(
+    page,
+    (snapshot) => async (cmd) => {
+      if (cmd === 'snapshot' || cmd === 'refresh_detection') return snapshot;
+      if (cmd === 'launch_session')
+        return {
+          recent: snapshot.recents.find((r) => r.keepAgentModel)!,
+          snapshot,
+        };
+      return null;
+    },
+    { arg: snapshot, state: {} },
+  );
+  await page.goto('/');
+  await row(page, 'Notizen')
+    .getByRole('button', { name: /starten$/ })
+    .click();
+  await expect(
+    page.getByRole('status').filter({ hasText: 'gestartet.' }),
+  ).toBeVisible();
+  const [call] = await readCalls(page, 'launch_session');
+  const request = call?.args?.request as LaunchRequest;
+  expect(request.keepAgentModel).toBe(true);
+  expect(request.options).toEqual(notes.options);
+});

@@ -105,14 +105,19 @@
   const effortLabel = $derived(
     choiceLabel(entry?.efforts ?? [], options.effort),
   );
-  /** Only options that differ from „Standard“ go into the start's tooltip. */
+  /**
+   * Only options that differ from „Standard“ go into the start's tooltip;
+   * with „Modell & Effort“ „Agent“ (#43) the start sends neither.
+   */
   const optionTitle = $derived(
-    [
-      options.model !== 'default' && `Modell: ${modelLabel}`,
-      options.effort !== 'default' && `Denken: ${effortLabel}`,
-    ]
-      .filter((part) => !!part)
-      .join(' · '),
+    recent.keepAgentModel
+      ? 'Modell & Effort vom Agent'
+      : [
+          options.model !== 'default' && `Modell: ${modelLabel}`,
+          options.effort !== 'default' && `Denken: ${effortLabel}`,
+        ]
+          .filter((part) => !!part)
+          .join(' · '),
   );
   /**
    * The start's hit area covers the row (owner request, #17), so the row's
@@ -196,6 +201,7 @@
     args={!!args}
     {repo}
     {env}
+    agentModel={!!recent.keepAgentModel}
     model={options.model}
     {modelLabel}
     {thinks}

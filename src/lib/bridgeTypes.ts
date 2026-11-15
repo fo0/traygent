@@ -33,6 +33,7 @@ export interface Bridge {
     options: LaunchOptions,
     ports: string[],
     profile: string | undefined,
+    keepAgentModel: boolean,
   ): Promise<Snapshot>;
   /** A folder dialog; `null` when cancelled. */
   pickFolder(initial: string | null): Promise<string | null>;

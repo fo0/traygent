@@ -169,7 +169,13 @@ describe('demo profiles', () => {
     const codex = before.find((r) => r.agent === 'codex')!;
     const stored = async (id: string, profile?: string) => {
       const { options } = before.find((r) => r.id === id)!;
-      const { recents } = await bridge.updateRecent(id, options, [], profile);
+      const { recents } = await bridge.updateRecent(
+        id,
+        options,
+        [],
+        profile,
+        false,
+      );
       return recents.find((r) => r.id === id)!.profile;
     };
     expect(local.profile).toBeUndefined();
@@ -184,7 +190,7 @@ describe('demo profiles', () => {
       [codex, 'team'],
     ] as const)
       await expect(
-        bridge.updateRecent(recent.id, recent.options, [], profile),
+        bridge.updateRecent(recent.id, recent.options, [], profile, false),
       ).rejects.toThrow('Profil nicht gefunden.');
   });
 

@@ -77,6 +77,7 @@ pub(crate) fn request(agent: AgentId, env: EnvId, folder: &str) -> LaunchRequest
         options: LaunchOptions::default(),
         session: SessionMode::New,
         profile: None,
+        keep_agent_model: false,
         ports: Vec::new(),
     }
 }
@@ -444,6 +445,7 @@ fn no_plan_ever_contains_powershell_51_pitfalls() {
     assert_eq!(count, 2 * 2 * 3 * 5 * (3 + 2 + 3));
 }
 
+mod agent_model;
 mod clone;
 mod profiles;
 mod terminal;

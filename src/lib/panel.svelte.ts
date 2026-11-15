@@ -237,9 +237,11 @@ export class Panel {
     options: LaunchOptions,
     ports: string[],
     profile: string | undefined,
+    keep: boolean,
   ) {
     const { id } = recent;
-    this.accept(await this.#bridge.updateRecent(id, options, ports, profile));
+    const bridge = this.#bridge;
+    this.accept(await bridge.updateRecent(id, options, ports, profile, keep));
   }
 
   /** Saves the whole settings object; rejects with the German message. */
