@@ -1,5 +1,5 @@
 /*
- * „Zuletzt“ in RepoWatch's list card: one bordered card with a 1 px divider
+ * „Workspaces“ in RepoWatch's list card: one bordered card with a 1 px divider
  * between single-line rows, the agent mark on a tile sized like its status
  * tiles, and chips like its branch chips. The whole row starts its session
  * (owner request, #17): the start's hit area covers the row, „⋯“ sits above

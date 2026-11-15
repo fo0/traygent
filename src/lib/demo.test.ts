@@ -283,7 +283,7 @@ describe('demo bridge', () => {
     ).rejects.toThrow('Unbekannte Denkstufe für Claude Code.');
     await expect(
       bridge.updateRecent('weg', local.options, [], undefined),
-    ).rejects.toThrow('Diese Session steht nicht mehr in „Zuletzt“.');
+    ).rejects.toThrow('Dieser Workspace steht nicht mehr in „Workspaces“.');
   });
 
   it('saves settings, picks a fake folder and opens nothing', async () => {

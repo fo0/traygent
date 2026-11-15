@@ -73,7 +73,7 @@ Brand top left: icon + „Traygent“. Window ~480×760, frameless, tray popup l
      „Installieren …“ (opens Settings → Agenten for that agent) — never a dead start.
    - Options start from the agent's saved defaults; changing them on the dashboard affects the
      next start only (not the defaults).
-3. **Zuletzt** (recent sessions — where RepoWatch lists repositories): one single-line row per
+3. **Workspaces** (recent sessions — where RepoWatch lists repositories): one single-line row per
    (folder, agent, env), newest first, max 20 kept, in one bordered list card with dividers
    (RepoWatch's list card). Row: agent mark on a tile — a profile other than „Standard“ sits on
    its corner as its initial on a small round accent tile („Profil <label>“, also in the row's
@@ -252,7 +252,7 @@ Commands (Rust `#[tauri::command]`, German `Err` strings; panel calls only via `
   picks, Esc closes). A picked suggestion becomes `owner/name`. Without an account the list
   holds one entry „GitHub verbinden …“ (Settings → GitHub). A repository typed or pasted needs
   no account.
-- Start: `repo` set, `folder` `''` (composer) or the recent's folder (▶ on a „Zuletzt“ row). A
+- Start: `repo` set, `folder` `''` (composer) or the recent's folder (▶ on a „Workspaces“ row). A
   given folder (validated like any folder) that exists is started as is, without a clone, so a
   recent keeps its clone after the clone root changed (#40). Otherwise Rust derives
   `<cloneRoot>\<owner>\<name>` (validated like any folder; `cloneRoot` `''` →

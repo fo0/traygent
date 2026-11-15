@@ -318,7 +318,7 @@ test('agents, Docker and GitHub carry their product marks; the name stays access
   page,
 }) => {
   await page.goto('/');
-  // „Zuletzt“: the badge is an image named after the agent, drawn as its mark.
+  // „Workspaces“: the badge is an image named after the agent, drawn as its mark.
   const badge = row(page, 'traygent').getByRole('img', { name: 'Claude Code' });
   await expect(badge.locator('svg.mark-claude')).toBeVisible();
   await expect(

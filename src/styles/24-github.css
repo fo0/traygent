@@ -1,6 +1,6 @@
 /*
  * GitHub (docs/adr/0005): the folder field's repository mark and suggestion
- * list, the repository mark in „Zuletzt“, and Settings → GitHub with its
+ * list, the repository mark in „Workspaces“, and Settings → GitHub with its
  * inline confirmation (ported from RepoWatch). Tokens from 00-tokens.css only.
  */
 .folder-kind {

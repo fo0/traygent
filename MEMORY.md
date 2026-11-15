@@ -8,7 +8,7 @@ Stable project knowledge. **Read at session start.**
 
 - **Date:** 2026-11-03
 - **Context:** The owner wants a tray app that starts coding-agent sessions fast, on the exact stack and shell of RepoWatch (`fo0/repo-watch`), replacing the Batch starters of `fo0/agent-tools` (`claude/cli-starter.bat` and the OpenCode starter).
-- **Decision:** The shell (tray popup, single instance, autostart, in-app updates, theme, staged settings, IPC contract test, CI and release pipeline) was copied from RepoWatch and renamed; every GitHub-domain part was removed. The agent domain (catalog, detection, launch builder, `state.json`, composer, „Zuletzt“, Settings „Agenten“ / „Umgebung“) follows `docs/SPEC.md`; decisions in ADR-0002 (JSON state), ADR-0003 (PowerShell argv), ADR-0004 (Docker volumes).
+- **Decision:** The shell (tray popup, single instance, autostart, in-app updates, theme, staged settings, IPC contract test, CI and release pipeline) was copied from RepoWatch and renamed; every GitHub-domain part was removed. The agent domain (catalog, detection, launch builder, `state.json`, composer, „Workspaces“, Settings „Agenten“ / „Umgebung“) follows `docs/SPEC.md`; decisions in ADR-0002 (JSON state), ADR-0003 (PowerShell argv), ADR-0004 (Docker volumes).
 - **Reason:** A proven, reviewed shell; both repositories were only read, never modified.
 
 ### Unsigned Windows releases, versions from the run timestamp

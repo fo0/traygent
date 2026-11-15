@@ -1,5 +1,5 @@
 /*
- * The „Zuletzt“ list as pure functions: newest first, one entry per
+ * The „Workspaces“ list as pure functions: newest first, one entry per
  * (folder, agent, env), at most `RECENT_LIMIT`. The native core owns the real
  * list; the demo and the panel's undo use these rules to mirror it.
  */

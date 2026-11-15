@@ -23,7 +23,7 @@
     shimArgsProblem,
   } from './validation';
 
-  // „Bearbeiten …“ of a „Zuletzt“ row: the options, ports (Docker) and
+  // „Bearbeiten …“ of a „Workspaces“ row: the options, ports (Docker) and
   // profile (Lokal, an agent with an extra profile) its ▶ sends. Staged like
   // the settings; „Speichern“ stores them without a start.
   let {

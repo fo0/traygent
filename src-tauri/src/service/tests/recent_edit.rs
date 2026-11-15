@@ -1,4 +1,4 @@
-//! „Bearbeiten …“ of a „Zuletzt“ row through the service.
+//! „Bearbeiten …“ of a „Workspaces“ row through the service.
 use super::*;
 
 fn bypass(model: &str) -> LaunchOptions {

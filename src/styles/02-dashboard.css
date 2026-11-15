@@ -1,6 +1,6 @@
 /*
  * Dashboard: the „Neue Session“ composer card right under the app bar (as
- * RepoWatch's search field) and the „Zuletzt“ list.
+ * RepoWatch's search field) and the „Workspaces“ list.
  */
 .dashboard-section + .dashboard-section {
   margin-top: 6px;

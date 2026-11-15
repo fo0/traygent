@@ -8,7 +8,7 @@
   import type { AgentCatalogEntry, LaunchOptions, PermissionId } from './types';
 
   // One agent's options as form fields: Einstellungen → Agenten → Standards
-  // and „Bearbeiten …“ of a „Zuletzt“ row.
+  // and „Bearbeiten …“ of a „Workspaces“ row.
   let {
     entry,
     options,

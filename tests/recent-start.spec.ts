@@ -4,7 +4,7 @@ import { installTauriMock, readCalls, readCommands } from './support/tauriMock';
 import type { LaunchRequest, Snapshot } from '../src/lib/types';
 
 /*
- * „Zuletzt“: a click anywhere on a row starts its session (owner request,
+ * „Workspaces“: a click anywhere on a row starts its session (owner request,
  * #17), once per press (src/lib/rowStart.ts); „⋯“ and its menu keep their
  * own actions, and a press that only closes a popup starts nothing
  * (src/lib/menu.ts → closedPopup). Runs against the labelled native-IPC

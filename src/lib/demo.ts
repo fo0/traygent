@@ -197,7 +197,7 @@ export function createDemoBridge(latency = 150, detection = 600): DemoBridge {
       await delay();
       const recent = data.recents.find((item) => item.id === id);
       if (!recent)
-        throw new Error('Diese Session steht nicht mehr in „Zuletzt“.');
+        throw new Error('Dieser Workspace steht nicht mehr in „Workspaces“.');
       const entry = data.catalog.find((item) => item.id === recent.agent);
       const problem =
         optionsProblem({ agent: recent.agent, options }) ||

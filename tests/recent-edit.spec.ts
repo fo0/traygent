@@ -4,7 +4,7 @@ import { expect, test, type Page } from './support/test';
 import type { Snapshot } from '../src/lib/types';
 
 /*
- * „Bearbeiten …“ of a „Zuletzt“ row (#3): the options and ports its ▶ sends,
+ * „Bearbeiten …“ of a „Workspaces“ row (#3): the options and ports its ▶ sends,
  * stored without a start. Runs against the labelled browser demo.
  */
 const row = (page: Page, name: string) =>

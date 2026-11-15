@@ -2,9 +2,9 @@
 
 Carried over from RepoWatch, where the owner set them (#18 there), and adapted to Traygent's domain. They override every older UI statement in `README.md`, `docs/`, `docs/adr/` and `agent_docs/`. Read them before any UI change; the UI review checks each one (`agent_docs/review_process.md → UI Review`).
 
-1. **Compact first.** Single-line rows over cards. Smallest readable size. No decorative headings, badges or step lists. The „Neue Session“ composer and the „Zuletzt“ list card (RepoWatch's list card, owner request #17) are the only cards.
+1. **Compact first.** Single-line rows over cards. Smallest readable size. No decorative headings, badges or step lists. The „Neue Session“ composer and the „Workspaces“ list card (RepoWatch's list card, owner request #17; named „Zuletzt“ until #43) are the only cards.
 2. **Minimal text.** Labels, not sentences. At most one short help line per form. No explanatory paragraphs. Details go into tooltips. Never describe what the UI obviously does.
-3. **Identify items by what differs.** In „Zuletzt“ the folder name is primary, its parent path secondary; agent, environment and options follow as icons and chips.
+3. **Identify items by what differs.** In „Workspaces“ the folder name is primary, its parent path secondary; agent, environment and options follow as icons and chips.
 4. **No manual configuration the app can infer.** Installed agent CLIs, their versions and Docker are detected, not entered; recent folders come from the sessions started. Options start from the agent's saved defaults.
 5. **Settings are staged.** Changes apply with one primary „Speichern“ next to „Abbrechen“. Immediate actions are explicit buttons. Adding a profile („+“ / Enter under „Profile“, owner request #37) is one: it saves at once and leaves the staged edits staged.
 6. **One primary action per form or flow, bottom right.** „Starten“ in the composer; a missing CLI turns it into „Installieren …“, never a dead start. A completed flow closes or returns by itself — the user never has to press „Schließen“ after success.

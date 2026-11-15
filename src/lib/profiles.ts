@@ -1,7 +1,7 @@
 /*
  * Agent profiles (#33) as pure functions: the id a typed name gives, the
  * rules a new profile and a saved list follow (mirroring the native checks,
- * which have the last word), and what the composer, „Zuletzt“ and the
+ * which have the last word), and what the composer, „Workspaces“ and the
  * settings read from a snapshot.
  */
 import type {

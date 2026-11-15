@@ -1,5 +1,5 @@
 /*
- * Synthetic „Zuletzt“ sessions of the browser preview. Folders, repositories
+ * Synthetic „Workspaces“ sessions of the browser preview. Folders, repositories
  * and times are invented and never read from the machine.
  */
 import type { AppSettings, RecentSession } from './types';

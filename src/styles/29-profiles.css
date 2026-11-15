@@ -1,6 +1,6 @@
 /*
  * Agent profiles (#33): the composer's mark-only „Profil“ chip, the round
- * profile mark on a „Zuletzt“ row's agent tile and Settings → Agenten →
+ * profile mark on a „Workspaces“ row's agent tile and Settings → Agenten →
  * „Profile“. Tokens from
  * 00-tokens.css only.
  */
@@ -26,7 +26,7 @@
   color: inherit;
 }
 
-/* „Zuletzt“: the profile on the agent tile's corner, so it takes no width
+/* „Workspaces“: the profile on the agent tile's corner, so it takes no width
    from the folder name; the ring separates it from the tile. */
 .agent-tile {
   position: relative;

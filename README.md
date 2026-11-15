@@ -30,7 +30,7 @@ Starting a coding agent usually means: open a terminal, `cd` into the project, r
 2. Pick an agent and a folder — or paste a GitHub repository.
 3. Press **Enter**. The session opens in Windows Terminal or a console window.
 
-Every start lands in **Zuletzt** (recent), so the next one is a single click.
+Every start lands in **Workspaces**, so the next one is a single click.
 
 ## Features
 
