@@ -3,6 +3,8 @@ use crate::launch::plan;
 use crate::launch::tests::{env_value, request, resolved, script, PS};
 use crate::models::{EnvId, PermissionId, SessionMode, TerminalId};
 
+mod socket;
+
 const DOCKER: &str = "C:\\Program Files\\Docker\\Docker\\resources\\bin\\docker.exe";
 const GH: &str = r"C:\Program Files\GitHub CLI\gh.exe";
 
@@ -83,11 +85,11 @@ fn init_scripts_are_lf_only_and_end_in_the_cli() {
             "exec runuser -u node -- /home/node/.local/bin/codex \"$@\"\n",
         ),
     ] {
-        let script = init_script(agent);
+        let script = init_script(agent, false);
         assert!(!script.contains('\r'));
         assert!(script.ends_with(last), "{agent:?}");
     }
-    let claude = init_script(AgentId::Claude);
+    let claude = init_script(AgentId::Claude, false);
     assert!(claude.contains("-mmin +60 -exec rm -rf {} +"));
     assert!(claude.contains("ln -s \"$V/config\" /home/node/.claude"));
 }
@@ -103,8 +105,8 @@ fn init_scripts_and_loader_are_valid_bash() {
         return;
     }
     for script in AgentId::ALL
-        .map(init_script)
         .into_iter()
+        .flat_map(|agent| [init_script(agent, false), init_script(agent, true)])
         .chain([LOADER.to_string()])
     {
         let status = std::process::Command::new("bash")
@@ -126,7 +128,7 @@ fn claude_reuses_the_starter_volumes_and_project_dir() {
     let text = script(&plan);
     assert_eq!(
         env_value(&text, "TRAYGENT_INIT").unwrap(),
-        init_script(AgentId::Claude)
+        init_script(AgentId::Claude, false)
     );
     let expected = [
         "run",
@@ -357,7 +359,7 @@ fn a_tampered_image_never_reaches_docker() {
             r"C:\x",
             vec![],
             None,
-            &[],
+            HostAccess::default(),
             &settings,
             &resolved(None),
         );

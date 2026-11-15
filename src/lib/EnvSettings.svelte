@@ -8,8 +8,9 @@
   import type { AgentId, EnvId, Snapshot, TerminalId } from './types';
 
   // „Umgebung“: which environments the composer offers, where and in which
-  // window a start runs by default, the Docker image per agent and the
-  // default ports. Everything is staged until „Speichern“.
+  // window a start runs by default, the Docker image per agent, the default
+  // ports and what a container gets from the host. Everything is staged until
+  // „Speichern“.
   let { snapshot, draft }: { snapshot: Snapshot; draft: SettingsDraft } =
     $props();
   const settings = $derived(draft.value);
@@ -189,6 +190,18 @@
       />
       <span class="switch" aria-hidden="true"></span>
       <span>GitHub-Token weitergeben</span>
+    </label>
+    <label
+      class="switch-row"
+      title="Mountet den Docker-Socket des Hosts in den Container – der Agent kann damit den Host-Docker steuern"
+    >
+      <input
+        type="checkbox"
+        class="switch-input"
+        bind:checked={draft.value.docker.socket}
+      />
+      <span class="switch" aria-hidden="true"></span>
+      <span>Docker-Socket durchreichen</span>
     </label>
   </section>
 {/if}

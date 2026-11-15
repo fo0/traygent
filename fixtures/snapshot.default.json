@@ -33,7 +33,8 @@
         "codex": "node:22-trixie"
       },
       "ghToken": false,
-      "ports": []
+      "ports": [],
+      "socket": false
     },
     "github": {
       "cloneRoot": ""

@@ -175,6 +175,7 @@ describe('demo profiles', () => {
         [],
         profile,
         false,
+        false,
       );
       return recents.find((r) => r.id === id)!.profile;
     };
@@ -190,7 +191,14 @@ describe('demo profiles', () => {
       [codex, 'team'],
     ] as const)
       await expect(
-        bridge.updateRecent(recent.id, recent.options, [], profile, false),
+        bridge.updateRecent(
+          recent.id,
+          recent.options,
+          [],
+          profile,
+          false,
+          false,
+        ),
       ).rejects.toThrow('Profil nicht gefunden.');
   });
 

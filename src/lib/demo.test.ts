@@ -206,6 +206,7 @@ describe('demo bridge', () => {
             [],
             recent.profile,
             false,
+            false,
           ),
         ),
       ).toBe(start + 7);
@@ -262,6 +263,7 @@ describe('demo bridge', () => {
       [' 3000 '],
       undefined,
       false,
+      false,
     );
     expect(after.recents.map((r) => r.id)).toEqual(before.map((r) => r.id));
     const edited = after.recents.find((r) => r.id === docker.id)!;
@@ -276,6 +278,7 @@ describe('demo bridge', () => {
         ['3000'],
         local.profile,
         false,
+        false,
       ),
     ).rejects.toThrow('Ports lassen sich nur für Docker-Sessions freigeben.');
     await expect(
@@ -284,6 +287,7 @@ describe('demo bridge', () => {
         { ...local.options, extraArgs: '"x"' },
         [],
         local.profile,
+        false,
         false,
       ),
     ).rejects.toThrow('Extra-Argumente: Keine Anführungszeichen.');
@@ -294,10 +298,11 @@ describe('demo bridge', () => {
         [],
         local.profile,
         false,
+        false,
       ),
     ).rejects.toThrow('Unbekannte Denkstufe für Claude Code.');
     await expect(
-      bridge.updateRecent('weg', local.options, [], undefined, false),
+      bridge.updateRecent('weg', local.options, [], undefined, false, false),
     ).rejects.toThrow('Dieser Workspace steht nicht mehr in „Workspaces“.');
   });
 
@@ -312,6 +317,7 @@ describe('demo bridge', () => {
       [],
       local.profile,
       true,
+      false,
     );
     const edited = after.recents.find((r) => r.id === local.id)!;
     expect(edited.keepAgentModel).toBe(true);

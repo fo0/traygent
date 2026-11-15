@@ -25,7 +25,8 @@ const newestFirst = (a: RecentSession, b: RecentSession) =>
  * The entry a start records: a new one, or the bumped existing one. A
  * repository start passes the folder derived from it. As natively
  * (src-tauri/src/recents.rs → upsert), `keepAgentModel` stays the entry's,
- * and a start that kept the agent's model keeps the stored model and effort.
+ * a start that kept the agent's model keeps the stored model and effort, and
+ * the Docker socket is stored for a Docker start only.
  */
 export function recordStart(
   list: readonly RecentSession[],
@@ -51,6 +52,8 @@ export function recordStart(
     ...(request.profile &&
       request.profile !== 'default' && { profile: request.profile }),
     ...(previous?.keepAgentModel && { keepAgentModel: true }),
+    ...(request.dockerSocket &&
+      request.env === 'docker' && { dockerSocket: true }),
   };
 }
 
@@ -95,9 +98,9 @@ export function restoreRecent(
 /**
  * „Bearbeiten …“, as natively (src-tauri/src/service.rs → update_recent): new
  * options (trimmed, a blank model or effort `default`), ports, profile
- * (already normalized, `undefined` for „Standard“) and „Modell & Denken“
- * mode on the entry; its place, start time and count stay. Null when the id
- * is no longer listed.
+ * (already normalized, `undefined` for „Standard“), „Modell & Denken“ mode
+ * and Docker socket (Docker entries only) on the entry; its place, start time
+ * and count stay. Null when the id is no longer listed.
  */
 export function editRecent(
   list: readonly RecentSession[],
@@ -106,6 +109,7 @@ export function editRecent(
   ports: readonly string[],
   profile?: string,
   keepAgentModel = false,
+  dockerSocket = false,
 ): RecentSession[] | null {
   if (!list.some((item) => item.id === id)) return null;
   const trimmed = {
@@ -125,6 +129,8 @@ export function editRecent(
     else delete edited.profile;
     if (keepAgentModel) edited.keepAgentModel = true;
     else delete edited.keepAgentModel;
+    if (dockerSocket && item.env === 'docker') edited.dockerSocket = true;
+    else delete edited.dockerSocket;
     return edited;
   });
 }

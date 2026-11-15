@@ -33,6 +33,24 @@ describe('Composer', () => {
     expect(composer.request().session).toBe('new');
   });
 
+  it('sends the saved Docker socket with a Docker start only', () => {
+    const { composer, snapshot } = loaded();
+    expect(composer.request()).not.toHaveProperty('dockerSocket');
+    composer.selectEnv('docker');
+    expect(composer.request()).not.toHaveProperty('dockerSocket');
+    composer.sync({
+      ...snapshot,
+      settings: {
+        ...snapshot.settings,
+        docker: { ...snapshot.settings.docker, socket: true },
+      },
+      revision: snapshot.revision + 1,
+    });
+    expect(composer.request().dockerSocket).toBe(true);
+    composer.selectEnv('local');
+    expect(composer.request()).not.toHaveProperty('dockerSocket');
+  });
+
   it('changes only the next start, never the defaults', () => {
     const { composer, snapshot } = loaded();
     composer.options.model = 'opus';

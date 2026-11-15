@@ -123,6 +123,12 @@ export interface LaunchRequest {
    * effort flags. Omitted (false) by the composer.
    */
   keepAgentModel?: boolean;
+  /**
+   * Mount the host Docker socket (docs/SPEC.md → Docker socket); Docker
+   * only, ignored elsewhere. The composer sends `settings.docker.socket`, a
+   * workspace row its stored value; omitted (false) when off.
+   */
+  dockerSocket?: boolean;
   /** A profile of the agent (`local` only); omitted for `default`. */
   profile?: string;
 }
@@ -149,6 +155,8 @@ export interface RecentSession {
    * (false) = Traygent sets them.
    */
   keepAgentModel?: boolean;
+  /** The last start (or „Bearbeiten …“) passed the host Docker socket; Docker only. */
+  dockerSocket?: boolean;
 }
 
 export interface AgentStatus {
@@ -176,6 +184,11 @@ export interface DockerSettings {
   ghToken: boolean;
   /** Ports every new Docker session starts with; the composer can change them per start. */
   ports: string[];
+  /**
+   * Mount the host Docker socket into every new Docker session, so the agent
+   * can drive the host's Docker (docs/SPEC.md → Docker socket).
+   */
+  socket: boolean;
 }
 
 /** A well-known dev-server port the panel offers as a checkbox. */

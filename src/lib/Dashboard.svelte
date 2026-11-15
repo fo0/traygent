@@ -45,8 +45,8 @@
     section?.querySelector<HTMLElement>('.composer-start')?.focus();
   }
   /**
-   * A row's start: exactly the options and ports it shows, as a new session,
-   * once per press (`rowStart.ts`). A session started from a repository
+   * A row's start: exactly the options and ports it shows and its stored
+   * Docker socket, as a new session, once per press (`rowStart.ts`). A session started from a repository
    * sends its folder with the repository: Rust reuses the folder while it
    * exists and clones into the current Klon-Ordner only when it is gone, so a
    * clone that failed is tried again (#40). Its profile goes as stored; one
@@ -65,6 +65,7 @@
         ports: [...recent.ports],
         ...(recent.profile && { profile: recent.profile }),
         ...(recent.keepAgentModel && { keepAgentModel: true }),
+        ...(recent.dockerSocket && { dockerSocket: true }),
       }),
     );
   }

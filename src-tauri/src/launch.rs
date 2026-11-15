@@ -202,7 +202,10 @@ fn build(
                 &folder,
                 argv,
                 config.as_deref(),
-                &ports,
+                docker::HostAccess {
+                    ports: &ports,
+                    socket: request.docker_socket,
+                },
                 settings,
                 resolved,
             )?;

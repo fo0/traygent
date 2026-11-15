@@ -30,6 +30,7 @@ impl Default for DockerSettings {
             images: PerAgent::from_fn(|_| DEFAULT_IMAGE.to_string()),
             gh_token: false,
             ports: Vec::new(),
+            socket: false,
         }
     }
 }

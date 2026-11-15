@@ -55,6 +55,7 @@ fn request(agent: AgentId, env: EnvId) -> LaunchRequest {
         session: SessionMode::New,
         profile: None,
         keep_agent_model: false,
+        docker_socket: false,
         ports: Vec::new(),
     }
 }

@@ -142,6 +142,7 @@ fn struct_fields_are_camel_case() {
         ports: vec!["127.0.0.1:3000:3000".into()],
         profile: None,
         keep_agent_model: false,
+        docker_socket: false,
         last_started_at: "2026-11-03T09:00:00Z".into(),
         starts: 2,
     };
@@ -443,4 +444,32 @@ fn keep_agent_model_defaults_to_false_and_is_written_only_when_set() {
             .unwrap()
             .keep_agent_model
     );
+}
+
+#[test]
+fn the_docker_socket_is_camel_case_absent_when_off_and_off_by_default() {
+    let docker: DockerSettings = serde_json::from_value(json!({ "ghToken": true })).unwrap();
+    assert!(!docker.socket);
+    assert_eq!(serde_json::to_value(&docker).unwrap()["socket"], false);
+    let recent: RecentSession = serde_json::from_value(json!({
+        "id": "abc", "agent": "codex", "env": "docker", "folder": "C:\\x",
+        "options": {}, "lastStartedAt": "2026-11-03T09:00:00Z", "starts": 1
+    }))
+    .unwrap();
+    assert!(!recent.docker_socket);
+    assert!(serde_json::to_value(&recent)
+        .unwrap()
+        .get("dockerSocket")
+        .is_none());
+    let passed = RecentSession {
+        docker_socket: true,
+        ..recent
+    };
+    assert_eq!(serde_json::to_value(&passed).unwrap()["dockerSocket"], true);
+    let request: LaunchRequest = serde_json::from_value(json!({
+        "agent": "codex", "env": "docker", "folder": "C:\\x", "options": {},
+        "session": "new", "dockerSocket": true
+    }))
+    .unwrap();
+    assert!(request.docker_socket);
 }

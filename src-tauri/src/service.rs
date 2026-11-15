@@ -267,22 +267,25 @@ impl Service {
             .transpose()?;
         let mut list = self.state.recents.clone();
         let profile = recents::stored_profile(recent.env, recent.profile.as_deref());
+        let docker_socket = recents::stored_socket(recent.env, recent.docker_socket);
         let recent = RecentSession {
             folder,
             repo,
             options,
             ports,
             profile,
+            docker_socket,
             ..recent
         };
         recents::restore(&mut list, recent)?;
         self.commit_recents(list)
     }
 
-    /// „Bearbeiten …“ of a „Workspaces“ row: replaces the options, ports, profile and
-    /// „Modell & Denken“ mode (`keep_agent_model`, #43) the next restart sends, validated and
-    /// normalized like a start (the profile none for „Standard“ and outside the local
-    /// environment); the entry keeps its place, start time and count.
+    /// „Bearbeiten …“ of a „Workspaces“ row: replaces the options, ports, profile,
+    /// „Modell & Denken“ mode (`keep_agent_model`, #43) and Docker socket (#46) the next
+    /// restart sends, validated and normalized like a start (the profile none for „Standard“
+    /// and outside the local environment, the socket false outside Docker); the entry keeps
+    /// its place, start time and count.
     pub fn update_recent(
         &mut self,
         id: &str,
@@ -290,6 +293,7 @@ impl Service {
         ports: Vec<String>,
         profile: Option<String>,
         keep_agent_model: bool,
+        docker_socket: bool,
     ) -> Result<Snapshot, String> {
         let mut list = self.state.recents.clone();
         let recent = list
@@ -307,6 +311,7 @@ impl Service {
         recent.ports = ports;
         recent.profile = profile;
         recent.keep_agent_model = keep_agent_model;
+        recent.docker_socket = recents::stored_socket(recent.env, docker_socket);
         self.commit_recents(list)
     }
 

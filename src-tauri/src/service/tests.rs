@@ -81,6 +81,7 @@ fn request(agent: AgentId, env: EnvId, folder: &str) -> LaunchRequest {
         session: SessionMode::New,
         profile: None,
         keep_agent_model: false,
+        docker_socket: false,
         ports: Vec::new(),
     }
 }
@@ -471,6 +472,8 @@ fn nonces_are_six_hex_digits() {
     assert_eq!(nonce.len(), 6);
     assert!(nonce.chars().all(|c| c.is_ascii_hexdigit()));
 }
+
+mod docker_socket;
 
 mod ports;
 

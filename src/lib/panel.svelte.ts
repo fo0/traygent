@@ -1,5 +1,5 @@
 import type { NoticeTone } from './StatusBanners.svelte';
-import type { Bridge, ObserveSnapshots } from './bridgeTypes';
+import type { Bridge, ObserveSnapshots, RecentEdit } from './bridgeTypes';
 import { errorMessage } from './format';
 import { GithubActions } from './githubActions.svelte';
 import {
@@ -12,7 +12,6 @@ import { ProfileActions } from './profileActions.svelte';
 import type {
   AgentId,
   AppSettings,
-  LaunchOptions,
   LaunchRequest,
   RecentSession,
   Snapshot,
@@ -232,16 +231,8 @@ export class Panel {
    * „Bearbeiten …“ of a „Workspaces“ row; rejects with the German message, so
    * the dialog stays open and shows it.
    */
-  async updateRecent(
-    recent: RecentSession,
-    options: LaunchOptions,
-    ports: string[],
-    profile: string | undefined,
-    keep: boolean,
-  ) {
-    const { id } = recent;
-    const bridge = this.#bridge;
-    this.accept(await bridge.updateRecent(id, options, ports, profile, keep));
+  async updateRecent(recent: RecentSession, ...edit: RecentEdit) {
+    this.accept(await this.#bridge.updateRecent(recent.id, ...edit));
   }
 
   /** Saves the whole settings object; rejects with the German message. */

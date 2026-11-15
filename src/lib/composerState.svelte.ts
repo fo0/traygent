@@ -213,6 +213,8 @@ export class Composer {
       options: sentOptions(entry, $state.snapshot(this.options)),
       session,
       ports: this.env === 'docker' ? $state.snapshot(this.ports) : [],
+      ...(this.env === 'docker' &&
+        this.#snapshot?.settings.docker.socket && { dockerSocket: true }),
       ...(this.profileApplies &&
         this.profile !== DEFAULT_PROFILE && { profile: this.profile }),
     };

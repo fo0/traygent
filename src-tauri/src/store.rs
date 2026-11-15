@@ -165,6 +165,7 @@ fn parse_settings(object: &Map<String, Value>) -> AppSettings {
     if let Some(docker) = docker {
         settings.docker.gh_token = field(docker, "ghToken", false);
         settings.docker.ports = field(docker, "ports", Vec::new());
+        settings.docker.socket = field(docker, "socket", false);
     }
     if let Some(github) = object.get("github").and_then(Value::as_object) {
         settings.github.clone_root = field(github, "cloneRoot", String::new());

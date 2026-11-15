@@ -84,6 +84,7 @@ Open http://127.0.0.1:1420. The preview is labelled **Demo**.
 - **Profiles never touch your sign-in.** Traygent only checks that a profile's `.credentials.json` holds a sign-in and names its plan; it never copies it, keeps a token or starts the CLI for it ([details](docs/USAGE.md#several-accounts--profile)).
 - **No shell strings.** Every launch is an argument list of quoted literals ([ADR-0003](docs/adr/0003-launch-through-a-powershell-argv.md)).
 - **Docker ports bind to `127.0.0.1`** unless you type an IP.
+- **The host Docker socket stays outside the container** unless you turn on **Docker-Socket durchreichen** (off by default); with it, the agent controls your host's Docker ([details](docs/USAGE.md#docker-sessions)).
 - **Network access:** Traygent itself contacts only the GitHub API (update check, account check, your repository list) and GitHub release downloads. `git clone`, agent installers and container image pulls run visibly in the terminal Traygent opens for the session or install.
 - **Local state** lives in one JSON file, `%APPDATA%\io.github.fo0.traygent\state.json` ([details](docs/USAGE.md#where-traygent-keeps-its-state)).
 

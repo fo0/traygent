@@ -134,7 +134,7 @@ describe('golden snapshot fixture', () => {
     }
     expectShape(
       settings.docker,
-      { required: ['images', 'ghToken', 'ports'] },
+      { required: ['images', 'ghToken', 'ports', 'socket'] },
       'docker',
     );
     expect(portListProblem(settings.docker.ports), 'docker.ports').toBe('');

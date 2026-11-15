@@ -36,11 +36,11 @@ fn sort(list: &mut [RecentSession]) {
     list.sort_by_key(|recent| std::cmp::Reverse(started(recent)));
 }
 
-/// Records a start: bumps `starts` and `lastStartedAt`, replaces the options, ports and
-/// profile (stored normalized), moves it first. A start of the same folder by path keeps the repository the
-/// entry was cloned from. The entry's `keep_agent_model` never changes here (only
-/// „Bearbeiten …“ sets it); a start that kept the agent's model keeps the stored model and
-/// effort too (#43).
+/// Records a start: bumps `starts` and `lastStartedAt`, replaces the options, ports, Docker
+/// socket and profile (stored normalized), moves it first. A start of the same folder by path
+/// keeps the repository the entry was cloned from. The entry's `keep_agent_model` never
+/// changes here (only „Bearbeiten …“ sets it); a start that kept the agent's model keeps the
+/// stored model and effort too (#43).
 pub fn upsert(
     list: &mut Vec<RecentSession>,
     request: &LaunchRequest,
@@ -72,6 +72,7 @@ pub fn upsert(
         ports: stored_ports(request.env, &request.ports),
         profile: stored_profile(request.env, request.profile.as_deref()),
         keep_agent_model,
+        docker_socket: stored_socket(request.env, request.docker_socket),
         last_started_at: timestamp(now),
         starts: starts.saturating_add(1),
     };
@@ -112,6 +113,11 @@ pub fn stored_ports(env: EnvId, list: &[String]) -> Vec<String> {
         .unwrap_or_default()
 }
 
+/// The Docker socket as a recent keeps it: Docker only, false for any other environment.
+pub fn stored_socket(env: EnvId, socket: bool) -> bool {
+    socket && env == EnvId::Docker
+}
+
 /// The profile as a recent keeps it: an id of an extra profile, local sessions only; the
 /// default profile, another environment and a malformed id are stored as none. Whether the
 /// profile still exists is checked at the start.
@@ -127,12 +133,12 @@ pub fn stored_repo(repo: Option<&RepoRef>) -> Option<RepoRef> {
     repo.and_then(|repo| crate::repo::validate(repo).ok())
 }
 
-/// Loaded lists: ports ([`stored_ports`]), repositories ([`stored_repo`]) and profiles
-/// ([`stored_profile`]) sanitized,
-/// duplicates dropped (first wins after sorting) and the cap kept.
+/// Loaded lists: ports ([`stored_ports`]), the Docker socket ([`stored_socket`]),
+/// repositories ([`stored_repo`]) and profiles ([`stored_profile`]) sanitized, duplicates dropped (first wins after sorting) and the cap kept.
 pub fn tidy(mut list: Vec<RecentSession>) -> Vec<RecentSession> {
     for recent in &mut list {
         recent.ports = stored_ports(recent.env, &recent.ports);
+        recent.docker_socket = stored_socket(recent.env, recent.docker_socket);
         recent.repo = stored_repo(recent.repo.as_ref());
         recent.profile = stored_profile(recent.env, recent.profile.as_deref());
     }
