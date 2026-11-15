@@ -5,8 +5,17 @@ use crate::launch::tests::decode_command;
 use crate::profiles::watch::{self, WatchHost, WATCH_LIMIT, WATCH_TICK};
 use crate::profiles::SyncOutcome;
 use std::cell::{Cell, RefCell};
-use std::sync::Mutex;
+use std::sync::{Mutex, MutexGuard, PoisonError};
 use std::time::{Duration, Instant};
+
+/// The watch registry is process-wide and these tests share one key, so the tests that
+/// start a watch run one at a time: a parallel `watch::start` on the same key would
+/// replace a running watch and end it without its commit.
+static WATCH_SERIAL: Mutex<()> = Mutex::new(());
+
+fn serial() -> MutexGuard<'static, ()> {
+    WATCH_SERIAL.lock().unwrap_or_else(PoisonError::into_inner)
+}
 
 #[test]
 fn a_sign_in_runs_hidden_unless_debug_is_on() {
@@ -107,6 +116,7 @@ fn team(snapshot: &Snapshot) -> &crate::models::ProfileStatus {
 
 #[test]
 fn the_watch_commits_once_when_the_profile_signs_in() {
+    let _serial = serial();
     let (state, home) = (
         TempDir::new("service-watch-in"),
         TempDir::new("home-watch-in"),
@@ -148,6 +158,7 @@ fn the_watch_commits_once_when_the_profile_signs_in() {
 
 #[test]
 fn without_a_change_the_watch_ends_at_its_limit_and_commits_nothing() {
+    let _serial = serial();
     let (state, home) = (
         TempDir::new("service-watch-idle"),
         TempDir::new("home-watch-idle"),
@@ -173,6 +184,7 @@ fn without_a_change_the_watch_ends_at_its_limit_and_commits_nothing() {
 
 #[test]
 fn a_panicking_read_or_a_newer_watch_ends_the_watch_without_harm() {
+    let _serial = serial();
     let (state, home) = (
         TempDir::new("service-watch-panic"),
         TempDir::new("home-watch-panic"),
