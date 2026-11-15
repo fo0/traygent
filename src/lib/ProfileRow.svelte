@@ -3,7 +3,7 @@
   import CopyField from './CopyField.svelte';
   import Icon from './Icon.svelte';
   import { dateTime } from './format';
-  import { SIGNED_OUT, rowAccount } from './profileRow';
+  import { SIGNED_OUT, planLabel, rowAccount } from './profileRow';
   import { repeatClick, repeatKey } from './rowStart';
   import { STANDARD_LABEL, profileFolder, renameProblem } from './profiles';
   import type { SettingsDraft } from './settingsDraft.svelte';
@@ -204,6 +204,8 @@
       >
       {#if status?.organization}<span class="field-label">Organisation</span
         ><span class="profile-value">{status.organization}</span>{/if}
+      {#if status?.signedIn && status.plan}<span class="field-label">Abo</span
+        ><span class="profile-value">{planLabel(status.plan)}</span>{/if}
       <span class="field-label">Ordner</span><CopyField
         value={status?.dir || profileFolder(agent, id)}
         label={`Ordner von ${shown}`}

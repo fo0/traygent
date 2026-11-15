@@ -1,5 +1,5 @@
 //! What the panel shows about each profile: its directory, whether it is signed in, the
-//! account the CLI recorded and the last sync.
+//! account and plan the CLI recorded and the last sync.
 use super::sync::read_marker;
 use super::{recipe, Homes};
 use crate::models::{
@@ -11,6 +11,8 @@ use std::path::Path;
 const MAX_TEXT_CHARS: usize = 128;
 /// A state file beyond this is not read for the account.
 const MAX_STATE_BYTES: u64 = 64 * 1024 * 1024;
+/// A credentials file beyond this is not parsed; the sign-in then rests on its size alone.
+const MAX_CREDENTIALS_BYTES: u64 = 1024 * 1024;
 
 /// (agent, profile id).
 pub type Key = (AgentId, String);
@@ -22,7 +24,25 @@ pub struct Facts {
     pub signed_in: bool,
     pub account: Option<String>,
     pub organization: Option<String>,
+    /// The subscription the credentials name (`max`, `team`, `pro`, …), signed in only.
+    pub plan: Option<String>,
     pub synced_at: Option<String>,
+}
+
+/// The two fields of the credentials file Traygent looks at. No `Debug`: a token must never
+/// reach a log by accident.
+#[derive(serde::Deserialize)]
+struct Credentials {
+    #[serde(rename = "claudeAiOauth")]
+    oauth: Option<Oauth>,
+}
+
+#[derive(serde::Deserialize)]
+struct Oauth {
+    #[serde(rename = "refreshToken")]
+    refresh_token: Option<String>,
+    #[serde(rename = "subscriptionType")]
+    subscription: Option<String>,
 }
 
 #[derive(serde::Deserialize)]
@@ -58,15 +78,49 @@ fn account(state_file: &Path) -> Option<Account> {
         .account
 }
 
-/// Reads one profile. The credentials file is only checked for existence and size — its
-/// content never leaves the disk.
+/// Whether the credentials file holds a sign-in, and its plan (the CLI's own rule, #43): no
+/// file, an empty one, no `claudeAiOauth` object or a blank `refreshToken` is signed out. A
+/// file that does not parse (the CLI may be mid-write), cannot be read or is beyond
+/// [`MAX_CREDENTIALS_BYTES`] counts as signed in while it is not empty, so a race never flips
+/// the row. The token is dropped right after the presence check; only the plan leaves.
+fn credentials(file: &Path) -> (bool, Option<String>) {
+    let Ok(meta) = std::fs::metadata(file) else {
+        return (false, None);
+    };
+    if !meta.is_file() || meta.len() == 0 {
+        return (false, None);
+    }
+    let bytes = (meta.len() <= MAX_CREDENTIALS_BYTES)
+        .then(|| std::fs::read(file).ok())
+        .flatten();
+    let Some(bytes) = bytes else {
+        return (true, None);
+    };
+    match serde_json::from_slice::<Credentials>(super::files::without_bom(&bytes)) {
+        Err(_) => (true, None),
+        Ok(Credentials { oauth: None }) => (false, None),
+        Ok(Credentials {
+            oauth:
+                Some(Oauth {
+                    refresh_token,
+                    subscription,
+                }),
+        }) => {
+            let signed_in = refresh_token.is_some_and(|token| !token.trim().is_empty());
+            (signed_in, subscription.filter(|_| signed_in))
+        }
+    }
+}
+
+/// Reads one profile. Of the credentials file only `claudeAiOauth.refreshToken` (present and
+/// not blank) and `claudeAiOauth.subscriptionType` are looked at ([`credentials`]); no token
+/// leaves this function, and no CLI runs.
 pub fn read(homes: &Homes, agent: AgentId, id: &str) -> Facts {
     let (Some(recipe), Some(dir)) = (recipe(agent), homes.dir(agent, id)) else {
         return Facts::default();
     };
     let dir = Path::new(&dir);
-    let signed_in = std::fs::metadata(dir.join(recipe.credentials))
-        .is_ok_and(|meta| meta.is_file() && meta.len() > 0);
+    let (signed_in, plan) = credentials(&dir.join(recipe.credentials));
     let account = homes
         .state_file(agent, id)
         .and_then(|file| account(Path::new(&file)));
@@ -82,6 +136,7 @@ pub fn read(homes: &Homes, agent: AgentId, id: &str) -> Facts {
         signed_in,
         account: shown(email),
         organization: shown(organization),
+        plan: shown(plan),
         synced_at,
     }
 }
@@ -134,6 +189,7 @@ pub fn list(
                 signed_in: known.signed_in,
                 account: known.account,
                 organization: known.organization,
+                plan: known.plan,
                 synced_at: known.synced_at,
                 sync_error: errors.get(&key).cloned(),
             });

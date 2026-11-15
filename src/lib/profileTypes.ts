@@ -30,6 +30,11 @@ export interface ProfileStatus {
   /** The signed-in account, e.g. its e-mail address. */
   account?: string;
   organization?: string;
+  /**
+   * The subscription the credentials name (e.g. `max`, `team`, `pro`), only
+   * while signed in (#43).
+   */
+  plan?: string;
   /** RFC 3339 time of the last sync into this profile. */
   syncedAt?: string;
   /** German reason the last sync into this profile failed. */

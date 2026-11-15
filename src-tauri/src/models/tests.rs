@@ -358,6 +358,7 @@ fn profile_fields_follow_the_contract() {
         signed_in: true,
         account: Some("team@example.test".into()),
         organization: None,
+        plan: Some("max".into()),
         synced_at: Some("2026-11-13T09:00:00Z".into()),
         sync_error: None,
     };
@@ -366,7 +367,8 @@ fn profile_fields_follow_the_contract() {
         json!({
             "agent": "claude", "id": "team", "label": "Team",
             "dir": "C:\\Users\\max\\.claude-team", "signedIn": true,
-            "account": "team@example.test", "syncedAt": "2026-11-13T09:00:00Z"
+            "account": "team@example.test", "plan": "max",
+            "syncedAt": "2026-11-13T09:00:00Z"
         })
     );
     let request: LaunchRequest = serde_json::from_value(json!({

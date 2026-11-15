@@ -40,7 +40,8 @@ pub struct Recipe {
     pub home_dir: &'static str,
     /// The CLI's state file: beside the default home, inside every other profile's directory.
     pub state_file: &'static str,
-    /// The sign-in, inside the profile directory. Never read, copied or logged.
+    /// The sign-in, inside the profile directory. Never copied, linked or logged; only
+    /// `profiles/status.rs` reads its sign-in and plan in place (#43).
     pub credentials: &'static str,
     /// Directories every profile shares: a link to the default home's directory.
     pub shared_dirs: &'static [&'static str],

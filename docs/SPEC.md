@@ -158,7 +158,8 @@ Brand top left: icon + „Traygent“. Window ~480×760, frameless, tray popup l
   the row's details in place, one row at a time: „Name“ (for an extra profile a field holding a
   staged rename — the id and folder never change — checked by the list rules — a problem shows in the open detail, else under „Neues Profil“ as „<Name>: <problem>“, and in the toggle's description; read-only for
   „Standard“), „Konto“, „Organisation“ (when reported; „Konto“ of a signed-in profile carries „Neu anmelden“ on the
-  right, the same action), „Ordner“ (the folder, mono, with a copy
+  right, the same action), „Abo“ (the `plan` capitalised, `max` → „Max“, signed in only — also
+  appended to the row's account tooltip; #43), „Ordner“ (the folder, mono, with a copy
   button), „Abgeglichen <time>“ and „Abgleich“ with the sync error when present. Then „Neues
   Profil“ + „+“ / Enter, whose tooltip shows the folder the name gives: adding is an explicit
   immediate action (#37) — it sends `save_settings` with the saved settings plus the new profile,
@@ -229,7 +230,7 @@ empty lists by default and for an agent without `profiles`),
 `LaunchRequest.keepAgentModel` and `RecentSession.keepAgentModel` (optional, absent = false,
 #43 — _Dashboard_ → Workspaces),
 `Snapshot.profiles` (`ProfileStatus[]`: `agent`, `id`, `label`, `dir`, `signedIn`, optional
-`account`, `organization`, `syncedAt`, `syncError`) and `LaunchOutcome.warning` (optional,
+`account`, `organization`, `plan`, `syncedAt`, `syncError`) and `LaunchOutcome.warning` (optional,
 German: the session started, the profile sync before it was incomplete).
 
 Commands (Rust `#[tauri::command]`, German `Err` strings; panel calls only via `src/lib/ipc.ts`):
@@ -544,7 +545,13 @@ Commands (Rust `#[tauri::command]`, German `Err` strings; panel calls only via `
   run and home, created on first use: a profile's losers in the profile's directory, „Standard“'s
   in `%USERPROFILE%\.claude` (also for `.claude.json`, which lives beside it), so no identity
   crosses profiles. Traygent never deletes a backup.
-- **Never touched:** `.credentials.json` (only its existence and size make `signedIn`); the own
+- **Never touched:** `.credentials.json` — never written, linked, copied or synced; it is read in
+  place only for `signedIn` and `plan` (#43, the CLI's own rule, no CLI started): signed out when
+  the file is missing or empty, has no `claudeAiOauth` object or a blank
+  `claudeAiOauth.refreshToken`; signed in otherwise. A file that does not parse (the CLI may be
+  mid-write), cannot be read or is over 1 MiB counts as signed in while it is not empty, so a
+  race never flips the row. Only `claudeAiOauth.subscriptionType` leaves the read, as `plan`
+  (signed in only, cleaned like `account`); no token is kept, logged or sent. The own
   keys and variables of `settings.json` and the own project fields of `.claude.json` stay in their
   file; every other key of `.claude.json` (`oauthAccount.emailAddress` /
   `organizationName` are read for `account` / `organization` only, control characters dropped, at

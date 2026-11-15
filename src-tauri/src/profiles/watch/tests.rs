@@ -10,6 +10,7 @@ fn signed(account: Option<&str>, organization: Option<&str>) -> Facts {
         signed_in: true,
         account: account.map(Into::into),
         organization: organization.map(Into::into),
+        plan: None,
         synced_at: None,
     }
 }

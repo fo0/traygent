@@ -48,6 +48,9 @@ test('only a signed-out row offers „Anmelden“; the demo sign-in flips it in 
   await expect(
     standard.getByRole('button', { name: 'Standard neu anmelden' }),
   ).toBeVisible();
+  // The plan from the credentials (#43): in the details, never in the row.
+  await expect(standard.locator('.profile-detail')).toContainText('AboMax');
+  await expect(standard.locator('.profile-row')).not.toContainText('Max');
   await expect(
     team.getByRole('button', { name: 'Team neu anmelden' }),
   ).toHaveCount(0);
@@ -68,7 +71,7 @@ test('only a signed-out row offers „Anmelden“; the demo sign-in flips it in 
   // tooltip both values.
   await expect(team.locator('.profile-account')).toHaveAttribute(
     'title',
-    'demo@example.com · Beispiel Team',
+    'demo@example.com · Beispiel Team · Team',
   );
   await expect(standard.locator('.profile-account')).toHaveText(
     'Beispiel GmbH',

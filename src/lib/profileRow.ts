@@ -3,7 +3,8 @@
  * (#41). Rows are told apart by what differs (UX rule 3): when another
  * signed-in profile of the agent has the same account but another
  * organization, the row shows its organization instead of the account; the
- * tooltip always carries both.
+ * tooltip always carries both, and the plan (#43) when the credentials name
+ * one.
  */
 import type { ProfileStatus } from './types';
 
@@ -19,6 +20,11 @@ export interface RowAccount {
   out: boolean;
 }
 
+/** A plan as shown: `max` → „Max“; `''` without one. */
+export function planLabel(plan: string | undefined): string {
+  return plan ? plan.charAt(0).toUpperCase() + plan.slice(1) : '';
+}
+
 const same = (a: string | undefined, b: string | undefined) =>
   !!a && !!b && a.toLowerCase() === b.toLowerCase();
 
@@ -31,7 +37,9 @@ export function rowAccount(
     return { text: SIGNED_OUT, title: SIGNED_OUT, out: true };
   const account = status.account ?? SIGNED_IN;
   const { organization } = status;
-  const title = organization ? `${account} · ${organization}` : account;
+  const title = [account, organization, planLabel(status.plan)]
+    .filter((part) => !!part)
+    .join(' · ');
   const twin = statuses.some(
     (other) =>
       other.agent === status.agent &&
