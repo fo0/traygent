@@ -18,6 +18,7 @@
     args,
     repo,
     env,
+    agentModel,
     model,
     modelLabel,
     thinks,
@@ -35,6 +36,11 @@
     /** The repository's accessible name, or `''`. */
     repo: string;
     env: EnvInfo;
+    /**
+     * „Modell & Denken“ „Agent“ (#43): a start sends neither, so one mark
+     * takes the model column and the thinking column stays empty.
+     */
+    agentModel: boolean;
     model: string;
     modelLabel: string;
     /** Whether the agent sends a thinking level with this model. */
@@ -74,11 +80,16 @@
   <span class="recent-env" role="img" aria-label={env.label}
     ><Icon name={env.icon} size={13} /></span
   >
-  {#if model !== 'default'}<ModelBadge {model} label={modelLabel} />{:else}<span
-      class="recent-slot"
-      aria-hidden="true"
-    ></span>{/if}
-  {#if thinks}<span
+  {#if agentModel}<span
+      class="recent-agent-model"
+      role="img"
+      aria-label="Modell & Denken vom Agent"
+      ><Icon name="history" size={13} /></span
+    >{:else if model !== 'default'}<ModelBadge
+      {model}
+      label={modelLabel}
+    />{:else}<span class="recent-slot" aria-hidden="true"></span>{/if}
+  {#if thinks && !agentModel}<span
       class="recent-effort"
       data-level={effortLevel(effort)}
       role="img"

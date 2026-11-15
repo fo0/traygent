@@ -16,6 +16,7 @@ mod projects;
 mod running;
 mod settings;
 mod share;
+mod sign_in_status;
 mod state;
 mod subset;
 
@@ -362,6 +363,7 @@ fn statuses_show_the_sign_in_without_reading_it() {
             signed_in: true,
             account: Some("max@example.test".into()),
             organization: Some("Privat".into()),
+            plan: None,
             synced_at: None,
         }
     );

@@ -35,7 +35,10 @@ export interface Commands {
   remove_recent: { args: { id: string }; result: Snapshot };
   /** The undo of `remove_recent`: puts the removed entry back. */
   restore_recent: { args: { recent: RecentSession }; result: Snapshot };
-  /** „Bearbeiten …“: the options, ports and profile the next restart sends. */
+  /**
+   * „Bearbeiten …“: the options, ports, profile and „Modell & Denken“ mode
+   * the next restart sends.
+   */
   update_recent: {
     args: {
       id: string;
@@ -43,6 +46,7 @@ export interface Commands {
       ports: string[];
       /** `null` (or `default`) for „Standard“. */
       profile: string | null;
+      keepAgentModel: boolean;
     };
     result: Snapshot;
   };

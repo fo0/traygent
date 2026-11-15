@@ -1,6 +1,6 @@
 /*
  * Dashboard domain: the „Neue Session“ composer card and the footer's Docker
- * state; the „Zuletzt“ rows live in 26-recent-rows.css. Tokens only.
+ * state; the „Workspaces“ rows live in 26-recent-rows.css. Tokens only.
  */
 .composer {
   display: flex;

@@ -81,6 +81,7 @@ const ARGS: { [K in Command]?: Exclude<Commands[K]['args'], undefined> } = {
     options: {} as LaunchOptions,
     ports: [],
     profile: null,
+    keepAgentModel: false,
   },
   pick_folder: { initial: null },
   install_agent: { agent: 'claude' as AgentId },

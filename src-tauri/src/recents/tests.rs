@@ -15,6 +15,7 @@ fn request(folder: &str, agent: AgentId, env: EnvId) -> LaunchRequest {
         options: LaunchOptions::default(),
         session: SessionMode::New,
         profile: None,
+        keep_agent_model: false,
         ports: Vec::new(),
     }
 }
@@ -262,4 +263,48 @@ fn the_profile_follows_the_latest_start_and_the_id_ignores_it() {
     let mut tampered = team;
     tampered.profile = Some("..\\..\\evil".into());
     assert_eq!(tidy(vec![tampered]).remove(0).profile, None);
+}
+
+#[test]
+fn a_start_never_changes_the_agent_model_mode_and_a_kept_start_keeps_model_and_effort() {
+    let mut list = Vec::new();
+    let mut composer = request("C:\\a", AgentId::Claude, EnvId::Local);
+    composer.options.model = "opus".into();
+    composer.options.effort = "high".into();
+    let first = upsert(&mut list, &composer, at(1));
+    assert!(
+        !first.keep_agent_model,
+        "a new entry lets Traygent set them"
+    );
+    // A request flag never sets the entry's mode: only „Bearbeiten …“ does.
+    let mut row = composer.clone();
+    row.keep_agent_model = true;
+    row.options.model = "default".into();
+    row.options.effort = "default".into();
+    row.options.permission = PermissionId::Bypass;
+    let kept = upsert(&mut list, &row, at(2));
+    assert!(!kept.keep_agent_model);
+    assert_eq!(
+        (kept.options.model.as_str(), kept.options.effort.as_str()),
+        ("opus", "high"),
+        "a kept start overwrites neither"
+    );
+    assert_eq!(
+        kept.options.permission,
+        PermissionId::Bypass,
+        "the rest follows"
+    );
+    list[0].keep_agent_model = true;
+    let again = upsert(&mut list, &row, at(3));
+    assert!(again.keep_agent_model, "the mode stays");
+    assert_eq!(again.options.model, "opus");
+    // A composer start of the same workspace keeps the mode but stores its options.
+    let mut sonnet = composer;
+    sonnet.options.model = "sonnet".into();
+    let composed = upsert(&mut list, &sonnet, at(4));
+    assert!(composed.keep_agent_model);
+    assert_eq!(
+        (composed.options.model.as_str(), composed.starts),
+        ("sonnet", 4)
+    );
 }

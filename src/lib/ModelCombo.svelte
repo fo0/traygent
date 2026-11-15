@@ -19,6 +19,7 @@
     describedBy,
     variant = 'chip',
     onEnter,
+    disabled = false,
   }: {
     id: string;
     /** The catalog models; `default` stands for the empty field. */
@@ -33,6 +34,8 @@
     variant?: 'chip' | 'field';
     /** Enter on the closed field, e.g. the composer's start. */
     onEnter?: (() => void) | undefined;
+    /** Off with its value kept, e.g. a workspace that keeps the agent's model. */
+    disabled?: boolean;
   } = $props();
 
   const listId = $derived(`${id}-list`);
@@ -97,6 +100,7 @@
   /** The caret toggles the full list and keeps the field's focus. */
   function toggle(event: MouseEvent) {
     event.preventDefault();
+    if (disabled) return;
     if (expanded) open = false;
     else show();
     input?.focus();
@@ -126,6 +130,7 @@
         : undefined}
       aria-invalid={invalid ? 'true' : undefined}
       aria-describedby={describedBy}
+      {disabled}
       placeholder={variant === 'chip' ? 'Modell' : 'Standard'}
       title={variant === 'field' ? title : undefined}
       spellcheck="false"

@@ -35,7 +35,7 @@
   .switch-input:checked + .switch:after {
     background: HighlightText;
   }
-  /* „Zuletzt“ (26-recent-rows.css, loaded later, hence the row prefix): the
+  /* „Workspaces“ (26-recent-rows.css, loaded later, hence the row prefix): the
      round start is an accent fill and the agent tile a tint; draw rings. */
   .recent-row .recent-start {
     border-color: ButtonText;

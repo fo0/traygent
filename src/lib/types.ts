@@ -118,6 +118,11 @@ export interface LaunchRequest {
    * Port spec rules: docs/SPEC.md → Ports.
    */
   ports: string[];
+  /**
+   * A workspace row's start of a recent set to „Agent“ (#43): no model or
+   * effort flags. Omitted (false) by the composer.
+   */
+  keepAgentModel?: boolean;
   /** A profile of the agent (`local` only); omitted for `default`. */
   profile?: string;
 }
@@ -138,6 +143,12 @@ export interface RecentSession {
   starts: number;
   /** The profile it started with; absent for `default`. */
   profile?: string;
+  /**
+   * „Modell & Denken“ „Agent“ (#43): a row start sends no model or effort
+   * and keeps the stored ones; only „Bearbeiten …“ changes it. Absent
+   * (false) = Traygent sets them.
+   */
+  keepAgentModel?: boolean;
 }
 
 export interface AgentStatus {

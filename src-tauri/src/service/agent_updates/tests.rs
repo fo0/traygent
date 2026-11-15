@@ -54,6 +54,7 @@ fn request(agent: AgentId, env: EnvId) -> LaunchRequest {
         options: LaunchOptions::default(),
         session: SessionMode::New,
         profile: None,
+        keep_agent_model: false,
         ports: Vec::new(),
     }
 }

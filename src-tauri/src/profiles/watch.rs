@@ -57,9 +57,13 @@ pub fn watching(key: &Key) -> bool {
     watches().iter().any(|(listed, _)| listed == key)
 }
 
-/// Signed in, account and organization; the sync time is not part of the sign-in.
+/// Signed in, account, organization and plan (#43: a new sign-in of the same account may
+/// change the subscription); the sync time is not part of the sign-in.
 fn signed_alike(a: &Facts, b: &Facts) -> bool {
-    a.signed_in == b.signed_in && a.account == b.account && a.organization == b.organization
+    a.signed_in == b.signed_in
+        && a.account == b.account
+        && a.organization == b.organization
+        && a.plan == b.plan
 }
 
 impl Watch {

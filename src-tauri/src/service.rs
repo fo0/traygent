@@ -21,7 +21,7 @@ pub use github::Listing;
 pub use launch_prep::{Prepared, PROFILE_MISSING};
 pub use profiles::{SignIn, PROFILE_SYNC_INTERVAL, PROFILE_SYNC_TICK, SYNC_WARNING};
 
-pub const RECENT_GONE: &str = "Diese Session steht nicht mehr in „Zuletzt“.";
+pub const RECENT_GONE: &str = "Dieser Workspace steht nicht mehr in „Workspaces“.";
 pub const SAVE_FAILED: &str = "Einstellungen und Sessions werden nicht gespeichert: state.json konnte nicht geschrieben werden.";
 
 pub struct Service {
@@ -279,15 +279,17 @@ impl Service {
         self.commit_recents(list)
     }
 
-    /// „Bearbeiten …“ of a „Zuletzt“ row: replaces the options, ports and profile the next
-    /// restart sends, validated and normalized like a start (the profile none for „Standard“
-    /// and outside the local environment); the entry keeps its place, start time and count.
+    /// „Bearbeiten …“ of a „Workspaces“ row: replaces the options, ports, profile and
+    /// „Modell & Denken“ mode (`keep_agent_model`, #43) the next restart sends, validated and
+    /// normalized like a start (the profile none for „Standard“ and outside the local
+    /// environment); the entry keeps its place, start time and count.
     pub fn update_recent(
         &mut self,
         id: &str,
         options: LaunchOptions,
         ports: Vec<String>,
         profile: Option<String>,
+        keep_agent_model: bool,
     ) -> Result<Snapshot, String> {
         let mut list = self.state.recents.clone();
         let recent = list
@@ -304,6 +306,7 @@ impl Service {
         recent.options = options;
         recent.ports = ports;
         recent.profile = profile;
+        recent.keep_agent_model = keep_agent_model;
         self.commit_recents(list)
     }
 

@@ -132,6 +132,17 @@ pub fn codex(
     args
 }
 
+/// The options a start that keeps the agent's model and effort builds from (#43): both
+/// `default`, so no agent gets a model or effort flag (Claude `--model` / `--effort`, Codex
+/// `-m` / `model_reasoning_effort`, OpenCode's `model` key); everything else unchanged.
+pub fn without_model(options: &LaunchOptions) -> LaunchOptions {
+    LaunchOptions {
+        model: "default".into(),
+        effort: "default".into(),
+        ..options.clone()
+    }
+}
+
 /// The agent's own arguments for this start.
 pub fn args(
     agent: AgentId,

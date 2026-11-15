@@ -20,7 +20,7 @@ test('the browser preview shows the labelled demo dashboard', async ({
     0,
   );
   await expect(
-    tray.getByRole('heading', { name: 'Zuletzt', level: 2 }),
+    tray.getByRole('heading', { name: 'Workspaces', level: 2 }),
   ).toBeVisible();
   await expect(tray.locator('.recent-row')).toHaveCount(6);
   await expect(page.locator('.app-footer .demo-tag')).toHaveText('Demo');

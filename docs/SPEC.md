@@ -73,7 +73,7 @@ Brand top left: icon + „Traygent“. Window ~480×760, frameless, tray popup l
      „Installieren …“ (opens Settings → Agenten for that agent) — never a dead start.
    - Options start from the agent's saved defaults; changing them on the dashboard affects the
      next start only (not the defaults).
-3. **Zuletzt** (recent sessions — where RepoWatch lists repositories): one single-line row per
+3. **Workspaces** (recent sessions — where RepoWatch lists repositories): one single-line row per
    (folder, agent, env), newest first, max 20 kept, in one bordered list card with dividers
    (RepoWatch's list card). Row: agent mark on a tile — a profile other than „Standard“ sits on
    its corner as its initial on a small round accent tile („Profil <label>“, also in the row's
@@ -106,6 +106,20 @@ Brand top left: icon + „Traygent“. Window ~480×760, frameless, tray popup l
    A row's profile: ▶ restarts with it (one removed since is refused natively, „Profil nicht
    gefunden.“); „In Composer übernehmen“ takes it over, or the saved „Standard-Profil“ when it
    is gone. A start of the same folder with another profile updates the row's profile.
+   „Modell & Denken“ (#43, a `Segmented` at the top of „Bearbeiten …“, explanation in the
+   tooltips): „Traygent“ (default) — every ▶ sends the stored model and thinking level as
+   today; „Agent“ — ▶ sends `keepAgentModel: true` and the launch builder passes no model or
+   effort to any agent (Claude `--model` / `--effort`, Codex `-m` /
+   `-c model_reasoning_effort`, OpenCode's `model` key in `OPENCODE_CONFIG_CONTENT`), so the
+   agent continues with what it last used (e.g. after `/model` in Claude Code); permission,
+   session, extra arguments, profile and ports are unchanged. While „Agent“ is chosen the
+   model and thinking fields are off with their values kept, and the row shows one mark
+   („Modell & Denken vom Agent“, also in ▶'s tooltip) in the model column instead of the model
+   badge and the signal bars. `RecentSession.keepAgentModel` changes only through
+   `update_recent`; a start never changes it, and a flagged start keeps the stored model and
+   thinking level (it never overwrites them). A composer start always sends the composer's
+   model and thinking level (no `keepAgentModel`); on the same workspace it keeps the mode and
+   stores those options as today.
 4. Footer: Docker state („Docker 27.5 bereit“ / „Docker nicht erreichbar“, only while Docker is
    shown) · „Stand hh:mm“.
 
@@ -119,7 +133,9 @@ Brand top left: icon + „Traygent“. Window ~480×760, frameless, tray popup l
   Dateien werden wie die eingebauten abgeglichen.“): „Jetzt
   synchronisieren“ beside the heading (immediate, `sync_profiles`, tooltip „Automatisch alle 15
   Minuten“), „Standard-Profil“ (staged), one single-line row per profile — „Standard“ first —
-  with a chevron toggle and its name, the account or „Nicht angemeldet“ — when another signed-in
+  with a chevron toggle and its name, a sign-in dot (#43: green `--ok` signed in, red `--fail`
+  signed out, `role="img"` named „Angemeldet“ / „Nicht angemeldet“, none until the snapshot
+  lists the profile; a forced-colours ring when signed out), the account or „Nicht angemeldet“ — when another signed-in
   profile of the agent has the same account (ignoring case) but another organization, the
   organization instead of the account (#41); tooltip: account · organization —, a warning icon
   after a failed sync, „Anmelden“ only while the profile is signed out (immediate,
@@ -142,7 +158,8 @@ Brand top left: icon + „Traygent“. Window ~480×760, frameless, tray popup l
   the row's details in place, one row at a time: „Name“ (for an extra profile a field holding a
   staged rename — the id and folder never change — checked by the list rules — a problem shows in the open detail, else under „Neues Profil“ as „<Name>: <problem>“, and in the toggle's description; read-only for
   „Standard“), „Konto“, „Organisation“ (when reported; „Konto“ of a signed-in profile carries „Neu anmelden“ on the
-  right, the same action), „Ordner“ (the folder, mono, with a copy
+  right, the same action), „Abo“ (the `plan` capitalised, `max` → „Max“, signed in only — also
+  appended to the row's account tooltip; #43), „Ordner“ (the folder, mono, with a copy
   button), „Abgeglichen <time>“ and „Abgleich“ with the sync error when present. Then „Neues
   Profil“ + „+“ / Enter, whose tooltip shows the folder the name gives: adding is an explicit
   immediate action (#37) — it sends `save_settings` with the saved settings plus the new profile,
@@ -210,8 +227,10 @@ Profiles in the contract (`profileTypes.ts` ↔ `models/profiles.rs`): `AgentCat
 `AppSettings.profileShare` (`Record<AgentId, ProfileShare>`, `{ dirs: string[], files: string[] }`,
 empty lists by default and for an agent without `profiles`),
 `LaunchRequest.profile` and `RecentSession.profile` (optional, absent for `default`),
+`LaunchRequest.keepAgentModel` and `RecentSession.keepAgentModel` (optional, absent = false,
+#43 — _Dashboard_ → Workspaces),
 `Snapshot.profiles` (`ProfileStatus[]`: `agent`, `id`, `label`, `dir`, `signedIn`, optional
-`account`, `organization`, `syncedAt`, `syncError`) and `LaunchOutcome.warning` (optional,
+`account`, `organization`, `plan`, `syncedAt`, `syncError`) and `LaunchOutcome.warning` (optional,
 German: the session started, the profile sync before it was incomplete).
 
 Commands (Rust `#[tauri::command]`, German `Err` strings; panel calls only via `src/lib/ipc.ts`):
@@ -224,7 +243,7 @@ Commands (Rust `#[tauri::command]`, German `Err` strings; panel calls only via `
 | `launch_session`                   | `{ request }`                                                                                    | `LaunchOutcome` (validates, opens terminal, records recent)   |
 | `remove_recent`                    | `{ id }`                                                                                         | `Snapshot`                                                    |
 | `restore_recent`                   | `{ recent }`                                                                                     | `Snapshot` (undo of remove)                                   |
-| `update_recent`                    | `{ id, options, ports, profile: string \| null }`                                                | `Snapshot` (edit, no start)                                   |
+| `update_recent`                    | `{ id, options, ports, profile: string \| null, keepAgentModel }`                                | `Snapshot` (edit, no start)                                   |
 | `pick_folder`                      | `{ initial?: string }`                                                                           | `string \| null` (native folder dialog)                       |
 | `install_agent`                    | `{ agent }`                                                                                      | `void` (opens a terminal running the catalog install command) |
 | `open_folder`                      | `{ path }`                                                                                       | `void` (Explorer)                                             |
@@ -252,7 +271,7 @@ Commands (Rust `#[tauri::command]`, German `Err` strings; panel calls only via `
   picks, Esc closes). A picked suggestion becomes `owner/name`. Without an account the list
   holds one entry „GitHub verbinden …“ (Settings → GitHub). A repository typed or pasted needs
   no account.
-- Start: `repo` set, `folder` `''` (composer) or the recent's folder (▶ on a „Zuletzt“ row). A
+- Start: `repo` set, `folder` `''` (composer) or the recent's folder (▶ on a „Workspaces“ row). A
   given folder (validated like any folder) that exists is started as is, without a clone, so a
   recent keeps its clone after the clone root changed (#40). Otherwise Rust derives
   `<cloneRoot>\<owner>\<name>` (validated like any folder; `cloneRoot` `''` →
@@ -526,7 +545,13 @@ Commands (Rust `#[tauri::command]`, German `Err` strings; panel calls only via `
   run and home, created on first use: a profile's losers in the profile's directory, „Standard“'s
   in `%USERPROFILE%\.claude` (also for `.claude.json`, which lives beside it), so no identity
   crosses profiles. Traygent never deletes a backup.
-- **Never touched:** `.credentials.json` (only its existence and size make `signedIn`); the own
+- **Never touched:** `.credentials.json` — never written, linked, copied or synced; it is read in
+  place only for `signedIn` and `plan` (#43, the CLI's own rule, no CLI started): signed out when
+  the file is missing or empty, has no `claudeAiOauth` object or a blank
+  `claudeAiOauth.refreshToken`; signed in otherwise. A file that does not parse (the CLI may be
+  mid-write), cannot be read or is over 1 MiB counts as signed in while it is not empty, so a
+  race never flips the row. Only `claudeAiOauth.subscriptionType` leaves the read, as `plan`
+  (signed in only, cleaned like `account`); no token is kept, logged or sent. The own
   keys and variables of `settings.json` and the own project fields of `.claude.json` stay in their
   file; every other key of `.claude.json` (`oauthAccount.emailAddress` /
   `organizationName` are read for `account` / `organization` only, control characters dropped, at

@@ -14,7 +14,7 @@ export class Modals {
   settingsAgent = $state<AgentId | null>(null);
   /** Opened by an „Installieren …“: the dialog closes once the install started. */
   installFlow = $state(false);
-  /** The id of the „Zuletzt“ entry „Bearbeiten …“ opened. */
+  /** The id of the „Workspaces“ entry „Bearbeiten …“ opened. */
   recentId = $state<string | null>(null);
   /** Element that opened the first of possibly chained dialogs. */
   opener: HTMLElement | null = null;
@@ -41,7 +41,7 @@ export class Modals {
     this.installFlow = false;
     this.show('settings');
   };
-  /** „Bearbeiten …“ of a „Zuletzt“ row. */
+  /** „Bearbeiten …“ of a „Workspaces“ row. */
   openRecent = (id: string) => {
     this.recentId = id;
     this.show('recent');

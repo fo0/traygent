@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { SIGNED_OUT, rowAccount } from './profileRow';
+import { SIGNED_OUT, planLabel, rowAccount } from './profileRow';
 import type { ProfileStatus } from './types';
 
 const status = (
@@ -61,5 +61,22 @@ describe('rowAccount', () => {
       status('other', { account: 'eva@example.com', organization: 'Z' }),
     ];
     expect(rowAccount(a, [a, ...others]).text).toBe('max@example.com');
+  });
+
+  it('appends the plan, capitalised, to the tooltip only', () => {
+    const max = status('default', {
+      organization: 'Beispiel GmbH',
+      plan: 'max',
+    });
+    expect(rowAccount(max, [max])).toEqual({
+      text: 'max@example.com',
+      title: 'max@example.com · Beispiel GmbH · Max',
+      out: false,
+    });
+    const pro = status('team', { plan: 'pro' });
+    expect(rowAccount(pro, [pro]).title).toBe('max@example.com · Pro');
+    expect(planLabel('team')).toBe('Team');
+    expect(planLabel(undefined)).toBe('');
+    expect(planLabel('')).toBe('');
   });
 });

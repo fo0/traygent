@@ -151,7 +151,7 @@ test('„Entfernen“ offers „Rückgängig“, which puts the row back', async
   ).toBeFocused();
   const notice = page
     .getByRole('status')
-    .filter({ hasText: 'Aus „Zuletzt“ entfernt.' });
+    .filter({ hasText: 'Aus „Workspaces“ entfernt.' });
   await notice.getByRole('button', { name: 'Rückgängig' }).click();
   await expect(rows(page)).toHaveCount(6);
   await expect(rows(page).nth(2).locator('.recent-name')).toHaveText(
@@ -322,7 +322,7 @@ test('the native default snapshot (Rust golden fixture) renders', async ({
   const form = composer(page);
   for (const entry of fixture.catalog)
     await expect(form.getByRole('radio', { name: entry.label })).toBeVisible();
-  await expect(page.getByText('Noch keine Sessions')).toHaveCount(
+  await expect(page.getByText('Noch keine Workspaces')).toHaveCount(
     fixture.recents.length ? 0 : 1,
   );
   await expect(page.locator('.app-footer .demo-tag')).toHaveText('Lokal');

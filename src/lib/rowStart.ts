@@ -1,5 +1,5 @@
 /*
- * One start per press for a „Zuletzt“ row. The whole row starts its session
+ * One start per press for a „Workspaces“ row. The whole row starts its session
  * (owner request, #17), so the second click of a double-click, a held Enter
  * or Space and a late second click on the same row never start it twice; the
  * guard and the cooldown follow RepoWatch's direct favorite start.

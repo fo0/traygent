@@ -13,7 +13,7 @@ export type MenuFocus = 'first' | 'last';
 /**
  * The last pointer press on the page and whether it closed a popup (a menu,
  * a popover, the folder suggestions) from outside. Its click then does
- * nothing else: a „Zuletzt“ row is one big start, and a press that only
+ * nothing else: a „Workspaces“ row is one big start, and a press that only
  * dismissed a popup over the panel must never start a session.
  */
 export class Presses {

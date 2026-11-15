@@ -8,7 +8,7 @@
   import type { AgentCatalogEntry, LaunchOptions, PermissionId } from './types';
 
   // One agent's options as form fields: Einstellungen → Agenten → Standards
-  // and „Bearbeiten …“ of a „Zuletzt“ row.
+  // and „Bearbeiten …“ of a „Workspaces“ row.
   let {
     entry,
     options,
@@ -16,6 +16,8 @@
     prefix,
     modelProblem = '',
     argsProblem = '',
+    modelOff = '',
+    lead,
     children,
   }: {
     entry: AgentCatalogEntry;
@@ -26,6 +28,13 @@
     prefix: string;
     modelProblem?: string;
     argsProblem?: string;
+    /**
+     * Set, model and thinking are off with their values kept and this text as
+     * their tooltip, e.g. a workspace that keeps the agent's own model (#43).
+     */
+    modelOff?: string;
+    /** Rows before the model, e.g. a workspace's „Modell & Denken“ mode. */
+    lead?: Snippet;
     /** Further rows of the same grid, e.g. the ports of a Docker session. */
     children?: Snippet;
   } = $props();
@@ -33,9 +42,13 @@
   /** Kept as stored, but off: without a model no thinking level is sent. */
   const effortOff = $derived(effortNeedsModel(entry, options.model));
   const effortTitle = $derived(
-    effortOff
-      ? 'Denken: nur mit gewähltem Modell'
-      : choiceTitle('Denken', entry.efforts, options.effort),
+    modelOff ||
+      (effortOff
+        ? 'Denken: nur mit gewähltem Modell'
+        : choiceTitle('Denken', entry.efforts, options.effort)),
+  );
+  const modelTitle = $derived(
+    modelOff || choiceTitle('Modell', entry.models, options.model),
   );
   const permissions = $derived<Segment<PermissionId>[]>(
     entry.permissions.map((choice) => ({
@@ -48,18 +61,20 @@
 </script>
 
 <div class="field-grid">
+  {@render lead?.()}
   <label for={`${prefix}-model`}>Modell</label>
-  <div class="field-cell">
+  <div class="field-cell" title={modelOff || undefined}>
     {#if entry.freeModel}
       <ModelCombo
         id={`${prefix}-model`}
         models={entry.models}
         value={options.model}
         onChange={(model) => onChange({ model })}
-        title={choiceTitle('Modell', entry.models, options.model)}
+        title={modelTitle}
         invalid={modelProblem}
         describedBy={modelProblem ? `${prefix}-model-error` : undefined}
         variant="field"
+        disabled={!!modelOff}
       />
     {:else}
       <Dropdown
@@ -68,7 +83,8 @@
         items={toItems(entry.models, options.model)}
         value={options.model}
         onChange={(model) => onChange({ model })}
-        title={choiceTitle('Modell', entry.models, options.model)}
+        title={modelTitle}
+        disabled={!!modelOff}
         variant="field"
       />
     {/if}
@@ -87,7 +103,7 @@
         value={options.effort}
         onChange={(effort) => onChange({ effort })}
         title={effortTitle}
-        disabled={effortOff}
+        disabled={effortOff || !!modelOff}
         variant="field"
       />
     </div>

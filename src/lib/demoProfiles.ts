@@ -77,6 +77,7 @@ export function demoProfileStatuses(
           signedIn: true,
           account: DEMO_PROFILE_ACCOUNT,
           organization: demoOrganization(status.id, status.label),
+          plan: 'max',
         }
       : { ...status, syncedAt: new Date(now - 20 * 60_000).toISOString() },
   );
@@ -108,6 +109,7 @@ export function signedIn(
           signedIn: true,
           account: DEMO_PROFILE_ACCOUNT,
           organization: demoOrganization(id, status.label),
+          plan: 'team',
         }
       : status,
   );

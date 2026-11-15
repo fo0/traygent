@@ -4,7 +4,7 @@
   import { profileLabel } from './profiles';
   import type { AgentId, RecentSession, Snapshot } from './types';
 
-  // „Zuletzt“: one single-line row per (folder, agent, env), newest first.
+  // „Workspaces“: one single-line row per (folder, agent, env), newest first.
   let {
     snapshot,
     launching,
@@ -51,5 +51,5 @@
     {/each}
   </ul>
 {:else}
-  <p class="section-empty">Noch keine Sessions</p>
+  <p class="section-empty">Noch keine Workspaces</p>
 {/if}

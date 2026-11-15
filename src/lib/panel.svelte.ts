@@ -206,7 +206,7 @@ export class Panel {
       this.accept(await this.#bridge.removeRecent(recent.id));
       this.notices.show({
         key: removedKey(recent.id),
-        text: 'Aus „Zuletzt“ entfernt.',
+        text: 'Aus „Workspaces“ entfernt.',
         tone: 'subtle',
         timeout: UNDO_TIMEOUT,
         action: {
@@ -229,7 +229,7 @@ export class Panel {
   }
 
   /**
-   * „Bearbeiten …“ of a „Zuletzt“ row; rejects with the German message, so
+   * „Bearbeiten …“ of a „Workspaces“ row; rejects with the German message, so
    * the dialog stays open and shows it.
    */
   async updateRecent(
@@ -237,9 +237,11 @@ export class Panel {
     options: LaunchOptions,
     ports: string[],
     profile: string | undefined,
+    keep: boolean,
   ) {
     const { id } = recent;
-    this.accept(await this.#bridge.updateRecent(id, options, ports, profile));
+    const bridge = this.#bridge;
+    this.accept(await bridge.updateRecent(id, options, ports, profile, keep));
   }
 
   /** Saves the whole settings object; rejects with the German message. */
@@ -288,7 +290,7 @@ export class Panel {
     }
   }
 
-  /** „Pfad kopieren“ of a „Zuletzt“ row: the folder path on the clipboard. */
+  /** „Pfad kopieren“ of a „Workspaces“ row: the folder path on the clipboard. */
   async copyFolder(path: string) {
     try {
       await navigator.clipboard.writeText(path);

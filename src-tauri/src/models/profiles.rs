@@ -39,13 +39,19 @@ pub struct ProfileStatus {
     pub label: String,
     /// The profile's config directory; `''` when the host has no usable user profile.
     pub dir: String,
-    /// The profile holds a non-empty credentials file (its content is never read).
+    /// The profile's credentials file holds a sign-in: a non-blank
+    /// `claudeAiOauth.refreshToken`, or a non-empty file that does not parse (mid-write). No
+    /// token is ever read out of it.
     pub signed_in: bool,
     /// The signed-in account's e-mail address, when the CLI recorded one.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub account: Option<String>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub organization: Option<String>,
+    /// The subscription the credentials name (`claudeAiOauth.subscriptionType`, e.g. `max`),
+    /// while signed in.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub plan: Option<String>,
     /// RFC 3339 time of the last sync without an error.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub synced_at: Option<String>,

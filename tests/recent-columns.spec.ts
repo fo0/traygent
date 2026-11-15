@@ -1,7 +1,7 @@
 import { expect, test, type Page } from './support/test';
 
 /*
- * „Zuletzt“ keeps its fixed-size parts in fixed columns (owner request,
+ * „Workspaces“ keeps its fixed-size parts in fixed columns (owner request,
  * #20): repo, environment, model, thinking, permission and time line up from
  * row to row, whichever parts a row has. The demo's recents mix rows with
  * and without a repository, a model, thinking bars and ports.
@@ -31,7 +31,7 @@ const columns = (page: Page) =>
   );
 
 for (const width of [480, 360]) {
-  test(`every icon of „Zuletzt“ sits in the same column at ${width}px`, async ({
+  test(`every icon of „Workspaces“ sits in the same column at ${width}px`, async ({
     page,
   }) => {
     await page.setViewportSize({ width, height: 760 });

@@ -6,7 +6,7 @@ import type { LaunchRequest, Snapshot } from '../src/lib/types';
 
 /*
  * Agent profiles (#33): the composer's „Profil“ chip, the profile mark in
- * „Zuletzt“ and Settings → Agenten → „Profile“, in the labelled demo and
+ * „Workspaces“ and Settings → Agenten → „Profile“, in the labelled demo and
  * against the labelled native-IPC mock (synthetic data only).
  */
 const composer = (page: Page) => page.locator('form.composer');
@@ -83,7 +83,7 @@ for (const font of LAYOUT_FONTS)
     expect(new Set(tops).size, tops.join(', ')).toBe(1);
   });
 
-test('„Zuletzt“ shows a profile on the agent tile, taking no width from the row', async ({
+test('„Workspaces“ shows a profile on the agent tile, taking no width from the row', async ({
   page,
 }) => {
   await page.setViewportSize({ width: 480, height: 760 });

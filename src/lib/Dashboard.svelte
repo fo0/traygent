@@ -21,7 +21,7 @@
     panel: Panel;
     /** Opens Einstellungen → Agenten at that agent. */
     onInstall: (agent: AgentId) => void;
-    /** „Bearbeiten …“ of a „Zuletzt“ row. */
+    /** „Bearbeiten …“ of a „Workspaces“ row. */
     onEdit: (recent: RecentSession) => void;
     /** Opens Einstellungen → GitHub. */
     onConnectGithub: () => void;
@@ -64,6 +64,7 @@
         session: 'new',
         ports: [...recent.ports],
         ...(recent.profile && { profile: recent.profile }),
+        ...(recent.keepAgentModel && { keepAgentModel: true }),
       }),
     );
   }
@@ -97,10 +98,10 @@
   <section class="dashboard-section" aria-labelledby="section-recent">
     <SectionHeader
       id="section-recent"
-      title="Zuletzt"
+      title="Workspaces"
       icon="clock"
       count={snapshot?.recents.length}
-      unit={['Session', 'Sessions']}
+      unit={['Workspace', 'Workspaces']}
     />
     {#if snapshot}
       <RecentList

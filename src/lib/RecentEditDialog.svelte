@@ -4,6 +4,7 @@
   import Modal from './Modal.svelte';
   import OptionFields from './OptionFields.svelte';
   import PortPicker from './PortPicker.svelte';
+  import Segmented, { type Segment } from './Segmented.svelte';
   import {
     catalogEntry,
     effortProblem,
@@ -23,9 +24,10 @@
     shimArgsProblem,
   } from './validation';
 
-  // „Bearbeiten …“ of a „Zuletzt“ row: the options, ports (Docker) and
-  // profile (Lokal, an agent with an extra profile) its ▶ sends. Staged like
-  // the settings; „Speichern“ stores them without a start.
+  // „Bearbeiten …“ of a „Workspaces“ row: the options, ports (Docker),
+  // profile (Lokal, an agent with an extra profile) and „Modell & Denken“
+  // mode its ▶ sends. Staged like the settings; „Speichern“ stores them
+  // without a start.
   let {
     snapshot,
     recent,
@@ -41,6 +43,7 @@
       options: LaunchOptions,
       ports: string[],
       profile: string | undefined,
+      keepAgentModel: boolean,
     ) => Promise<void>;
     onClose: () => void;
   } = $props();
@@ -62,6 +65,23 @@
         : DEFAULT_PROFILE;
     }),
   );
+  type ModelMode = 'traygent' | 'agent';
+  const MODES: Segment<ModelMode>[] = [
+    {
+      id: 'traygent',
+      label: 'Traygent',
+      hint: 'Jeder Start setzt Modell und Denkstufe von hier',
+    },
+    {
+      id: 'agent',
+      label: 'Agent',
+      hint: 'Ohne Modell und Denkstufe: der Agent nimmt, was er zuletzt nutzte',
+    },
+  ];
+  let mode = $state<ModelMode>(
+    untrack(() => (recent.keepAgentModel ? 'agent' : 'traygent')),
+  );
+  const keepAgentModel = $derived(mode === 'agent');
   let error = $state('');
   let saving = $state(false);
   let alive = true;
@@ -84,6 +104,7 @@
     ports: docker ? normalizePorts(ports) : [],
     profile:
       profiles.length && profile !== DEFAULT_PROFILE ? profile : undefined,
+    keepAgentModel,
   });
   const dirty = $derived(
     JSON.stringify(next) !==
@@ -91,6 +112,7 @@
         options: sentOptions(entry, recent.options),
         ports: recent.ports,
         profile: recent.profile,
+        keepAgentModel: !!recent.keepAgentModel,
       }),
   );
   const blocked = $derived(!dirty || saving || invalid);
@@ -104,6 +126,7 @@
         $state.snapshot(next.options),
         [...next.ports],
         next.profile,
+        next.keepAgentModel,
       );
       if (alive) onClose();
     } catch (cause) {
@@ -137,7 +160,18 @@
           prefix="recent"
           modelProblem={model}
           argsProblem={args}
+          modelOff={keepAgentModel ? 'Modell & Denken vom Agent' : ''}
         >
+          {#snippet lead()}
+            <span class="field-label" aria-hidden="true">Modell & Denken</span>
+            <Segmented
+              name="recent-model-mode"
+              label="Modell & Denken"
+              items={MODES}
+              value={mode}
+              onChange={(value) => (mode = value)}
+            />
+          {/snippet}
           {#if profiles.length}
             <label for="recent-profile">Profil</label>
             <div class="field-cell">

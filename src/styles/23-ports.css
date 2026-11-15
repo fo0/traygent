@@ -1,6 +1,6 @@
 /*
  * Ports of a Docker session: the picker (presets, custom chips, add field),
- * the composer's popover and the „Zuletzt“ chip. Tokens from 00-tokens.css.
+ * the composer's popover and the „Workspaces“ chip. Tokens from 00-tokens.css.
  */
 .ports-chip {
   display: contents;

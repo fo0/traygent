@@ -100,8 +100,9 @@ Versions seen: Claude Code npm `2.1.317`; OpenCode `@opencode/cli` `2.2.5` (`lat
 - **Config dir:** `%USERPROFILE%\.claude` by default; the state file `.claude.json` sits _beside_ it
   (`%USERPROFILE%\.claude.json`) for the default home and _inside_ any directory named by `CLAUDE_CONFIG_DIR`.
 - **Credentials:** `.credentials.json` inside the config dir on Windows (docs _Credential management_); the
-  account shown is `.claude.json → oauthAccount.emailAddress` / `organizationName`. Traygent checks only that the
-  credentials file exists and is non-empty, never reads it.
+  account shown is `.claude.json → oauthAccount.emailAddress` / `organizationName`. Traygent reads the credentials file in
+  place for two fields only (#43): signed in with a non-blank `claudeAiOauth.refreshToken` (a non-empty file that
+  does not parse counts as signed in), and `claudeAiOauth.subscriptionType` as the plan; no token leaves the read.
 - **One account per dir:** `CLAUDE_CONFIG_DIR=<dir>` (docs _Authentication → Log in with multiple accounts_);
   Traygent sets it in the session script (`$env:CLAUDE_CONFIG_DIR='%USERPROFILE%\.claude-<id>'`) and removes it for
   the default profile while extra ones exist. Sign-in: `claude auth login` in that env, in a terminal the user
@@ -120,7 +121,7 @@ Versions seen: Claude Code npm `2.1.317`; OpenCode `@opencode/cli` `2.2.5` (`lat
   - `.claude.json`, three-way merged — entry keys `mcpServers`, `projects`; whole-value keys `showSpinnerTree`,
     `claudeInChromeDefaultEnabled`; own project fields: prefix `last`, name `hasUnseenTeamArtifacts`; containers for a
     seeded merge: the top level, `mcpServers`, `projects` — each MCP server and project entry is one unit;
-  - never read: `.credentials.json`; user extras (`settings.profileShare`) are linked like the dirs or copied
+  - never synced: `.credentials.json` (read in place for the sign-in status only); user extras (`settings.profileShare`) are linked like the dirs or copied
     whole like `CLAUDE.md`; never shareable as extras: names starting with `.claude.json` or `.credentials.json`
     and `never_shared` — `policy-limits.json`, `policy-limits.json.stamp.json`, `remote-settings.json`, `cache`,
     `statsig`, `telemetry`, `backups`, `debug`, `shell-snapshots`, `ide`, `local`, `sessions`, `jobs`, `daemon`.

@@ -30,14 +30,14 @@ Starting a coding agent usually means: open a terminal, `cd` into the project, r
 2. Pick an agent and a folder — or paste a GitHub repository.
 3. Press **Enter**. The session opens in Windows Terminal or a console window.
 
-Every start lands in **Zuletzt** (recent), so the next one is a single click.
+Every start lands in **Workspaces**, so the next one is a single click.
 
 ## Features
 
 | Feature                               | What you get                                                                                                                                             |
 | ------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | ⚡ **One-click starts**               | Agent, folder, environment, Enter. Model, effort and permission default to your settings; the session mode starts at **Neu**.                            |
-| 🕘 **Recent sessions**                | Up to 20 folder · agent · environment combinations as compact rows; a click restarts one with exactly the same settings.                                 |
+| 🕘 **Workspaces**                     | Up to 20 folder · agent · environment rows; a click restarts one as it was, or lets the agent keep its own model and effort.                             |
 | 🐳 **Local or Docker**                | Run the agent on the host or in a container with named volumes for its state and optional port publishing.                                               |
 | 🐙 **Start from a GitHub repository** | Paste a URL, type `owner/name` or search your repositories; Traygent clones it on first use and reuses the folder afterwards.                            |
 | 👥 **Several Claude accounts**        | One profile per sign-in; skills, plugins, settings, MCP servers and history stay the same in all of them, synced in the background every 15 minutes too. |
@@ -81,7 +81,7 @@ Open http://127.0.0.1:1420. The preview is labelled **Demo**.
 ## Privacy and security
 
 - **Your GitHub token stays in the Windows Credential Manager.** It only checks your account and reads your repository list; it never reaches a clone, a command line, an environment variable or the state file. Cloning uses your own Git credentials. Exception, off by default: **GitHub-Token weitergeben** forwards `gh auth token` to Docker sessions as `GH_TOKEN`, by name only ([details](docs/USAGE.md#docker-sessions)).
-- **Profiles never touch your sign-in.** Traygent only checks that a profile's `.credentials.json` exists; it never reads or copies it ([details](docs/USAGE.md#several-accounts--profile)).
+- **Profiles never touch your sign-in.** Traygent only checks that a profile's `.credentials.json` holds a sign-in and names its plan; it never copies it, keeps a token or starts the CLI for it ([details](docs/USAGE.md#several-accounts--profile)).
 - **No shell strings.** Every launch is an argument list of quoted literals ([ADR-0003](docs/adr/0003-launch-through-a-powershell-argv.md)).
 - **Docker ports bind to `127.0.0.1`** unless you type an IP.
 - **Network access:** Traygent itself contacts only the GitHub API (update check, account check, your repository list) and GitHub release downloads. `git clone`, agent installers and container image pulls run visibly in the terminal Traygent opens for the session or install.
