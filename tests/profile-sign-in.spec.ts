@@ -37,6 +37,12 @@ test('only a signed-out row offers „Anmelden“; the demo sign-in flips it in 
     0,
   );
   await expect(team.locator('.profile-row')).toContainText('Nicht angemeldet');
+  // The sign-in dot (#43): green signed in, red signed out, in the collapsed row.
+  const dot = (row: typeof team, name: string) =>
+    row.locator('.profile-row').getByRole('img', { name, exact: true });
+  await expect(dot(standard, 'Angemeldet')).toHaveAttribute('data-in', 'true');
+  await expect(dot(team, 'Nicht angemeldet')).toBeVisible();
+  await expect(dot(team, 'Nicht angemeldet')).not.toHaveAttribute('data-in');
   // „Neu anmelden“ sits in a signed-in row's details.
   await standard.getByRole('button', { name: 'Standard Details' }).click();
   await expect(
@@ -53,6 +59,7 @@ test('only a signed-out row offers „Anmelden“; the demo sign-in flips it in 
     'Angemeldet (Demo).',
   );
   await expect(team.getByRole('button', { name: /anmelden$/ })).toHaveCount(0);
+  await expect(dot(team, 'Angemeldet')).toHaveAttribute('data-in', 'true');
   // The focus moved from the gone button to the row's toggle, never <body>.
   await expect(
     team.getByRole('button', { name: 'Team Details' }),

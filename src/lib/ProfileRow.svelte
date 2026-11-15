@@ -3,14 +3,15 @@
   import CopyField from './CopyField.svelte';
   import Icon from './Icon.svelte';
   import { dateTime } from './format';
-  import { rowAccount } from './profileRow';
+  import { SIGNED_OUT, rowAccount } from './profileRow';
   import { repeatClick, repeatKey } from './rowStart';
   import { STANDARD_LABEL, profileFolder, renameProblem } from './profiles';
   import type { SettingsDraft } from './settingsDraft.svelte';
   import type { AgentId, ProfileStatus } from './types';
 
-  // One profile in Settings → Agenten → „Profile“ (#37, #41): a single line —
-  // name, account (or organization, when another row has the same account),
+  // One profile in Settings → Agenten → „Profile“ (#37, #41, #43): a single
+  // line — name, sign-in dot, account (or organization, when another row has
+  // the same account),
   // warning, „Anmelden“ while signed out, remove — that opens in place to its
   // details with „Neu anmelden“. A pending sign-in turns the same button
   // into its cancel; when it leaves a signed-in row the focus moves to the
@@ -118,6 +119,13 @@
       >{#if problem}<span id={`${detail}-why`} class="sr-only">{problem}</span
         >{/if}</button
     >
+    {#if status}<span
+        class="profile-dot"
+        data-in={status.signedIn ? 'true' : undefined}
+        role="img"
+        aria-label={status.signedIn ? 'Angemeldet' : SIGNED_OUT}
+        title={status.signedIn ? 'Angemeldet' : SIGNED_OUT}
+      ></span>{/if}
     <span
       class="profile-account"
       data-out={row.out ? 'true' : undefined}

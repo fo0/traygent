@@ -144,6 +144,30 @@
 .profile-account[data-out='true'] {
   color: var(--text-3);
 }
+/* Sign-in at a glance (#43): green signed in, red signed out; none until the
+   snapshot lists the profile. */
+.profile-dot {
+  flex: none;
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: var(--fail);
+}
+.profile-dot[data-in='true'] {
+  background: var(--ok);
+}
+@media (forced-colors: active) {
+  /* Fills would vanish: signed in filled, signed out a ring. */
+  .profile-dot {
+    forced-color-adjust: none;
+    box-sizing: border-box;
+    border: 1.5px solid CanvasText;
+    background: Canvas;
+  }
+  .profile-dot[data-in='true'] {
+    background: CanvasText;
+  }
+}
 .profile-warn {
   display: inline-flex;
   flex: none;

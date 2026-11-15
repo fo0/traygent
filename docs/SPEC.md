@@ -133,7 +133,9 @@ Brand top left: icon + „Traygent“. Window ~480×760, frameless, tray popup l
   Dateien werden wie die eingebauten abgeglichen.“): „Jetzt
   synchronisieren“ beside the heading (immediate, `sync_profiles`, tooltip „Automatisch alle 15
   Minuten“), „Standard-Profil“ (staged), one single-line row per profile — „Standard“ first —
-  with a chevron toggle and its name, the account or „Nicht angemeldet“ — when another signed-in
+  with a chevron toggle and its name, a sign-in dot (#43: green `--ok` signed in, red `--fail`
+  signed out, `role="img"` named „Angemeldet“ / „Nicht angemeldet“, none until the snapshot
+  lists the profile; a forced-colours ring when signed out), the account or „Nicht angemeldet“ — when another signed-in
   profile of the agent has the same account (ignoring case) but another organization, the
   organization instead of the account (#41); tooltip: account · organization —, a warning icon
   after a failed sync, „Anmelden“ only while the profile is signed out (immediate,
