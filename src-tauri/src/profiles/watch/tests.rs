@@ -58,6 +58,12 @@ fn only_a_changed_sign_in_commits_and_the_limit_ends_the_watch() {
         ),
         Step::Changed
     );
+    // The same account with another plan (#43) is a new sign-in as well.
+    let upgraded = Facts {
+        plan: Some("max".into()),
+        ..before
+    };
+    assert_eq!(again.step(Some(&upgraded), now), Step::Changed);
 }
 
 #[test]

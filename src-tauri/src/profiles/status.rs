@@ -90,10 +90,7 @@ fn credentials(file: &Path) -> (bool, Option<String>) {
     if !meta.is_file() || meta.len() == 0 {
         return (false, None);
     }
-    let bytes = (meta.len() <= MAX_CREDENTIALS_BYTES)
-        .then(|| std::fs::read(file).ok())
-        .flatten();
-    let Some(bytes) = bytes else {
+    let Some(bytes) = read_capped(file) else {
         return (true, None);
     };
     match serde_json::from_slice::<Credentials>(super::files::without_bom(&bytes)) {
@@ -110,6 +107,20 @@ fn credentials(file: &Path) -> (bool, Option<String>) {
             (signed_in, subscription.filter(|_| signed_in))
         }
     }
+}
+
+/// The file's bytes, or `None` when it cannot be read or holds more than
+/// [`MAX_CREDENTIALS_BYTES`]. The cap holds while the file grows after the size check: never
+/// more than one byte past it is read.
+fn read_capped(file: &Path) -> Option<Vec<u8>> {
+    use std::io::Read;
+    let mut bytes = Vec::new();
+    std::fs::File::open(file)
+        .ok()?
+        .take(MAX_CREDENTIALS_BYTES + 1)
+        .read_to_end(&mut bytes)
+        .ok()?;
+    (bytes.len() as u64 <= MAX_CREDENTIALS_BYTES).then_some(bytes)
 }
 
 /// Reads one profile. Of the credentials file only `claudeAiOauth.refreshToken` (present and
