@@ -36,7 +36,7 @@ export interface Commands {
   /** The undo of `remove_recent`: puts the removed entry back. */
   restore_recent: { args: { recent: RecentSession }; result: Snapshot };
   /**
-   * „Bearbeiten …“: the options, ports, profile and „Modell & Effort“ mode
+   * „Bearbeiten …“: the options, ports, profile and „Modell & Denken“ mode
    * the next restart sends.
    */
   update_recent: {

@@ -280,7 +280,7 @@ impl Service {
     }
 
     /// „Bearbeiten …“ of a „Workspaces“ row: replaces the options, ports, profile and
-    /// „Modell & Effort“ mode (`keep_agent_model`, #43) the next restart sends, validated and
+    /// „Modell & Denken“ mode (`keep_agent_model`, #43) the next restart sends, validated and
     /// normalized like a start (the profile none for „Standard“ and outside the local
     /// environment); the entry keeps its place, start time and count.
     pub fn update_recent(

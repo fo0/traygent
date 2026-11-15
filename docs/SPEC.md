@@ -106,7 +106,7 @@ Brand top left: icon + „Traygent“. Window ~480×760, frameless, tray popup l
    A row's profile: ▶ restarts with it (one removed since is refused natively, „Profil nicht
    gefunden.“); „In Composer übernehmen“ takes it over, or the saved „Standard-Profil“ when it
    is gone. A start of the same folder with another profile updates the row's profile.
-   „Modell & Effort“ (#43, a `Segmented` at the top of „Bearbeiten …“, explanation in the
+   „Modell & Denken“ (#43, a `Segmented` at the top of „Bearbeiten …“, explanation in the
    tooltips): „Traygent“ (default) — every ▶ sends the stored model and thinking level as
    today; „Agent“ — ▶ sends `keepAgentModel: true` and the launch builder passes no model or
    effort to any agent (Claude `--model` / `--effort`, Codex `-m` /
@@ -114,7 +114,7 @@ Brand top left: icon + „Traygent“. Window ~480×760, frameless, tray popup l
    agent continues with what it last used (e.g. after `/model` in Claude Code); permission,
    session, extra arguments, profile and ports are unchanged. While „Agent“ is chosen the
    model and thinking fields are off with their values kept, and the row shows one mark
-   („Modell & Effort vom Agent“, also in ▶'s tooltip) in the model column instead of the model
+   („Modell & Denken vom Agent“, also in ▶'s tooltip) in the model column instead of the model
    badge and the signal bars. `RecentSession.keepAgentModel` changes only through
    `update_recent`; a start never changes it, and a flagged start keeps the stored model and
    thinking level (it never overwrites them). A composer start always sends the composer's

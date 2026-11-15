@@ -301,7 +301,7 @@ describe('demo bridge', () => {
     ).rejects.toThrow('Dieser Workspace steht nicht mehr in „Workspaces“.');
   });
 
-  it('stores the „Modell & Effort“ mode; a row start keeps the stored model', async () => {
+  it('stores the „Modell & Denken“ mode; a row start keeps the stored model', async () => {
     const bridge = createDemoBridge(0);
     const before = (await bridge.snapshot()).recents;
     const local = before.find((r) => r.env === 'local')!;

@@ -157,7 +157,7 @@ for (const [name, stale] of STALE)
     });
   });
 
-test('„Modell & Effort“ „Agent“: fields off, a mark on the row, saved without a start', async ({
+test('„Modell & Denken“ „Agent“: fields off, a mark on the row, saved without a start', async ({
   page,
 }) => {
   await page.goto('/');
@@ -173,12 +173,12 @@ test('„Modell & Effort“ „Agent“: fields off, a mark on the row, saved wi
   await expect(dialog.getByRole('combobox', { name: 'Denken' })).toBeDisabled();
   await dialog.getByRole('button', { name: 'Speichern' }).click();
   await expect(dialog).toBeHidden();
-  const mark = target.getByRole('img', { name: 'Modell & Effort vom Agent' });
+  const mark = target.getByRole('img', { name: 'Modell & Denken vom Agent' });
   await expect(mark).toBeVisible();
   await expect(target.getByRole('img', { name: /^Modell: / })).toHaveCount(0);
   await expect(
     target.getByRole('button', { name: /starten$/ }),
-  ).toHaveAttribute('title', /Modell & Effort vom Agent/);
+  ).toHaveAttribute('title', /Modell & Denken vom Agent/);
   // Back to „Traygent“: the stored model shows again.
   const again = await openEdit(page, 'Notizen');
   await expect(again.getByRole('radio', { name: 'Agent' })).toBeChecked();

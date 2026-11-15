@@ -107,11 +107,11 @@
   );
   /**
    * Only options that differ from „Standard“ go into the start's tooltip;
-   * with „Modell & Effort“ „Agent“ (#43) the start sends neither.
+   * with „Modell & Denken“ „Agent“ (#43) the start sends neither.
    */
   const optionTitle = $derived(
     recent.keepAgentModel
-      ? 'Modell & Effort vom Agent'
+      ? 'Modell & Denken vom Agent'
       : [
           options.model !== 'default' && `Modell: ${modelLabel}`,
           options.effort !== 'default' && `Denken: ${effortLabel}`,

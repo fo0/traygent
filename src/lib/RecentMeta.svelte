@@ -37,7 +37,7 @@
     repo: string;
     env: EnvInfo;
     /**
-     * „Modell & Effort“ „Agent“ (#43): a start sends neither, so one mark
+     * „Modell & Denken“ „Agent“ (#43): a start sends neither, so one mark
      * takes the model column and the thinking column stays empty.
      */
     agentModel: boolean;
@@ -83,7 +83,7 @@
   {#if agentModel}<span
       class="recent-agent-model"
       role="img"
-      aria-label="Modell & Effort vom Agent"
+      aria-label="Modell & Denken vom Agent"
       ><Icon name="history" size={13} /></span
     >{:else if model !== 'default'}<ModelBadge
       {model}

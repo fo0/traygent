@@ -33,7 +33,7 @@
      * their tooltip, e.g. a workspace that keeps the agent's own model (#43).
      */
     modelOff?: string;
-    /** Rows before the model, e.g. a workspace's „Modell & Effort“ mode. */
+    /** Rows before the model, e.g. a workspace's „Modell & Denken“ mode. */
     lead?: Snippet;
     /** Further rows of the same grid, e.g. the ports of a Docker session. */
     children?: Snippet;

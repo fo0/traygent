@@ -248,7 +248,7 @@ pub struct RecentSession {
     /// The profile the last start used; absent for the default one.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub profile: Option<String>,
-    /// „Modell & Effort“ „Agent“ (#43): a row start sends no model or effort and keeps the
+    /// „Modell & Denken“ „Agent“ (#43): a row start sends no model or effort and keeps the
     /// stored ones; only „Bearbeiten …“ changes it. Absent (false) = Traygent sets them.
     #[serde(default, skip_serializing_if = "is_false")]
     pub keep_agent_model: bool,

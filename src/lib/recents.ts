@@ -95,7 +95,7 @@ export function restoreRecent(
 /**
  * „Bearbeiten …“, as natively (src-tauri/src/service.rs → update_recent): new
  * options (trimmed, a blank model or effort `default`), ports, profile
- * (already normalized, `undefined` for „Standard“) and „Modell & Effort“
+ * (already normalized, `undefined` for „Standard“) and „Modell & Denken“
  * mode on the entry; its place, start time and count stay. Null when the id
  * is no longer listed.
  */

@@ -25,7 +25,7 @@
   } from './validation';
 
   // „Bearbeiten …“ of a „Workspaces“ row: the options, ports (Docker),
-  // profile (Lokal, an agent with an extra profile) and „Modell & Effort“
+  // profile (Lokal, an agent with an extra profile) and „Modell & Denken“
   // mode its ▶ sends. Staged like the settings; „Speichern“ stores them
   // without a start.
   let {
@@ -70,12 +70,12 @@
     {
       id: 'traygent',
       label: 'Traygent',
-      hint: 'Jeder Start setzt Modell und Effort von hier',
+      hint: 'Jeder Start setzt Modell und Denkstufe von hier',
     },
     {
       id: 'agent',
       label: 'Agent',
-      hint: 'Kein Modell, kein Effort: der Agent nimmt, was er zuletzt nutzte',
+      hint: 'Ohne Modell und Denkstufe: der Agent nimmt, was er zuletzt nutzte',
     },
   ];
   let mode = $state<ModelMode>(
@@ -160,13 +160,13 @@
           prefix="recent"
           modelProblem={model}
           argsProblem={args}
-          modelOff={keepAgentModel ? 'Modell & Effort vom Agent' : ''}
+          modelOff={keepAgentModel ? 'Modell & Denken vom Agent' : ''}
         >
           {#snippet lead()}
-            <span class="field-label" aria-hidden="true">Modell & Effort</span>
+            <span class="field-label" aria-hidden="true">Modell & Denken</span>
             <Segmented
               name="recent-model-mode"
-              label="Modell & Effort"
+              label="Modell & Denken"
               items={MODES}
               value={mode}
               onChange={(value) => (mode = value)}

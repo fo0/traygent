@@ -164,7 +164,7 @@ describe('recents', () => {
     expect(standard).toEqual({ ...entry, profile: undefined });
   });
 
-  it('keeps the „Modell & Effort“ mode on a start, and a kept start keeps model and effort', () => {
+  it('keeps the „Modell & Denken“ mode on a start, and a kept start keeps model and effort', () => {
     const start: LaunchRequest = {
       agent: 'claude',
       env: 'local',

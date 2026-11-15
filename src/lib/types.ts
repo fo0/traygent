@@ -144,7 +144,7 @@ export interface RecentSession {
   /** The profile it started with; absent for `default`. */
   profile?: string;
   /**
-   * „Modell & Effort“ „Agent“ (#43): a row start sends no model or effort
+   * „Modell & Denken“ „Agent“ (#43): a row start sends no model or effort
    * and keeps the stored ones; only „Bearbeiten …“ changes it. Absent
    * (false) = Traygent sets them.
    */

@@ -1,4 +1,4 @@
-//! A workspace start set to „Modell & Effort“ „Agent“ (#43): no model or effort flag for any
+//! A workspace start set to „Modell & Denken“ „Agent“ (#43): no model or effort flag for any
 //! agent; permission, session and extra arguments unchanged.
 use super::*;
 
