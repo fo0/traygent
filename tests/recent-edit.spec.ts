@@ -72,6 +72,14 @@ test('a Docker row stores its Docker socket; a Lokal row has no switch', async (
     local.getByRole('checkbox', { name: 'Docker-Socket durchreichen' }),
   ).toHaveCount(0);
   await local.getByRole('button', { name: 'Abbrechen' }).click();
+  // The row's start names the socket it passes (host-level access).
+  const start = row(page, 'terraform-module').getByRole('button', {
+    name: /starten$/,
+  });
+  await expect(start).toHaveAttribute(
+    'title',
+    /· Docker-Socket durchgereicht ·/,
+  );
   const dialog = await openEdit(page, 'terraform-module');
   const socket = dialog.getByRole('checkbox', {
     name: 'Docker-Socket durchreichen',
@@ -83,6 +91,7 @@ test('a Docker row stores its Docker socket; a Lokal row has no switch', async (
   await expect(save).not.toHaveAttribute('aria-disabled', 'true');
   await save.click();
   await expect(dialog).toBeHidden();
+  await expect(start).not.toHaveAttribute('title', /Docker-Socket/);
   const again = await openEdit(page, 'terraform-module');
   await expect(
     again.getByRole('checkbox', { name: 'Docker-Socket durchreichen' }),

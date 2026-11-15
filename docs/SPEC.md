@@ -627,7 +627,8 @@ Commands (Rust `#[tauri::command]`, German `Err` strings; panel calls only via `
 - Port of the Batch starter's „Docker Socket“ toggle: Settings → Umgebung → Docker
   „Docker-Socket durchreichen“ (`docker.socket`, app-wide, off by default, staged). The composer
   sends it with every Docker start (`LaunchRequest.dockerSocket`, no chip); the recent stores it
-  and a row's ▶ sends the stored value; „Bearbeiten …“ of a Docker row shows the same switch.
+  and a row's ▶ sends the stored value (its tooltip then names „Docker-Socket durchgereicht“);
+  „Bearbeiten …“ of a Docker row shows the same switch.
   Any other environment ignores it: launch preparation, the recent, an edit and a loaded
   `state.json` all normalize it to false, never an error.
 - On: `-v /var/run/docker.sock:/var/run/docker.sock` (read-write — the agent drives the host's

@@ -205,7 +205,7 @@
       {#if docker}
         <label
           class="switch-row"
-          title="Mountet den Docker-Socket des Hosts in den Container – der Agent kann damit den Host-Docker steuern"
+          title="Mountet den Docker-Socket des Hosts in den Container – der Agent steuert damit den Host-Docker und kann jeden Host-Ordner einbinden"
         >
           <input type="checkbox" class="switch-input" bind:checked={socket} />
           <span class="switch" aria-hidden="true"></span>
