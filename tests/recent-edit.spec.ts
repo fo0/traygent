@@ -63,6 +63,41 @@ test('an invalid entry blocks „Speichern“; „Abbrechen“ keeps the row', a
   ).toBeVisible();
 });
 
+test('a Docker row stores its Docker socket; a Lokal row has no switch', async ({
+  page,
+}) => {
+  await page.goto('/');
+  const local = await openEdit(page, 'Notizen');
+  await expect(
+    local.getByRole('checkbox', { name: 'Docker-Socket durchreichen' }),
+  ).toHaveCount(0);
+  await local.getByRole('button', { name: 'Abbrechen' }).click();
+  // The row's start names the socket it passes (host-level access).
+  const start = row(page, 'terraform-module').getByRole('button', {
+    name: /starten$/,
+  });
+  await expect(start).toHaveAttribute(
+    'title',
+    /· Docker-Socket durchgereicht ·/,
+  );
+  const dialog = await openEdit(page, 'terraform-module');
+  const socket = dialog.getByRole('checkbox', {
+    name: 'Docker-Socket durchreichen',
+  });
+  await expect(socket).toBeChecked();
+  const save = dialog.getByRole('button', { name: 'Speichern' });
+  await expect(save).toHaveAttribute('aria-disabled', 'true');
+  await dialog.getByText('Docker-Socket durchreichen').click();
+  await expect(save).not.toHaveAttribute('aria-disabled', 'true');
+  await save.click();
+  await expect(dialog).toBeHidden();
+  await expect(start).not.toHaveAttribute('title', /Docker-Socket/);
+  const again = await openEdit(page, 'terraform-module');
+  await expect(
+    again.getByRole('checkbox', { name: 'Docker-Socket durchreichen' }),
+  ).not.toBeChecked();
+});
+
 test('changes a Lokal row’s profile; a Docker row has none', async ({
   page,
 }) => {
@@ -154,6 +189,7 @@ for (const [name, stale] of STALE)
       ports: [],
       profile: null,
       keepAgentModel: false,
+      dockerSocket: false,
     });
   });
 
@@ -218,4 +254,32 @@ test('natively: a row set to „Agent“ starts with keepAgentModel', async ({
   const request = call?.args?.request as LaunchRequest;
   expect(request.keepAgentModel).toBe(true);
   expect(request.options).toEqual(notes.options);
+});
+
+test('natively: a Docker row with the socket starts with dockerSocket', async ({
+  page,
+}) => {
+  const snapshot = nativeSnapshot();
+  const infra = snapshot.recents.find((r) => r.dockerSocket)!;
+  await installTauriMock<Snapshot, Record<string, never>>(
+    page,
+    (snapshot) => async (cmd) => {
+      if (cmd === 'snapshot' || cmd === 'refresh_detection') return snapshot;
+      if (cmd === 'launch_session')
+        return {
+          recent: snapshot.recents.find((r) => r.dockerSocket)!,
+          snapshot,
+        };
+      return null;
+    },
+    { arg: snapshot, state: {} },
+  );
+  await page.goto('/');
+  await row(page, 'terraform-module')
+    .getByRole('button', { name: /starten$/ })
+    .click();
+  const [call] = await readCalls(page, 'launch_session');
+  const request = call?.args?.request as LaunchRequest;
+  expect(request).toMatchObject({ env: 'docker', dockerSocket: true });
+  expect(request.folder).toBe(infra.folder);
 });

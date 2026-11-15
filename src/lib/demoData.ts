@@ -178,6 +178,7 @@ export function demoSettings(): AppSettings {
       images: { claude: IMAGE, opencode: IMAGE, codex: IMAGE },
       ghToken: false,
       ports: [],
+      socket: false,
     },
     github: { cloneRoot: '' },
     agentUpdates: false,

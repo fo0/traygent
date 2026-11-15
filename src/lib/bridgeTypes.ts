@@ -10,6 +10,15 @@ import type {
   Snapshot,
 } from './types';
 
+/** „Bearbeiten …“ of a recent, after its id (`Bridge.updateRecent`). */
+export type RecentEdit = [
+  options: LaunchOptions,
+  ports: string[],
+  profile: string | undefined,
+  keepAgentModel: boolean,
+  dockerSocket: boolean,
+];
+
 /** The domain commands both the native shell and the demo serve. */
 export interface Bridge {
   /** The current snapshot (cached detection natively). */
@@ -25,16 +34,11 @@ export interface Bridge {
   removeRecent(id: string): Promise<Snapshot>;
   restoreRecent(recent: RecentSession): Promise<Snapshot>;
   /**
-   * Stores new options, ports and profile (`undefined` for „Standard“) on a
-   * recent; rejects with a German message.
+   * Stores new options, ports, profile (`undefined` for „Standard“),
+   * „Modell & Denken“ mode and Docker socket on a recent; rejects with a
+   * German message.
    */
-  updateRecent(
-    id: string,
-    options: LaunchOptions,
-    ports: string[],
-    profile: string | undefined,
-    keepAgentModel: boolean,
-  ): Promise<Snapshot>;
+  updateRecent(id: string, ...edit: RecentEdit): Promise<Snapshot>;
   /** A folder dialog; `null` when cancelled. */
   pickFolder(initial: string | null): Promise<string | null>;
   installAgent(agent: AgentId): Promise<void>;

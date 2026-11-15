@@ -83,14 +83,54 @@ const CODEX_INIT: &[&str] = &[
     "exec runuser -u node -- /home/node/.local/bin/codex \"$@\"",
 ];
 
-/// The init script for the agent, LF line endings whatever the checkout uses.
-pub fn init_script(agent: AgentId) -> String {
+/// `DOCKER_CLI_FALLBACK_VERSION` of the starter: used when the listing gives no version.
+pub const DOCKER_CLI_FALLBACK: &str = "27.5.1";
+const DOCKER_STATIC: &str = "https://download.docker.com/linux/static/stable/x86_64/";
+/// The host socket's path inside the container, and on the engine's side of the mount.
+pub const DOCKER_SOCK: &str = "/var/run/docker.sock";
+
+/// Prepended (as root) when the host Docker socket is passed through (#46): the starter's
+/// `INSTALL_DOCKER_LATEST_SH` (static CLI into the agent's `/home/node/.local` volume, so it
+/// persists; a failure only warns) and `DOCKER_SOCK_INIT` (node joins the socket's group, a
+/// non-zero GID only; `chmod a+rw` when node still cannot use it). `PATH` gains the CLI's
+/// directory for agents whose run sets none (OpenCode); `runuser -u` keeps it.
+fn socket_init() -> Vec<String> {
+    let bin = "/home/node/.local/bin";
+    let sock = DOCKER_SOCK;
+    vec![
+        format!("mkdir -p {bin}"),
+        format!("if [ ! -x {bin}/docker ]; then"),
+        "  echo '[traygent] Installiere Docker CLI ...'".into(),
+        format!("  DVER=$(curl -4 -fsSL {DOCKER_STATIC} 2>/dev/null | grep -oE 'docker-[0-9]+\\.[0-9]+\\.[0-9]+\\.tgz' | sed 's/docker-//;s/\\.tgz//' | sort -V | tail -1)"),
+        format!("  [ -n \"$DVER\" ] || DVER={DOCKER_CLI_FALLBACK}"),
+        format!("  if curl -4 -fsSL \"{DOCKER_STATIC}docker-$DVER.tgz\" | tar xz --strip-components=1 -C {bin} docker/docker && [ -x {bin}/docker ]; then"),
+        format!("    chown node:node {bin}/docker; echo \"[traygent] Docker CLI $DVER installiert\""),
+        format!("  else rm -f {bin}/docker; echo '[traygent] WARNUNG: Docker CLI konnte nicht installiert werden - docker fehlt im Container'; fi"),
+        "fi".into(),
+        format!("if [ -S {sock} ]; then"),
+        format!("  DSG=$(ls -n {sock} | awk '{{print $4}}')"),
+        "  case \"x$DSG\" in x|x0) ;; *)".into(),
+        "    getent group \"$DSG\" >/dev/null 2>&1 || groupadd -g \"$DSG\" hostdocker >/dev/null 2>&1".into(),
+        "    DGN=$(getent group \"$DSG\" | awk -F: '{print $1}')".into(),
+        "    [ -z \"$DGN\" ] || usermod -aG \"$DGN\" node >/dev/null 2>&1;;".into(),
+        "  esac".into(),
+        format!("  runuser -u node -- sh -c 'test -r {sock} && test -w {sock}' || chmod a+rw {sock} 2>/dev/null"),
+        "else echo '[traygent] Kein Docker-Socket im Container - laeuft Docker auf dem Host?'; fi".into(),
+        format!("export PATH=\"{bin}:$PATH\""),
+    ]
+}
+
+/// The init script for the agent, LF line endings whatever the checkout uses; with
+/// `socket` the Docker socket block ([`socket_init`]) runs first.
+pub fn init_script(agent: AgentId, socket: bool) -> String {
     let lines = match agent {
         AgentId::Claude => CLAUDE_INIT,
         AgentId::Opencode => OPENCODE_INIT,
         AgentId::Codex => CODEX_INIT,
     };
-    let mut script = lines.join("\n");
+    let mut all = if socket { socket_init() } else { Vec::new() };
+    all.extend(lines.iter().map(|line| line.to_string()));
+    let mut script = all.join("\n");
     script.push('\n');
     script
 }
@@ -131,20 +171,28 @@ pub struct DockerRun {
     pub cleanup: Vec<String>,
 }
 
+/// What a Docker session opens to the host besides its folder: published ports (canonical
+/// specs, [`crate::ports::normalize_ports`]) and the host Docker socket (#46).
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+pub struct HostAccess<'a> {
+    pub ports: &'a [String],
+    pub socket: bool,
+}
+
 fn push(args: &mut Vec<String>, parts: &[&str]) {
     args.extend(parts.iter().map(|part| part.to_string()));
 }
 
 /// The whole `docker run …` argv for `agent` in `folder` (already normalized, no UNC). The
 /// image is checked again here: it lands in the argv right before the command, where a value
-/// like `--privileged` would turn into a flag. `ports` are canonical specs
-/// ([`crate::ports::normalize_ports`]); each becomes `-p <spec>` right before the image.
+/// like `--privileged` would turn into a flag. Each of `access.ports` becomes `-p <spec>`
+/// right before the image; `access.socket` mounts the host socket and prepends its init.
 pub fn run(
     agent: AgentId,
     folder: &str,
     agent_args: Vec<String>,
     opencode_config: Option<&str>,
-    ports: &[String],
+    access: HostAccess,
     settings: &AppSettings,
     resolved: &Resolved,
 ) -> Result<DockerRun, String> {
@@ -156,7 +204,8 @@ pub fn run(
         // Session lists and `--continue` are per cwd; one path per folder keeps them apart.
         AgentId::Opencode | AgentId::Codex => format!("/workspace/{pdn}"),
     };
-    let mut env = vec![set_env_base64("TRAYGENT_INIT", &init_script(agent))];
+    let init = init_script(agent, access.socket);
+    let mut env = vec![set_env_base64("TRAYGENT_INIT", &init)];
     let mut fetch = Vec::new();
     let mut cleanup = Vec::new();
     let mut args = Vec::new();
@@ -167,6 +216,10 @@ pub fn run(
     let name = format!("traygent-{}-{pdn}-{}", agent.id(), resolved.nonce);
     push(&mut args, &["--name", &name]);
     push(&mut args, &["-v", &format!("{folder}:{workspace}")]);
+    if access.socket {
+        // Read-write: the agent drives the host's daemon (the starter's DOCKER_SOCK_MOUNT).
+        push(&mut args, &["-v", &format!("{DOCKER_SOCK}:{DOCKER_SOCK}")]);
+    }
     match agent {
         AgentId::Claude => {
             push(
@@ -300,7 +353,7 @@ pub fn run(
     if agent == AgentId::Claude {
         push(&mut args, &["-w", &workspace]);
     }
-    for port in ports {
+    for port in access.ports {
         push(&mut args, &["-p", port]);
     }
     push(&mut args, &[image.as_str()]);

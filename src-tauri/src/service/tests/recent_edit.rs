@@ -29,6 +29,7 @@ fn an_edited_recent_keeps_its_place_time_and_count_and_is_saved() {
             vec![" 3000 ".into()],
             None,
             false,
+            false,
         )
         .unwrap();
     assert!(snapshot.revision > before);
@@ -55,21 +56,29 @@ fn an_invalid_edit_or_a_gone_entry_changes_nothing() {
             vec!["3000".into()],
             None,
             false,
+            false,
         ),
         Err(crate::ports::DOCKER_ONLY.into())
     );
     assert!(service
-        .update_recent(&local.id, bypass("-p"), Vec::new(), None, false)
+        .update_recent(&local.id, bypass("-p"), Vec::new(), None, false, false)
         .is_err());
     let quoted = LaunchOptions {
         extra_args: "\"x\"".into(),
         ..LaunchOptions::default()
     };
     assert!(service
-        .update_recent(&local.id, quoted, Vec::new(), None, false)
+        .update_recent(&local.id, quoted, Vec::new(), None, false, false)
         .is_err());
     assert_eq!(
-        service.update_recent("unknown", LaunchOptions::default(), Vec::new(), None, false),
+        service.update_recent(
+            "unknown",
+            LaunchOptions::default(),
+            Vec::new(),
+            None,
+            false,
+            false
+        ),
         Err(RECENT_GONE.into())
     );
     assert_eq!(service.snapshot().recents, before);
@@ -101,6 +110,7 @@ fn an_edit_stores_the_profile_normalized_like_a_start() {
                 Vec::new(),
                 profile.map(Into::into),
                 false,
+                false,
             )
             .unwrap();
         snapshot.recents[0].profile.clone()
@@ -129,6 +139,7 @@ fn an_edit_stores_the_profile_normalized_like_a_start() {
             Vec::new(),
             Some("team".into()),
             false,
+            false,
         )
         .unwrap();
     let edited = snapshot.recents.iter().find(|r| r.id == docker.id).unwrap();
@@ -149,7 +160,14 @@ fn an_unlisted_profile_is_refused_and_changes_nothing() {
         (&codex.id, "team"),
     ] {
         assert_eq!(
-            service.update_recent(id, bypass("opus"), Vec::new(), Some(profile.into()), false),
+            service.update_recent(
+                id,
+                bypass("opus"),
+                Vec::new(),
+                Some(profile.into()),
+                false,
+                false
+            ),
             Err(PROFILE_MISSING.into()),
             "{profile}"
         );
@@ -157,7 +175,14 @@ fn an_unlisted_profile_is_refused_and_changes_nothing() {
     assert_eq!(service.snapshot().recents, before);
     // An agent without profiles stores none, as before.
     let snapshot = service
-        .update_recent(&codex.id, LaunchOptions::default(), Vec::new(), None, false)
+        .update_recent(
+            &codex.id,
+            LaunchOptions::default(),
+            Vec::new(),
+            None,
+            false,
+            false,
+        )
         .unwrap();
     let edited = snapshot.recents.iter().find(|r| r.id == codex.id).unwrap();
     assert_eq!(edited.profile, None);
@@ -169,7 +194,7 @@ fn an_edit_sets_the_agent_model_mode_and_a_row_start_keeps_it_and_the_stored_mod
     let mut service = Service::open(&dir.0);
     let local = service.record_launch(&request(AgentId::Claude, EnvId::Local, r"C:\a"), Utc::now());
     let snapshot = service
-        .update_recent(&local.id, bypass("opus"), Vec::new(), None, true)
+        .update_recent(&local.id, bypass("opus"), Vec::new(), None, true, false)
         .unwrap();
     assert!(snapshot.recents[0].keep_agent_model);
     let saved = Service::open(&dir.0).snapshot().recents;
@@ -184,7 +209,7 @@ fn an_edit_sets_the_agent_model_mode_and_a_row_start_keeps_it_and_the_stored_mod
     assert!(started.keep_agent_model);
     assert_eq!(started.options, bypass("opus"));
     let snapshot = service
-        .update_recent(&local.id, bypass("opus"), Vec::new(), None, false)
+        .update_recent(&local.id, bypass("opus"), Vec::new(), None, false, false)
         .unwrap();
     assert!(
         !snapshot.recents[0].keep_agent_model,

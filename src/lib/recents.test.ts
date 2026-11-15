@@ -164,6 +164,48 @@ describe('recents', () => {
     expect(standard).toEqual({ ...entry, profile: undefined });
   });
 
+  it('stores the Docker socket of a Docker start or edit only', () => {
+    const start: LaunchRequest = {
+      agent: 'codex',
+      env: 'docker',
+      folder: 'C:\\a',
+      options,
+      session: 'new',
+      ports: [],
+      dockerSocket: true,
+    };
+    const docker = recordStart([], start);
+    expect(docker.dockerSocket).toBe(true);
+    expect(
+      recordStart([docker], { ...start, dockerSocket: false }),
+    ).not.toHaveProperty('dockerSocket');
+    const local = recordStart([], { ...start, env: 'local' });
+    expect(local).not.toHaveProperty('dockerSocket');
+    const list = [docker, local];
+    const off = editRecent(
+      list,
+      docker.id,
+      options,
+      [],
+      undefined,
+      false,
+      false,
+    )!;
+    expect(off[0]).not.toHaveProperty('dockerSocket');
+    const on = editRecent(off, docker.id, options, [], undefined, false, true)!;
+    expect(on[0]!.dockerSocket).toBe(true);
+    const ignored = editRecent(
+      list,
+      local.id,
+      options,
+      [],
+      undefined,
+      false,
+      true,
+    )!;
+    expect(ignored[1]).not.toHaveProperty('dockerSocket');
+  });
+
   it('keeps the „Modell & Denken“ mode on a start, and a kept start keeps model and effort', () => {
     const start: LaunchRequest = {
       agent: 'claude',

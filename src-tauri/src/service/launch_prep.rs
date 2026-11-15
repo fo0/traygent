@@ -22,8 +22,9 @@ const PROFILE_DIR_FAILED: &str = "Der Profilordner konnte nicht angelegt werden.
 /// A launch ready to spawn; `fallback` is the console plan when wt.exe fails to start.
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct Prepared {
-    /// Normalized: the folder (derived for a repository start), options, ports, repo and
-    /// profile (none for the default one and outside the local environment).
+    /// Normalized: the folder (derived for a repository start), options, ports, repo,
+    /// profile (none for the default one and outside the local environment) and Docker
+    /// socket (false outside Docker).
     pub request: LaunchRequest,
     pub plan: LaunchPlan,
     pub fallback: Option<LaunchPlan>,
@@ -74,6 +75,7 @@ impl Service {
             repo,
             options: settings::normalize_options(request.options.clone()),
             ports: launch::request_ports(request)?,
+            docker_socket: request.docker_socket && request.env == EnvId::Docker,
             profile,
             ..request.clone()
         };

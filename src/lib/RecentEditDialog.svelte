@@ -24,10 +24,10 @@
     shimArgsProblem,
   } from './validation';
 
-  // „Bearbeiten …“ of a „Workspaces“ row: the options, ports (Docker),
-  // profile (Lokal, an agent with an extra profile) and „Modell & Denken“
-  // mode its ▶ sends. Staged like the settings; „Speichern“ stores them
-  // without a start.
+  // „Bearbeiten …“ of a „Workspaces“ row: the options, ports and Docker
+  // socket (Docker), profile (Lokal, an agent with an extra profile) and
+  // „Modell & Denken“ mode its ▶ sends. Staged like the settings;
+  // „Speichern“ stores them without a start.
   let {
     snapshot,
     recent,
@@ -44,6 +44,7 @@
       ports: string[],
       profile: string | undefined,
       keepAgentModel: boolean,
+      dockerSocket: boolean,
     ) => Promise<void>;
     onClose: () => void;
   } = $props();
@@ -52,6 +53,7 @@
   const docker = $derived(recent.env === 'docker');
   let options = $state<LaunchOptions>(untrack(() => ({ ...recent.options })));
   let ports = $state<string[]>(untrack(() => [...recent.ports]));
+  let socket = $state(untrack(() => !!recent.dockerSocket));
   /** „Standard“ first; `[]` when the entry has no profile to choose. */
   const profiles = $derived(
     recentProfileItems(snapshot, recent.agent, recent.env, recent.profile),
@@ -105,6 +107,7 @@
     profile:
       profiles.length && profile !== DEFAULT_PROFILE ? profile : undefined,
     keepAgentModel,
+    dockerSocket: docker && socket,
   });
   const dirty = $derived(
     JSON.stringify(next) !==
@@ -113,6 +116,7 @@
         ports: recent.ports,
         profile: recent.profile,
         keepAgentModel: !!recent.keepAgentModel,
+        dockerSocket: !!recent.dockerSocket,
       }),
   );
   const blocked = $derived(!dirty || saving || invalid);
@@ -127,6 +131,7 @@
         [...next.ports],
         next.profile,
         next.keepAgentModel,
+        next.dockerSocket,
       );
       if (alive) onClose();
     } catch (cause) {
@@ -196,6 +201,16 @@
             />
           {/if}
         </OptionFields>
+      {/if}
+      {#if docker}
+        <label
+          class="switch-row"
+          title="Mountet den Docker-Socket des Hosts in den Container – der Agent steuert damit den Host-Docker und kann jeden Host-Ordner einbinden"
+        >
+          <input type="checkbox" class="switch-input" bind:checked={socket} />
+          <span class="switch" aria-hidden="true"></span>
+          <span>Docker-Socket durchreichen</span>
+        </label>
       {/if}
     </div>
     {#if error || effort}<div class="dialog-alert danger" role="alert">

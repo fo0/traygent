@@ -132,6 +132,7 @@
       optionTitle,
       `Freigabe: ${permission.label}`,
       ports.length && portsTitle,
+      recent.dockerSocket && 'Docker-Socket durchgereicht',
       args && `Extra-Argumente: ${args}`,
       dateTime(recent.lastStartedAt),
     ]

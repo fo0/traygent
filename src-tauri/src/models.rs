@@ -228,6 +228,11 @@ pub struct LaunchRequest {
     /// so the agent continues with what it last used. The composer always sends false.
     #[serde(default, skip_serializing_if = "is_false")]
     pub keep_agent_model: bool,
+    /// Mount the host Docker socket into the container (docs/SPEC.md → Docker socket);
+    /// Docker only, normalized to false for any other environment. The composer sends
+    /// `settings.docker.socket`, a workspace row its stored value.
+    #[serde(default, skip_serializing_if = "is_false")]
+    pub docker_socket: bool,
 }
 
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
@@ -252,6 +257,9 @@ pub struct RecentSession {
     /// stored ones; only „Bearbeiten …“ changes it. Absent (false) = Traygent sets them.
     #[serde(default, skip_serializing_if = "is_false")]
     pub keep_agent_model: bool,
+    /// The last start (or „Bearbeiten …“) passed the host Docker socket; Docker only.
+    #[serde(default, skip_serializing_if = "is_false")]
+    pub docker_socket: bool,
     /// RFC 3339.
     pub last_started_at: String,
     pub starts: u32,
@@ -328,6 +336,9 @@ pub struct DockerSettings {
     pub gh_token: bool,
     /// Ports every new Docker session starts with; the composer can change them per start.
     pub ports: Vec<String>,
+    /// Mount the host Docker socket into every new Docker session, so the agent can drive
+    /// the host's Docker (docs/SPEC.md → Docker socket).
+    pub socket: bool,
 }
 
 /// A well-known dev-server port the panel offers as a checkbox.

@@ -26,6 +26,7 @@ fn sample() -> Persisted {
     };
     settings.docker.gh_token = true;
     settings.docker.ports = vec!["127.0.0.1:5173:5173".into()];
+    settings.docker.socket = true;
     settings.agents.get_mut(AgentId::Codex).permission = PermissionId::Bypass;
     settings.github.clone_root = r"D:\src".into();
     settings.profiles.claude = vec![
@@ -52,6 +53,7 @@ fn sample() -> Persisted {
         session: SessionMode::Continue,
         profile: None,
         keep_agent_model: false,
+        docker_socket: true,
         ports: vec!["3000".into(), "0.0.0.0:8080:80/udp".into()],
     };
     recents::upsert(&mut recents, &request, chrono::Utc::now());
@@ -96,6 +98,8 @@ fn save_then_load_round_trips_with_a_version() {
     assert_eq!(value["settings"]["sharedWindow"], true);
     assert_eq!(value["settings"]["agentUpdates"], true);
     assert_eq!(value["settings"]["debug"], true);
+    assert_eq!(value["settings"]["docker"]["socket"], true);
+    assert_eq!(value["recents"][0]["dockerSocket"], true);
     assert_eq!(
         value["settings"]["profiles"],
         json!({
@@ -439,3 +443,35 @@ fn the_github_account_loads_leniently_and_is_left_out_without_one() {
 
 mod profiles;
 mod share;
+
+#[test]
+fn the_docker_socket_loads_leniently_and_only_for_docker_recents() {
+    let dir = TempDir::new("docker-socket");
+    let recent = |id: &str, env: &str| {
+        json!({ "id": id, "agent": "claude", "env": env, "folder": "C:\\a", "dockerSocket": true,
+            "options": {}, "lastStartedAt": "2026-11-03T09:00:00Z", "starts": 1 })
+    };
+    dir.write(
+        &json!({
+            "version": 1,
+            "settings": { "docker": { "socket": true } },
+            "recents": [recent("a", "docker"), recent("b", "local")]
+        })
+        .to_string(),
+    );
+    let loaded = load(&dir.0);
+    assert!(loaded.state.settings.docker.socket);
+    let sockets: Vec<_> = loaded
+        .state
+        .recents
+        .iter()
+        .map(|recent| (recent.id.as_str(), recent.docker_socket))
+        .collect();
+    assert_eq!(sockets, [("a", true), ("b", false)]);
+    // An unreadable value resets only itself; a file from before the setting reads false.
+    dir.write(r#"{"version":1,"settings":{"docker":{"socket":"yes","ghToken":true}}}"#);
+    let settings = load(&dir.0).state.settings;
+    assert!(!settings.docker.socket && settings.docker.gh_token);
+    dir.write(r#"{"version":1,"settings":{"docker":{"ghToken":true}}}"#);
+    assert!(!load(&dir.0).state.settings.docker.socket);
+}

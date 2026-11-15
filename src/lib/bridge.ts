@@ -15,13 +15,14 @@ const nativeBridge: Bridge = {
   launchSession: (request) => call('launch_session', { request }),
   removeRecent: (id) => call('remove_recent', { id }),
   restoreRecent: (recent) => call('restore_recent', { recent }),
-  updateRecent: (id, options, ports, profile, keepAgentModel) =>
+  updateRecent: (id, options, ports, profile, keepAgentModel, dockerSocket) =>
     call('update_recent', {
       id,
       options,
       ports,
       profile: profile ?? null,
       keepAgentModel,
+      dockerSocket,
     }),
   pickFolder: (initial) => call('pick_folder', { initial }),
   installAgent: (agent) => call('install_agent', { agent }),

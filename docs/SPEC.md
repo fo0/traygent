@@ -184,11 +184,12 @@ Brand top left: icon + „Traygent“. Window ~480×760, frameless, tray popup l
   one when its own is hidden, the row hides with a single one), default agent, terminal
   (Windows Terminal / Konsole; with Windows Terminal, `sharedWindow` (default off) opens every
   start as a tab of one window named `traygent`), Docker: image per agent (defaults from research), pass host gh
-  token (off by default). Rust stores the list each once in `local` · `docker` · `wsl` order and
+  token (off by default), „Docker-Socket durchreichen“ (`docker.socket`, off by default, tooltip
+  only; _Docker socket_). Rust stores the list each once in `local` · `docker` · `wsl` order and
   refuses one without Lokal or Docker („Mindestens eine Umgebung muss aktiv sein.“, „WSL ist noch
   nicht verfügbar.“) or without the default („Die Standard-Umgebung ist deaktiviert.“); a
   `state.json` without the field shows all three, an unknown id is dropped. While the staged list
-  hides Docker, the Docker section (images, default ports, gh token) and the Agenten tab's Docker
+  hides Docker, the Docker section (images, default ports, gh token, socket) and the Agenten tab's Docker
   readiness are hidden too, their values kept; unticking Docker resets each invalid Docker field to
   its saved value, valid edits stay staged; the default ports count as one field, so a list with a
   conflict resets as a whole
@@ -228,7 +229,9 @@ Profiles in the contract (`profileTypes.ts` ↔ `models/profiles.rs`): `AgentCat
 empty lists by default and for an agent without `profiles`),
 `LaunchRequest.profile` and `RecentSession.profile` (optional, absent for `default`),
 `LaunchRequest.keepAgentModel` and `RecentSession.keepAgentModel` (optional, absent = false,
-#43 — _Dashboard_ → Workspaces),
+#43 — _Dashboard_ → Workspaces), `DockerSettings.socket` (default false) and
+`LaunchRequest.dockerSocket` / `RecentSession.dockerSocket` (optional, absent = false, Docker
+only — _Docker socket_),
 `Snapshot.profiles` (`ProfileStatus[]`: `agent`, `id`, `label`, `dir`, `signedIn`, optional
 `account`, `organization`, `plan`, `syncedAt`, `syncError`) and `LaunchOutcome.warning` (optional,
 German: the session started, the profile sync before it was incomplete).
@@ -243,7 +246,7 @@ Commands (Rust `#[tauri::command]`, German `Err` strings; panel calls only via `
 | `launch_session`                   | `{ request }`                                                                                    | `LaunchOutcome` (validates, opens terminal, records recent)   |
 | `remove_recent`                    | `{ id }`                                                                                         | `Snapshot`                                                    |
 | `restore_recent`                   | `{ recent }`                                                                                     | `Snapshot` (undo of remove)                                   |
-| `update_recent`                    | `{ id, options, ports, profile: string \| null, keepAgentModel }`                                | `Snapshot` (edit, no start)                                   |
+| `update_recent`                    | `{ id, options, ports, profile: string \| null, keepAgentModel, dockerSocket }`                  | `Snapshot` (edit, no start)                                   |
 | `pick_folder`                      | `{ initial?: string }`                                                                           | `string \| null` (native folder dialog)                       |
 | `install_agent`                    | `{ agent }`                                                                                      | `void` (opens a terminal running the catalog install command) |
 | `open_folder`                      | `{ path }`                                                                                       | `void` (Explorer)                                             |
@@ -619,6 +622,25 @@ Commands (Rust `#[tauri::command]`, German `Err` strings; panel calls only via `
   entries.
 - The service inside the container must listen on `0.0.0.0` (tooltip hint, no prose).
 
+## Docker socket (Docker sessions, #46)
+
+- Port of the Batch starter's „Docker Socket“ toggle: Settings → Umgebung → Docker
+  „Docker-Socket durchreichen“ (`docker.socket`, app-wide, off by default, staged). The composer
+  sends it with every Docker start (`LaunchRequest.dockerSocket`, no chip); the recent stores it
+  and a row's ▶ sends the stored value (its tooltip then names „Docker-Socket durchgereicht“);
+  „Bearbeiten …“ of a Docker row shows the same switch.
+  Any other environment ignores it: launch preparation, the recent, an edit and a loaded
+  `state.json` all normalize it to false, never an error.
+- On: `-v /var/run/docker.sock:/var/run/docker.sock` (read-write — the agent drives the host's
+  daemon, which is host-level access) next to the workspace mount, and a root block before the
+  agent's init script: the static Docker CLI into `/home/node/.local/bin` when missing (latest
+  from `download.docker.com/linux/static/stable/x86_64/`, fallback 27.5.1; a failure only warns),
+  node joins the socket's group (a non-zero GID only), `chmod a+rw` when node still cannot use it,
+  a German notice when no socket arrived, and `PATH` gains `/home/node/.local/bin` (`runuser -u`
+  keeps it). `/home/node/.local` is a named volume for every agent, so the CLI persists.
+- No probe before the start (the starter runs a throwaway container): an engine without the
+  socket shows the in-container notice instead (`docs/VALIDATION.md`).
+
 ## Launch rules (Rust, pure builder + thin Windows spawn adapter)
 
 - Build an argv `Vec<String>` per (agent, env, options, session). Never build a cmd.exe string.
@@ -645,7 +667,8 @@ script>`; inside the script every argument is a PowerShell single-quoted literal
   The install terminal always stays open.
 - Docker: `docker run -it --rm` with the workspace bind-mounted, state in **named volumes**
   (never bind-mounts for state — agent-tools ADR-0007), Claude reuses the starter's volume
-  layout so an existing login keeps working (research file has the recipe).
+  layout so an existing login keeps working (research file has the recipe). The host Docker
+  socket is the one other bind mount, only when on (_Docker socket_).
 - Detection: local — find the CLI on PATH + known install locations, run `<cli> --version` with
   a timeout, capped output, closed stdin, no console window (`CREATE_NO_WINDOW`); docker —
   `docker version --format {{.Server.Version}}` with timeout (CLI missing → `missing`, daemon

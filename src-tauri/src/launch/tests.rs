@@ -78,6 +78,7 @@ pub(crate) fn request(agent: AgentId, env: EnvId, folder: &str) -> LaunchRequest
         session: SessionMode::New,
         profile: None,
         keep_agent_model: false,
+        docker_socket: false,
         ports: Vec::new(),
     }
 }

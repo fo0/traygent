@@ -106,6 +106,12 @@ test('Umgebung: default environment, terminal and Docker image save together', a
   });
   await dialog.getByText('GitHub-Token weitergeben').click();
   await expect(token).toBeChecked();
+  const socket = dialog.getByRole('checkbox', {
+    name: 'Docker-Socket durchreichen',
+  });
+  await expect(socket).not.toBeChecked();
+  await dialog.getByText('Docker-Socket durchreichen').click();
+  await expect(socket).toBeChecked();
   await saveButton(page).click();
   await expect(dialog).toHaveCount(0);
   await expect(

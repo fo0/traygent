@@ -50,6 +50,7 @@ fn request(agent: AgentId, env: EnvId, profile: Option<&str>) -> LaunchRequest {
         ports: Vec::new(),
         profile: profile.map(Into::into),
         keep_agent_model: false,
+        docker_socket: false,
     }
 }
 

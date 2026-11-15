@@ -16,6 +16,7 @@ fn request(folder: &str, agent: AgentId, env: EnvId) -> LaunchRequest {
         session: SessionMode::New,
         profile: None,
         keep_agent_model: false,
+        docker_socket: false,
         ports: Vec::new(),
     }
 }
@@ -192,6 +193,25 @@ fn upsert_stores_normalized_ports_and_replaces_them_on_the_next_start() {
     assert!(upsert(&mut list, &local, at(4)).ports.is_empty());
     docker.ports = vec!["3000;calc".into()];
     assert!(upsert(&mut list, &docker, at(5)).ports.is_empty());
+}
+
+#[test]
+fn the_docker_socket_is_stored_for_docker_only_and_replaced_by_each_start() {
+    let mut list = Vec::new();
+    let mut docker = request("C:\\a", AgentId::Opencode, EnvId::Docker);
+    docker.docker_socket = true;
+    let first = upsert(&mut list, &docker, at(1));
+    assert!(first.docker_socket);
+    docker.docker_socket = false;
+    assert!(!upsert(&mut list, &docker, at(2)).docker_socket);
+    let mut local = request("C:\\b", AgentId::Claude, EnvId::Local);
+    local.docker_socket = true;
+    assert!(!upsert(&mut list, &local, at(3)).docker_socket);
+    // A tampered `state.json` never hands the socket to a non-Docker restart.
+    let mut tampered = first.clone();
+    tampered.env = EnvId::Local;
+    assert!(!tidy(vec![tampered]).remove(0).docker_socket);
+    assert!(tidy(vec![first]).remove(0).docker_socket);
 }
 
 #[test]

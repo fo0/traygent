@@ -82,6 +82,7 @@ const ARGS: { [K in Command]?: Exclude<Commands[K]['args'], undefined> } = {
     ports: [],
     profile: null,
     keepAgentModel: false,
+    dockerSocket: false,
   },
   pick_folder: { initial: null },
   install_agent: { agent: 'claude' as AgentId },
