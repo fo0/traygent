@@ -134,7 +134,8 @@ Brand top left: icon + „Traygent“. Window ~480×760, frameless, tray popup l
   synchronisieren“ beside the heading (immediate, `sync_profiles`, tooltip „Automatisch alle 15
   Minuten“), „Standard-Profil“ (staged), one single-line row per profile — „Standard“ first —
   with a chevron toggle and its name, a sign-in dot (#43: green `--ok` signed in, red `--fail`
-  signed out, `role="img"` named „Angemeldet“ / „Nicht angemeldet“, none until the snapshot
+  signed out; `role="img"` named „Angemeldet“ while signed in, hidden from assistive tech while
+  signed out, as the account text says it already; none until the snapshot
   lists the profile; a forced-colours ring when signed out), the account or „Nicht angemeldet“ — when another signed-in
   profile of the agent has the same account (ignoring case) but another organization, the
   organization instead of the account (#41); tooltip: account · organization —, a warning icon
@@ -634,7 +635,9 @@ Commands (Rust `#[tauri::command]`, German `Err` strings; panel calls only via `
 - On: `-v /var/run/docker.sock:/var/run/docker.sock` (read-write — the agent drives the host's
   daemon, which is host-level access) next to the workspace mount, and a root block before the
   agent's init script: the static Docker CLI into `/home/node/.local/bin` when missing (latest
-  from `download.docker.com/linux/static/stable/x86_64/`, fallback 27.5.1; a failure only warns),
+  from `download.docker.com/linux/static/stable/x86_64/`, fallback 27.5.1; a failure only warns;
+  curl gives up after 10 s without a connection, after 30 s on the listing and after 30 s below
+  1 KiB/s on the tarball, so a slow link still finishes),
   node joins the socket's group (a non-zero GID only), `chmod a+rw` when node still cannot use it,
   a German notice when no socket arrived, and `PATH` gains `/home/node/.local/bin` (`runuser -u`
   keeps it). `/home/node/.local` is a named volume for every agent, so the CLI persists.

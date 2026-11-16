@@ -189,6 +189,20 @@ fn number_tokens_survive_a_rewrite_untouched() {
         object(r#"{"b":1e2,"a":1.5}"#)
     );
     assert_ne!(object(r#"{"a":1}"#), object(r#"{"a":1.0}"#));
+    assert_eq!(object(r#"{"a":-0.0150e2}"#), object(r#"{"a":-1.5}"#));
+    assert_eq!(object(r#"{"a":0.0}"#), object(r#"{"a":-0e5}"#));
+    // Values that differ beyond f64 precision differ (BACKLOG #68).
+    for (first, second) in [
+        (
+            "123456789012345678901234567890",
+            "123456789012345678901234567891",
+        ),
+        ("0.1234567890123456789012345", "0.1234567890123456789012346"),
+        ("1.00000000000000000001e3", "1e3"),
+    ] {
+        let doc = |number: &str| object(&format!(r#"{{"a":{number}}}"#));
+        assert_ne!(doc(first), doc(second), "{first} vs {second}");
+    }
     assert_ne!(object(r#"{"a":1}"#), object(r#"{"a":"1"}"#));
 }
 
