@@ -42,7 +42,7 @@ test('only a signed-out row offers „Anmelden“; the demo sign-in flips it in 
     row.locator('.profile-row').getByRole('img', { name, exact: true });
   await expect(dot(standard, 'Angemeldet')).toHaveAttribute('data-in', 'true');
   // Signed out, the row's text already says it: the dot is hidden from
-  // assistive tech, so a screen reader reads „Nicht angemeldet“ once (#80).
+  // assistive tech, so a screen reader reads „Nicht angemeldet“ once (BACKLOG #80).
   const outDot = team.locator('.profile-row .profile-dot');
   await expect(outDot).toBeVisible();
   await expect(outDot).toHaveAttribute('aria-hidden', 'true');
