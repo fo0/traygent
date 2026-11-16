@@ -55,7 +55,7 @@ fn the_init_block_follows_the_starter() {
         "if [ ! -x /home/node/.local/bin/docker ]; then",
         "echo '[traygent] Installiere Docker CLI ...'",
         "curl -4 -fsSL --connect-timeout 10 --max-time 30 https://download.docker.com/linux/static/stable/x86_64/ 2>/dev/null",
-        "curl -4 -fsSL --connect-timeout 10 --max-time 300 \"https://download.docker.com/linux/static/stable/x86_64/docker-$DVER.tgz\"",
+        "curl -4 -fsSL --connect-timeout 10 --speed-limit 1024 --speed-time 30 \"https://download.docker.com/linux/static/stable/x86_64/docker-$DVER.tgz\"",
         "grep -oE 'docker-[0-9]+\\.[0-9]+\\.[0-9]+\\.tgz'",
         "[ -n \"$DVER\" ] || DVER=27.5.1",
         "| tar xz --strip-components=1 -C /home/node/.local/bin docker/docker",
