@@ -122,8 +122,9 @@
     {#if status}<span
         class="profile-dot"
         data-in={status.signedIn ? 'true' : undefined}
-        role="img"
-        aria-label={status.signedIn ? 'Angemeldet' : SIGNED_OUT}
+        role={status.signedIn ? 'img' : undefined}
+        aria-label={status.signedIn ? 'Angemeldet' : undefined}
+        aria-hidden={status.signedIn ? undefined : 'true'}
         title={status.signedIn ? 'Angemeldet' : SIGNED_OUT}
       ></span>{/if}
     <span

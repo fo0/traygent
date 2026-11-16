@@ -41,8 +41,13 @@ test('only a signed-out row offers „Anmelden“; the demo sign-in flips it in 
   const dot = (row: typeof team, name: string) =>
     row.locator('.profile-row').getByRole('img', { name, exact: true });
   await expect(dot(standard, 'Angemeldet')).toHaveAttribute('data-in', 'true');
-  await expect(dot(team, 'Nicht angemeldet')).toBeVisible();
-  await expect(dot(team, 'Nicht angemeldet')).not.toHaveAttribute('data-in');
+  // Signed out, the row's text already says it: the dot is hidden from
+  // assistive tech, so a screen reader reads „Nicht angemeldet“ once (#80).
+  const outDot = team.locator('.profile-row .profile-dot');
+  await expect(outDot).toBeVisible();
+  await expect(outDot).toHaveAttribute('aria-hidden', 'true');
+  await expect(outDot).not.toHaveAttribute('data-in');
+  await expect(dot(team, 'Nicht angemeldet')).toHaveCount(0);
   // „Neu anmelden“ sits in a signed-in row's details.
   await standard.getByRole('button', { name: 'Standard Details' }).click();
   await expect(
