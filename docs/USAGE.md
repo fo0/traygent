@@ -3,7 +3,7 @@
 Everything the panel does, control by control. The UI labels are German; each one is quoted as it appears, with its meaning where it is not obvious. Back to the [README](../README.md).
 
 - [New session](#new-session--neue-session)
-- [Recent sessions](#recent-sessions--zuletzt)
+- [Workspaces](#workspaces)
 - [Status and refresh](#status-and-refresh)
 - [Settings](#settings--einstellungen)
 - [Panel and tray](#panel-and-tray)
