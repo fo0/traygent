@@ -55,9 +55,38 @@ pub fn same_object(first: &[(String, Node)], second: &[(String, Node)]) -> bool 
 }
 
 /// The same token, or two spellings of one number (`1.50` and `1.5`, `1e2` and `100.0`).
+/// serde_json alone would also match two values that differ beyond f64 precision, so the
+/// exact decimal values must agree too.
 fn same_number(first: &str, second: &str) -> bool {
     let parsed = |token: &str| serde_json::from_str::<serde_json::Number>(token).ok();
-    first == second || (parsed(first).is_some() && parsed(first) == parsed(second))
+    first == second
+        || (parsed(first).is_some()
+            && parsed(first) == parsed(second)
+            && decimal(first) == decimal(second))
+}
+
+/// A number token's exact value as sign, significant digits and exponent: `1.50`, `15e-1`
+/// and `0.15E1` all give `(false, "15", -1)`; every zero gives `(false, "", 0)`.
+fn decimal(token: &str) -> (bool, String, i64) {
+    let (negative, rest) = match token.strip_prefix('-') {
+        Some(rest) => (true, rest),
+        None => (false, token),
+    };
+    let (mantissa, exponent) = match rest.split_once(['e', 'E']) {
+        Some((mantissa, exponent)) => (mantissa, exponent.parse::<i64>().unwrap_or(0)),
+        None => (rest, 0),
+    };
+    let (whole, fraction) = mantissa.split_once('.').unwrap_or((mantissa, ""));
+    let digits = format!("{whole}{fraction}");
+    let significant = digits.trim_start_matches('0').trim_end_matches('0');
+    if significant.is_empty() {
+        return (false, String::new(), 0);
+    }
+    let trailing = digits.len() - digits.trim_end_matches('0').len();
+    let exponent = exponent
+        .saturating_sub(fraction.len() as i64)
+        .saturating_add(trailing as i64);
+    (negative, significant.to_string(), exponent)
 }
 
 impl PartialEq for Node {
