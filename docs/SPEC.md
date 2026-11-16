@@ -634,7 +634,8 @@ Commands (Rust `#[tauri::command]`, German `Err` strings; panel calls only via `
 - On: `-v /var/run/docker.sock:/var/run/docker.sock` (read-write — the agent drives the host's
   daemon, which is host-level access) next to the workspace mount, and a root block before the
   agent's init script: the static Docker CLI into `/home/node/.local/bin` when missing (latest
-  from `download.docker.com/linux/static/stable/x86_64/`, fallback 27.5.1; a failure only warns),
+  from `download.docker.com/linux/static/stable/x86_64/`, fallback 27.5.1; a failure only warns; curl gives up after 10 s without a connection and
+  30 s for the listing, 300 s for the tarball),
   node joins the socket's group (a non-zero GID only), `chmod a+rw` when node still cannot use it,
   a German notice when no socket arrived, and `PATH` gains `/home/node/.local/bin` (`runuser -u`
   keeps it). `/home/node/.local` is a named volume for every agent, so the CLI persists.

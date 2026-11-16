@@ -91,9 +91,10 @@ pub const DOCKER_SOCK: &str = "/var/run/docker.sock";
 
 /// Prepended (as root) when the host Docker socket is passed through (#46): the starter's
 /// `INSTALL_DOCKER_LATEST_SH` (static CLI into the agent's `/home/node/.local` volume, so it
-/// persists; a failure only warns) and `DOCKER_SOCK_INIT` (node joins the socket's group, a
-/// non-zero GID only; `chmod a+rw` when node still cannot use it). `PATH` gains the CLI's
-/// directory for agents whose run sets none (OpenCode); `runuser -u` keeps it.
+/// persists; a failure only warns, and curl's time limits bound a dropped connection) and
+/// `DOCKER_SOCK_INIT` (node joins the socket's group, a non-zero GID only; `chmod a+rw` when
+/// node still cannot use it). `PATH` gains the CLI's directory for agents whose run sets none
+/// (OpenCode); `runuser -u` keeps it.
 fn socket_init() -> Vec<String> {
     let bin = "/home/node/.local/bin";
     let sock = DOCKER_SOCK;
@@ -101,9 +102,9 @@ fn socket_init() -> Vec<String> {
         format!("mkdir -p {bin}"),
         format!("if [ ! -x {bin}/docker ]; then"),
         "  echo '[traygent] Installiere Docker CLI ...'".into(),
-        format!("  DVER=$(curl -4 -fsSL {DOCKER_STATIC} 2>/dev/null | grep -oE 'docker-[0-9]+\\.[0-9]+\\.[0-9]+\\.tgz' | sed 's/docker-//;s/\\.tgz//' | sort -V | tail -1)"),
+        format!("  DVER=$(curl -4 -fsSL --connect-timeout 10 --max-time 30 {DOCKER_STATIC} 2>/dev/null | grep -oE 'docker-[0-9]+\\.[0-9]+\\.[0-9]+\\.tgz' | sed 's/docker-//;s/\\.tgz//' | sort -V | tail -1)"),
         format!("  [ -n \"$DVER\" ] || DVER={DOCKER_CLI_FALLBACK}"),
-        format!("  if curl -4 -fsSL \"{DOCKER_STATIC}docker-$DVER.tgz\" | tar xz --strip-components=1 -C {bin} docker/docker && [ -x {bin}/docker ]; then"),
+        format!("  if curl -4 -fsSL --connect-timeout 10 --max-time 300 \"{DOCKER_STATIC}docker-$DVER.tgz\" | tar xz --strip-components=1 -C {bin} docker/docker && [ -x {bin}/docker ]; then"),
         format!("    chown node:node {bin}/docker; echo \"[traygent] Docker CLI $DVER installiert\""),
         format!("  else rm -f {bin}/docker; echo '[traygent] WARNUNG: Docker CLI konnte nicht installiert werden - docker fehlt im Container'; fi"),
         "fi".into(),
