@@ -14,7 +14,7 @@ Stable project knowledge. **Read at session start.**
 ### Unsigned Windows releases, versions from the run timestamp
 
 - **Date:** 2026-11-03 (inherited)
-- **Decision:** The manual _Release_ Action publishes an unsigned NSIS EXE (`createUpdaterArtifacts: false` in `src-tauri/tauri.release.conf.json`). The version is `YYYY.MMDD.HHmm` (UTC) from the run creation time, stamped only into the build workspace — Git keeps `0.1.0`. Detail: `docs/RELEASES.md`.
+- **Decision:** The manual _Desktop Release_ Action publishes an unsigned NSIS EXE (`createUpdaterArtifacts: false` in `src-tauri/tauri.release.conf.json`). The version is `YYYY.MMDD.HHmm` (UTC) from the run creation time, stamped only into the build workspace — Git keeps `0.1.0`. Detail: `docs/RELEASES.md`.
 
 ### Unsigned builds update in the app
 
