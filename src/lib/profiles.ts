@@ -124,14 +124,19 @@ export function profilesProblem(list: readonly AgentProfile[], chosen: string) {
   return '';
 }
 
-/** Whether a start of `agent` in `env` sends a profile: Lokal only. */
+/** Mirrors launch_profile in the native launch service. */
+function profileEnvironment(agent: AgentId, env: EnvId) {
+  return env === 'local' || (agent === 'claude' && env === 'docker');
+}
+
+/** Whether the composer and workspace editor offer the agent's profiles. */
 export function profilesApply(
   snapshot: Pick<Snapshot, 'catalog'>,
   agent: AgentId,
   env: EnvId,
 ) {
   const entry = snapshot.catalog.find((item) => item.id === agent);
-  return !!entry?.profiles && env === 'local';
+  return !!entry?.profiles && profileEnvironment(agent, env);
 }
 
 /** Whether `id` names a profile of `agent` in `settings`. */
@@ -194,8 +199,7 @@ export function profileInitial(label: string) {
 
 /**
  * Why a start's profile is refused, as natively (launch_prep.rs →
- * launch_profile, by `editedProfile`): only an id the agent does not list, in
- * Lokal; „Standard“ and every other environment start without one.
+ * launch_profile, by `editedProfile`): a named profile must still be listed.
  */
 export function launchProfileProblem(
   snapshot: Pick<Snapshot, 'settings'>,
@@ -209,7 +213,7 @@ export function launchProfileProblem(
 
 /**
  * The „Profil“ choices of a recent's „Bearbeiten …“: „Standard“ and the
- * agent's profiles; none (no field) outside Lokal, or without an extra one
+ * agent's profiles; none in unsupported environments or without an extra one
  * unless the entry still stores a profile (then just „Standard“, so the
  * change a save makes is visible).
  */
@@ -228,7 +232,7 @@ export function recentProfileItems(
 /**
  * The profile a start uses and an edited recent stores, as natively
  * (launch_prep.rs → launch_profile): none for „Standard“ (absent, blank, `default`) and
- * outside Lokal; `null` for an id the agent does not list.
+ * in unsupported environments; `null` for an id the agent does not list.
  */
 export function editedProfile(
   settings: Pick<AppSettings, 'profiles'>,
@@ -237,6 +241,7 @@ export function editedProfile(
   profile: string | undefined,
 ): string | undefined | null {
   const id = profile?.trim();
-  if (!id || id === DEFAULT_PROFILE || env !== 'local') return undefined;
+  if (!id || id === DEFAULT_PROFILE || !profileEnvironment(agent, env))
+    return undefined;
   return knownProfile(settings, agent, id) ? id : null;
 }

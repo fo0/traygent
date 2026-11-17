@@ -1,6 +1,6 @@
 # ADR-0004: Docker Sessions Share the Batch Starter's Claude Volumes
 
-- **Status:** Accepted
+- **Status:** Accepted; partly superseded — Claude and Codex config storage and the Claude workspace path by [ADR-0011](0011-share-host-agent-config-with-docker.md)
 - **Date:** 2026-11-03
 - **Decider(s):** both
 - **Tags:** docker, launch, storage
@@ -12,6 +12,8 @@ Users of `fo0/agent-tools` already run Claude Code in Docker through `claude/cli
 The OpenCode starter builds its own image bound to a company LLM gateway, and there is no Codex starter. OpenCode and Codex keep their session lists per working directory, so every folder mounted at the same `/workspace` would share one list and `--continue` would pick another project's session.
 
 ## Decision
+
+_(Config storage for Claude and Codex and the Claude workspace path superseded by ADR-0011.)_
 
 We will run every Docker session from a plain `node:22-trixie` image (changeable per agent) with `docker run --rm -it --init`, the folder bind-mounted and all state in named volumes (`src-tauri/src/launch/docker.rs`). **Claude Code** reuses the starter's volumes, paths, environment and per-folder project dir name (`CLAUDE_CODE_PROJECT_DIR_NAME`, byte for byte the starter's algorithm), and mounts the folder at `/workspace`, so a login carries over in both directions. Unlike the starter it does not set `CLAUDE_CODE_TRUST_WORKSPACE`: the trust prompt appears once per folder, and skipping it would let a repository's hooks run unasked. **OpenCode** uses `traygent-opencode-bin`, `traygent-opencode-data`, `traygent-opencode-config`; **Codex** uses `traygent-codex-tools`, `traygent-codex-home`. Both mount the folder at `/workspace/<pdn>` (the same project dir name). All three run with `--security-opt no-new-privileges` (root prepares, `runuser` drops to `node`, neither needs setuid; UNVERIFIED for Claude on a real engine). The image is validated when `state.json` is read and again before it reaches `docker run` or `docker image inspect`. On first start an init script, passed as `TRAYGENT_INIT` in Base64 and sourced by a fixed loader, installs the CLI into its tools volume as user `node`.
 

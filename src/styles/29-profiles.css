@@ -48,7 +48,7 @@
   box-shadow: 0 0 0 1.5px var(--hover);
 }
 
-/* The chip is the last before „Starten“: its list opens to the left. */
+/* Open the profile list to the left so it fits beside „Starten“. */
 .profile-chip {
   display: inline-flex;
 }

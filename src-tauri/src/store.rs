@@ -44,6 +44,19 @@ pub fn path(dir: &Path) -> PathBuf {
     dir.join(FILE)
 }
 
+/// Read-only lookup for the credential helper. An unreadable or incompatible state
+/// refuses forwarding; a helper never repairs, moves or writes the settings file.
+pub(crate) fn docker_github_account_id(dir: &Path) -> Option<u64> {
+    let bytes = std::fs::read(path(dir)).ok()?;
+    let state: Value = serde_json::from_slice(&bytes).ok()?;
+    if state.get("version")?.as_u64()? != VERSION
+        || !state.pointer("/settings/docker/ghToken")?.as_bool()?
+    {
+        return None;
+    }
+    parse_account(state.get("github")?).map(|account| account.id)
+}
+
 pub fn load(dir: &Path) -> Loaded {
     let file = path(dir);
     let text = match std::fs::read(&file) {

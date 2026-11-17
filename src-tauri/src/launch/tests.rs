@@ -58,8 +58,14 @@ pub(crate) fn resolved(cli: Option<(&str, bool)>) -> Resolved {
             shim,
         }),
         docker: Some("C:\\Program Files\\Docker\\Docker\\resources\\bin\\docker.exe".into()),
-        gh: None,
+        traygent_exe: Some(r"C:\Program Files\Traygent\traygent.exe".into()),
+        github_account_id: Some(42),
         gitconfig: None,
+        docker_home: Some(docker::AgentHome {
+            directory: r"C:\Agent Home".into(),
+            claude_state: Some(r"C:\Users\Max\.claude.json".into()),
+            shared_from: None,
+        }),
         git: None,
         powershell: PS.into(),
         wt: Some(WT.into()),
@@ -397,7 +403,6 @@ fn no_plan_ever_contains_powershell_51_pitfalls() {
         r"C:\100% (sicher)",
     ];
     let mut resolved = resolved(Some((CLAUDE, false)));
-    resolved.gh = Some(r"C:\Program Files\GitHub CLI\gh.exe".into());
     resolved.gitconfig = Some(r"C:\Users\max\.gitconfig".into());
     let mut count = 0;
     for terminal in [TerminalId::WindowsTerminal, TerminalId::Console] {

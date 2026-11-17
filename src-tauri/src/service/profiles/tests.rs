@@ -3,7 +3,9 @@
 use super::*;
 use crate::detect::Fs;
 use crate::launch::tests::script;
-use crate::models::{AgentProfile, AppSettings, LaunchOptions, SessionMode, Snapshot, TerminalId};
+use crate::models::{
+    AgentProfile, AppSettings, EnvId, LaunchOptions, SessionMode, Snapshot, TerminalId,
+};
 use crate::testing::{windows_host, FakeFs, TempDir};
 use chrono::TimeZone;
 
@@ -262,39 +264,65 @@ fn without_an_extra_profile_the_script_is_as_before() {
 }
 
 #[test]
-fn a_docker_start_ignores_the_profile() {
+fn docker_starts_and_restores_the_selected_profile_without_exposing_another_login() {
     const DOCKER: &str = r"C:\Program Files\Docker\Docker\resources\bin\docker.exe";
     let dir = TempDir::new("service-profiles-docker");
     let mut service = service(&dir);
     let host = windows_host();
-    let fs = FakeFs::with(&[DOCKER]).dir(DEMO);
-    let plain = service
-        .prepare_launch(
-            &request(AgentId::Claude, EnvId::Docker, None),
-            &host,
-            &fs,
-            "n",
-        )
-        .unwrap();
-    // Also one that does not exist: the container has its own home.
-    for profile in ["team", "gone"] {
-        let prepared = service
+    let mut fs = FakeFs::with(&[DOCKER]).dir(DEMO);
+    for profile in ["team", "solo"] {
+        let request = request(AgentId::Claude, EnvId::Docker, Some(profile));
+        let prepared = service.prepare_launch(&request, &host, &fs, "n").unwrap();
+        assert_eq!(prepared.request.profile.as_deref(), Some(profile));
+        let text = script(&prepared.plan);
+        assert!(text.contains(&format!(
+            r"C:\Users\max\.claude-{profile}:/home/node/.claude:rw"
+        )));
+        assert!(!text.contains(".claude:/home/node/.claude:rw"));
+        assert!(!text.contains(".claude.json:rw"));
+        assert!(service.launch_sync_plan(&prepared.request).is_some());
+        let recent = service.record_launch(&prepared.request, at(1));
+        assert_eq!(recent.profile.as_deref(), Some(profile));
+        assert_eq!(
+            Service::open(&dir.0).snapshot().recents[0].profile,
+            recent.profile
+        );
+    }
+    assert_eq!(
+        service
             .prepare_launch(
-                &request(AgentId::Claude, EnvId::Docker, Some(profile)),
+                &request(AgentId::Claude, EnvId::Docker, Some("gone")),
                 &host,
                 &fs,
-                "n",
+                "n"
             )
-            .unwrap();
-        assert_eq!(prepared.request.profile, None);
-        assert_eq!(script(&prepared.plan), script(&plain.plan));
-        assert!(!script(&prepared.plan).contains(".claude-team"));
-        let recent = service.record_launch(&prepared.request, at(1));
-        assert_eq!(recent.profile, None);
-        let linker: Box<dyn crate::profiles::Linker> = Box::new(crate::testing::TestLinker);
-        let synced = service.sync_for_launch(&prepared.request, linker.as_ref(), at(1));
-        assert_eq!(synced, Ok(None));
-    }
+            .unwrap_err(),
+        crate::service::PROFILE_MISSING
+    );
+    fs.links.insert(r"C:\Users\max\.claude-solo".into());
+    assert_eq!(
+        service
+            .prepare_launch(
+                &request(AgentId::Claude, EnvId::Docker, Some("solo")),
+                &host,
+                &fs,
+                "n"
+            )
+            .unwrap_err(),
+        "Der Profilordner darf keine Verknüpfung sein."
+    );
+    fs.foreign.insert(r"C:\Users\max\.claude-team".into());
+    assert_eq!(
+        service
+            .prepare_launch(
+                &request(AgentId::Claude, EnvId::Docker, Some("team")),
+                &host,
+                &fs,
+                "n"
+            )
+            .unwrap_err(),
+        "Der Profilordner gehört nicht zu Claude Code."
+    );
 }
 
 #[test]

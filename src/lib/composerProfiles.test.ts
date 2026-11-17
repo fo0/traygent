@@ -13,13 +13,12 @@ const loaded = (change: (snapshot: Snapshot) => void = () => {}) => {
 const ids = (composer: Composer) => composer.profiles.map((p) => p.id);
 
 describe('Composer profile', () => {
-  it('offers „Standard“ and the extra profiles for Claude Code in Lokal only', () => {
+  it('offers „Standard“ and the extra profiles for local and Docker Claude Code', () => {
     const { composer } = loaded();
     expect(composer.profile).toBe('default');
     expect(ids(composer)).toEqual(['default', 'team']);
     composer.selectEnv('docker');
-    expect(ids(composer)).toEqual([]);
-    composer.selectEnv('local');
+    expect(ids(composer)).toEqual(['default', 'team']);
     composer.selectAgent('codex');
     expect(ids(composer)).toEqual([]);
   });
@@ -52,11 +51,13 @@ describe('Composer profile', () => {
     expect(composer.profile).toBe('team');
   });
 
-  it('sends no profile from Docker', () => {
+  it('keeps the selected profile when switching to Docker and back', () => {
     const { composer } = loaded();
     composer.profile = 'team';
     composer.selectEnv('docker');
-    expect(composer.request()).not.toHaveProperty('profile');
+    expect(composer.request().profile).toBe('team');
+    composer.selectEnv('local');
+    expect(composer.request().profile).toBe('team');
   });
 
   it('follows a saved default and a removed profile, keeping other choices', () => {

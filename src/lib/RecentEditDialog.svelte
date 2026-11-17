@@ -25,7 +25,7 @@
   } from './validation';
 
   // „Bearbeiten …“ of a „Workspaces“ row: the options, ports and Docker
-  // socket (Docker), profile (Lokal, an agent with an extra profile) and
+  // socket (Docker), profile (when supported) and
   // „Modell & Denken“ mode its ▶ sends. Staged like the settings;
   // „Speichern“ stores them without a start.
   let {

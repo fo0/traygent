@@ -98,40 +98,37 @@ test('a Docker row stores its Docker socket; a Lokal row has no switch', async (
   ).not.toBeChecked();
 });
 
-test('changes a Lokal row’s profile; a Docker row has none', async ({
-  page,
-}) => {
-  await page.goto('/');
-  const target = row(page, 'traygent');
-  const mark = target.getByRole('img', { name: 'Profil Team' });
-  await expect(mark).toHaveCount(0);
-  const dialog = await openEdit(page, 'traygent');
-  const field = dialog.getByRole('combobox', { name: 'Profil' });
-  await expect(field).toHaveText('Standard');
-  await field.click();
-  const list = dialog.getByRole('listbox', { name: 'Profil' });
-  await expect(list.getByRole('option')).toHaveText(['Standard', 'Team']);
-  await list.getByRole('option', { name: 'Team' }).click();
-  await dialog.getByRole('button', { name: 'Speichern' }).click();
-  await expect(dialog).toBeHidden();
-  await expect(mark).toBeVisible();
-  // Back to „Standard“: the mark goes.
-  const again = await openEdit(page, 'traygent');
-  await expect(again.getByRole('combobox', { name: 'Profil' })).toHaveText(
-    'Team',
-  );
-  // A still-listed profile opens clean.
-  await expect(
-    again.getByRole('button', { name: 'Speichern' }),
-  ).toHaveAttribute('aria-disabled', 'true');
-  await again.getByRole('combobox', { name: 'Profil' }).click();
-  await again.getByRole('option', { name: 'Standard' }).click();
-  await again.getByRole('button', { name: 'Speichern' }).click();
-  await expect(again).toBeHidden();
-  await expect(mark).toHaveCount(0);
-  const docker = await openEdit(page, 'kunden-portal');
-  await expect(docker.getByRole('combobox', { name: 'Profil' })).toHaveCount(0);
-});
+for (const name of ['traygent', 'kunden-portal'])
+  test(`changes the Claude workspace profile for ${name}`, async ({ page }) => {
+    await page.goto('/');
+    const target = row(page, name);
+    const mark = target.getByRole('img', { name: 'Profil Team' });
+    await expect(mark).toHaveCount(0);
+    const dialog = await openEdit(page, name);
+    const field = dialog.getByRole('combobox', { name: 'Profil' });
+    await expect(field).toHaveText('Standard');
+    await field.click();
+    const list = dialog.getByRole('listbox', { name: 'Profil' });
+    await expect(list.getByRole('option')).toHaveText(['Standard', 'Team']);
+    await list.getByRole('option', { name: 'Team' }).click();
+    await dialog.getByRole('button', { name: 'Speichern' }).click();
+    await expect(dialog).toBeHidden();
+    await expect(mark).toBeVisible();
+    // Back to „Standard“: the mark goes.
+    const again = await openEdit(page, name);
+    await expect(again.getByRole('combobox', { name: 'Profil' })).toHaveText(
+      'Team',
+    );
+    // A still-listed profile opens clean.
+    await expect(
+      again.getByRole('button', { name: 'Speichern' }),
+    ).toHaveAttribute('aria-disabled', 'true');
+    await again.getByRole('combobox', { name: 'Profil' }).click();
+    await again.getByRole('option', { name: 'Standard' }).click();
+    await again.getByRole('button', { name: 'Speichern' }).click();
+    await expect(again).toBeHidden();
+    await expect(mark).toHaveCount(0);
+  });
 
 const STALE: [string, (snapshot: Snapshot) => string[]][] = [
   [
@@ -256,11 +253,15 @@ test('natively: a row set to „Agent“ starts with keepAgentModel', async ({
   expect(request.options).toEqual(notes.options);
 });
 
-test('natively: a Docker row with the socket starts with dockerSocket', async ({
+test('natively: a Docker row restarts with its stored socket and Claude profile', async ({
   page,
 }) => {
   const snapshot = nativeSnapshot();
-  const infra = snapshot.recents.find((r) => r.dockerSocket)!;
+  const workspace = snapshot.recents.find(
+    (r) => r.agent === 'claude' && r.env === 'docker',
+  )!;
+  workspace.dockerSocket = true;
+  workspace.profile = 'team';
   await installTauriMock<Snapshot, Record<string, never>>(
     page,
     (snapshot) => async (cmd) => {
@@ -275,11 +276,15 @@ test('natively: a Docker row with the socket starts with dockerSocket', async ({
     { arg: snapshot, state: {} },
   );
   await page.goto('/');
-  await row(page, 'terraform-module')
+  await row(page, 'kunden-portal')
     .getByRole('button', { name: /starten$/ })
     .click();
   const [call] = await readCalls(page, 'launch_session');
   const request = call?.args?.request as LaunchRequest;
-  expect(request).toMatchObject({ env: 'docker', dockerSocket: true });
-  expect(request.folder).toBe(infra.folder);
+  expect(request).toMatchObject({
+    env: 'docker',
+    profile: 'team',
+    dockerSocket: true,
+    folder: workspace.folder,
+  });
 });

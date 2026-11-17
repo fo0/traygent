@@ -8,8 +8,11 @@ use crate::models::{AgentId, ProfileShare};
 pub trait Fs: Sync {
     fn is_file(&self, path: &str) -> bool;
     fn is_dir(&self, path: &str) -> bool;
+    fn is_link(&self, path: &str) -> bool;
     /// Creates `path` and its missing parents (the clone root before a `git clone`).
     fn create_dir_all(&self, path: &str) -> std::io::Result<()>;
+    /// Ensure the single-file bind source exists before Docker can create a directory there.
+    fn ensure_json_file(&self, path: &str) -> std::io::Result<()>;
     /// Whether the agent's profile directory `dir` exists and is someone else's (or that
     /// cannot be told): no sign-in may write into it
     /// ([`crate::profiles::sync::refuses_sign_in`]).
@@ -39,8 +42,26 @@ impl Fs for RealFs {
         std::path::Path::new(path).is_dir()
     }
 
+    fn is_link(&self, path: &str) -> bool {
+        std::fs::symlink_metadata(path).is_ok_and(|meta| meta.file_type().is_symlink())
+    }
+
     fn create_dir_all(&self, path: &str) -> std::io::Result<()> {
         std::fs::create_dir_all(path)
+    }
+
+    fn ensure_json_file(&self, path: &str) -> std::io::Result<()> {
+        use std::io::Write;
+        match std::fs::File::create_new(path) {
+            Ok(mut file) => file.write_all(b"{}"),
+            Err(e)
+                if e.kind() == std::io::ErrorKind::AlreadyExists
+                    && std::fs::metadata(path)?.is_file() =>
+            {
+                Ok(())
+            }
+            Err(e) => Err(e),
+        }
     }
 
     fn refuses_sign_in(
@@ -75,6 +96,9 @@ pub struct Host {
     pub program_files: Option<String>,
     pub system_root: Option<String>,
     pub codex_install_dir: Option<String>,
+    pub codex_home: Option<String>,
+    pub claude_config_dir: Option<String>,
+    pub traygent_exe: Option<String>,
 }
 
 impl Host {
@@ -92,6 +116,11 @@ impl Host {
             program_files: var("ProgramFiles"),
             system_root: var("SystemRoot"),
             codex_install_dir: var("CODEX_INSTALL_DIR"),
+            codex_home: var("CODEX_HOME"),
+            claude_config_dir: var("CLAUDE_CONFIG_DIR"),
+            traygent_exe: std::env::current_exe()
+                .ok()
+                .and_then(|path| path.into_os_string().into_string().ok()),
         }
     }
 

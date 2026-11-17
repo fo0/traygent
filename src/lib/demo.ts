@@ -155,6 +155,14 @@ export function createDemoBridge(latency = 150, detection = 600): DemoBridge {
         launchPortsProblem(request) ||
         launchProfileProblem(data, request);
       if (problem) throw new Error(problem);
+      if (
+        request.env === 'docker' &&
+        data.settings.docker.ghToken &&
+        !data.github.account
+      )
+        throw new Error(
+          'Für die Token-Weitergabe bitte unter GitHub ein Konto verbinden oder „GitHub-Token weitergeben“ ausschalten.',
+        );
       // Every demo folder exists: a repository start reuses the folder it
       // brings (a recent's restart), else starts in its clone folder, as
       // natively; nothing clones.
@@ -162,7 +170,7 @@ export function createDemoBridge(latency = 150, detection = 600): DemoBridge {
         data.settings.github.cloneRoot.trim() || data.github.defaultCloneRoot;
       const folder = repo && !given ? cloneFolder(root, repo) : request.folder;
       // Normalized like natively: the recent stores what the start published
-      // (no profile outside Lokal or for „Standard“).
+      // and the selected profile („Standard“ is omitted).
       const ports = normalizePorts(request.ports);
       const { profile: wanted, ...rest } = request;
       const profile = editedProfile(

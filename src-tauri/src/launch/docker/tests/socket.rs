@@ -44,7 +44,10 @@ fn the_init_block_runs_first_and_the_agent_last() {
         let block = &init[..init.len() - plain.len()];
         // The CLI install only warns: a session without docker still starts.
         assert!(!block.contains("exit"), "{block}");
-        assert!(block.ends_with("export PATH=\"/home/node/.local/bin:$PATH\"\n"));
+        assert!(
+            !block.contains("export PATH="),
+            "root keeps the image toolchain"
+        );
     }
 }
 

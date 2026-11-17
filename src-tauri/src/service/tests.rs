@@ -421,7 +421,7 @@ fn a_detected_cli_wins_and_a_rejected_v1_is_skipped() {
 }
 
 #[test]
-fn docker_launches_resolve_docker_gh_and_the_gitconfig() {
+fn docker_launches_use_the_connected_account_and_the_gitconfig() {
     let dir = TempDir::new("service-docker");
     let mut service = Service::open(&dir.0);
     let mut settings = AppSettings {
@@ -432,16 +432,29 @@ fn docker_launches_resolve_docker_gh_and_the_gitconfig() {
     settings.agents.get_mut(AgentId::Claude).permission = PermissionId::Ask;
     service.save_settings(settings).unwrap();
     let host = windows_host();
-    let gh = r"C:\Program Files\GitHub CLI\gh.exe";
     let gitconfig = r"C:\Users\max\.gitconfig";
-    let fs = FakeFs::with(&[DOCKER, gh, gitconfig]).dir(r"C:\x");
+    let fs = FakeFs::with(&[DOCKER, gitconfig]).dir(r"C:\x");
     let mut req = request(AgentId::Claude, EnvId::Docker, r"C:\x");
     req.options = service.settings().agents.claude.clone();
+    assert_eq!(
+        service
+            .prepare_launch(&req, &host, &fs, "n0nce1")
+            .unwrap_err(),
+        crate::github::docker::NO_ACCOUNT
+    );
+    service.connect_github(
+        crate::models::GithubAccount {
+            login: "fixture".into(),
+            id: 42,
+            source: crate::models::GithubSource::Token,
+        },
+        &crate::github::NoVault,
+    );
     let prepared = service.prepare_launch(&req, &host, &fs, "n0nce1").unwrap();
     assert_eq!(prepared.fallback, None);
     let script = script(&prepared.plan);
     assert!(script.contains(&format!("& '{DOCKER}' 'run'")));
-    assert!(script.contains(&format!("(& '{gh}' auth token 2>$null)")));
+    assert!(script.contains("'--docker-github-token' '42'"));
     assert!(script.contains(&format!("'{gitconfig}:/home/node/.gitconfig:ro'")));
     assert!(script.contains("'--name' 'traygent-claude-x-"));
     assert!(script.contains("-n0nce1'"));

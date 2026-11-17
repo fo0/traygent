@@ -19,7 +19,7 @@ required-features = ["desktop"]
 [features]
 default = []
 # The Windows tray shell; pulls the update client in.
-desktop = ["dep:tauri", "dep:tauri-build", "dep:tauri-plugin-dialog", "dep:tauri-plugin-opener", "dep:tauri-plugin-single-instance", "dep:tauri-plugin-updater", "dep:windows-sys", "dep:winreg", "updates", "vault"]
+desktop = ["dep:tauri", "dep:tauri-build", "dep:tauri-plugin-dialog", "dep:tauri-plugin-opener", "dep:tauri-plugin-single-instance", "dep:tauri-plugin-updater", "dep:dirs", "dep:windows-sys", "dep:winreg", "updates", "vault"]
 # In-app updates: release check, installer download and verification.
 updates = ["dep:reqwest", "dep:semver"]
 # The GitHub token in the OS credential vault (Windows Credential Manager); never a
@@ -57,5 +57,6 @@ opt-level = "s"
 strip = true
 
 [target.'cfg(windows)'.dependencies]
+dirs = { version = "7", optional = true }
 winreg = { version = "0.56", optional = true }
-windows-sys = { version = "0.61", optional = true, features = ["Win32_Foundation", "Win32_Graphics_Gdi", "Win32_UI_HiDpi", "Win32_UI_Input_KeyboardAndMouse", "Win32_UI_WindowsAndMessaging"] }
+windows-sys = { version = "0.61", optional = true, features = ["Win32_Foundation", "Win32_Graphics_Gdi", "Win32_Storage_FileSystem", "Win32_UI_HiDpi", "Win32_UI_Input_KeyboardAndMouse", "Win32_UI_WindowsAndMessaging"] }

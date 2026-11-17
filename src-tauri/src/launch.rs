@@ -60,10 +60,12 @@ pub struct Resolved {
     /// The local CLI of the requested agent.
     pub cli: Option<Candidate>,
     pub docker: Option<String>,
-    /// gh.exe, only consulted when `docker.ghToken` is on.
-    pub gh: Option<String>,
+    /// Absolute path of this Traygent executable, which supplies the selected vault entry.
+    pub traygent_exe: Option<String>,
+    pub github_account_id: Option<u64>,
     /// The host `.gitconfig`, only when it exists as a file.
     pub gitconfig: Option<String>,
+    pub docker_home: Option<docker::AgentHome>,
     /// git.exe, only resolved when a repository start has to clone first.
     pub git: Option<String>,
     pub powershell: String,
@@ -71,7 +73,7 @@ pub struct Resolved {
     pub wt: Option<String>,
     /// Short random suffix for the container name.
     pub nonce: String,
-    /// The config directory of the requested profile (local starts); `None` = the default
+    /// The config directory of the requested extra profile; `None` = the default
     /// profile, the CLI's own home.
     pub profile_dir: Option<String>,
 }
@@ -159,6 +161,13 @@ fn build(
         .then(|| agents::opencode_config(&options))
         .flatten();
     let argv = agents::args(agent, request.env, &options, request.session, extra);
+    let wanted = request
+        .profile
+        .as_deref()
+        .is_some_and(|id| id != crate::models::DEFAULT_PROFILE);
+    if wanted != resolved.profile_dir.is_some() {
+        return Err(PROFILE_UNRESOLVED.into());
+    }
     match request.env {
         EnvId::Local => {
             let cli = resolved
@@ -177,11 +186,6 @@ fn build(
                 script.push(set_env_base64("OPENCODE_CONFIG_CONTENT", config));
             }
             let profiled = !settings.profiles.get(agent).is_empty();
-            let wanted = request.profile.as_deref();
-            let extra = wanted.is_some_and(|id| id != crate::models::DEFAULT_PROFILE);
-            if extra != resolved.profile_dir.is_some() {
-                return Err(PROFILE_UNRESOLVED.into());
-            }
             script.extend(profile_env(agent, resolved, profiled)?);
             if agent == AgentId::Claude {
                 // Claude Code would replace the title with its own.
@@ -211,7 +215,27 @@ fn build(
             )?;
             script.extend(run.env);
             let mut call = run.fetch;
-            call.push(invoke(docker, &run.args));
+            let profile_mounts = resolved
+                .docker_home
+                .as_ref()
+                .and_then(|home| home.profile_mounts(&settings.profile_share.claude));
+            if wanted != profile_mounts.is_some()
+                || (wanted
+                    && resolved.docker_home.as_ref().map(|home| &home.directory)
+                        != resolved.profile_dir.as_ref())
+            {
+                return Err(PROFILE_UNRESOLVED.into());
+            }
+            if let Some(mounts) = profile_mounts {
+                script.push(mounts);
+                call.push(format!(
+                    "& {} 'run' @tgProfileMounts{}",
+                    ps_literal(docker),
+                    quote::literal_args(&run.args[1..])
+                ));
+            } else {
+                call.push(invoke(docker, &run.args));
+            }
             // The token leaves the session however docker ends, also on Ctrl+C or an error.
             script.push(run_agent(label, &call, &run.cleanup));
         }
