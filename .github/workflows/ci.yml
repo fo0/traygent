@@ -1,7 +1,7 @@
 name: CI
 on:
   pull_request:
-  # Release runs this first for the commit it publishes.
+  # Desktop Release runs this first for the commit it publishes.
   workflow_call:
 permissions:
   contents: read
@@ -12,7 +12,7 @@ concurrency:
 jobs:
   changes:
     # Pull requests run the Rust and Windows jobs only when they touch what those jobs
-    # check. Release runs always check everything.
+    # check. Desktop Release runs always check everything.
     runs-on: ubuntu-latest
     timeout-minutes: 5
     permissions:
@@ -32,7 +32,7 @@ jobs:
           fi
           files=$(gh api --paginate "repos/$GITHUB_REPOSITORY/pulls/$PR_NUMBER/files" --jq '.[] | .filename, (.previous_filename // empty)')
           touches() { grep -qE "$1" <<< "$files" && echo true || echo false; }
-          # release:test reads scripts/ and release.yml.
+          # release:test reads scripts/ and desktop-release.yml.
           echo "rust=$(touches '^(src-tauri/|fixtures/|\.github/workflows/ci\.yml$)')" >> "$GITHUB_OUTPUT"
           echo "desktop=$(touches '^(src-tauri/|fixtures/|scripts/|\.github/workflows/|package\.json$|pnpm-lock\.yaml$|pnpm-workspace\.yaml$|\.node-version$)')" >> "$GITHUB_OUTPUT"
   panel:
@@ -109,7 +109,7 @@ jobs:
           save-if: ${{ github.ref == 'refs/heads/main' }}
       - run: pnpm install --frozen-lockfile
       # Lint and icon bytes are platform-independent and run in `panel`. The release
-      # tests execute release.yml's PowerShell blocks, which publish from Windows.
+      # tests execute desktop-release.yml's PowerShell blocks, which publish from Windows.
       - run: pnpm release:test
       # The desktop crate embeds dist/ at compile time.
       - run: pnpm build

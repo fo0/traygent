@@ -13,7 +13,7 @@ cargo clippy --locked --manifest-path src-tauri/Cargo.toml --features updates --
 
 `pnpm verify` runs formatting, ESLint, the icon byte check, Svelte/TypeScript diagnostics, frontend unit tests, release-helper tests and the production frontend build. Browser tests use the labelled browser demo and a labelled native IPC mock. Rust tests exercise the IPC model, update policy, installer verification, startup rules, popup geometry, the folder-field classification, the GitHub account and listing flow (gh, HTTP and the OS vault faked) and the profile sync on a temp directory through a test linker (symbolic links; on Windows `symlink_dir`, which needs Developer Mode or admin rights, [backlog](../BACKLOG.md) #60); one Windows-only test creates real junctions through Windows PowerShell.
 
-The Windows CI job additionally compiles the actual desktop shell and tests the Win32 popup and the autostart registry adapter in an isolated test subkey (never the real login Run key). See [Windows autostart behavior and acceptance](WINDOWS_AUTOSTART.md). Normal checks skip installer packaging; Release or an explicit manual installer request performs the NSIS build. CI results apply to the exact tested commit, not to later changes. See [release process](RELEASES.md).
+The Windows CI job additionally compiles the actual desktop shell and tests the Win32 popup and the autostart registry adapter in an isolated test subkey (never the real login Run key). See [Windows autostart behavior and acceptance](WINDOWS_AUTOSTART.md). Normal checks skip installer packaging; Desktop Release or an explicit manual installer request performs the NSIS build. CI results apply to the exact tested commit, not to later changes. See [release process](RELEASES.md).
 
 ## Test boundaries
 
