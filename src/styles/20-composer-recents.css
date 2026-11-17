@@ -79,6 +79,9 @@
   min-height: 30px;
   padding: 0 10px;
 }
+.composer-actions:has(.profile-chip):has(.ports-chip) .composer-start {
+  padding-inline: 5px;
+}
 
 /* Footer: the Docker probe next to Demo/Lokal. */
 .docker-state {
