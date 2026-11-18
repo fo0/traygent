@@ -113,16 +113,44 @@ fn a_request_and_its_resolved_directory_must_agree() {
 }
 
 #[test]
-fn a_docker_start_never_carries_the_profile() {
-    let plain = request(AgentId::Claude, EnvId::Docker, r"C:\Code\demo");
-    let expected = script(&plan(&plain, &profiled(), &resolved(None)).unwrap());
-    // Whatever arrives: the container's own home is used.
-    for resolved in [resolved(None), in_profile(TEAM_DIR)] {
-        let docker = plan(&team_request(EnvId::Docker), &profiled(), &resolved).unwrap();
-        assert_eq!(script(&docker), expected);
-        assert!(!script(&docker).contains(".claude-team"));
-        assert!(!script(&docker).contains("Env:CLAUDE_CONFIG_DIR"));
-    }
+fn docker_requires_the_selected_profiles_home_and_keeps_ambient_auth_out() {
+    let request = team_request(EnvId::Docker);
+    assert_eq!(
+        plan(&request, &profiled(), &resolved(None)),
+        Err(PROFILE_UNRESOLVED.into())
+    );
+    let mut selected = in_profile(TEAM_DIR);
+    let home = selected.docker_home.as_mut().unwrap();
+    home.directory = TEAM_DIR.into();
+    home.claude_state = None;
+    home.shared_from = Some(r"C:\Users\Max O'Neil\.claude".into());
+    let text = script(&plan(&request, &profiled(), &selected).unwrap());
+    assert!(text.contains(r"C:\Users\Max O''Neil\.claude-team:/home/node/.claude:rw"));
+    assert!(text.contains("@tgProfileMounts"));
+    assert!(!text.contains("'-e' 'ANTHROPIC_API_KEY'"));
+    assert!(!text.contains("'-e' 'CLAUDE_CODE_OAUTH_TOKEN'"));
+    assert!(!text.contains(".claude.json:rw"));
+    assert!(env_value(&text, "TRAYGENT_INIT")
+        .unwrap()
+        .contains("unset ANTHROPIC_API_KEY ANTHROPIC_AUTH_TOKEN CLAUDE_CODE_OAUTH_TOKEN"));
+
+    let mut request = request;
+    request.repo = Some(crate::models::RepoRef {
+        owner: "fixture".into(),
+        name: "demo".into(),
+    });
+    request.docker_socket = true;
+    let mut settings = profiled();
+    settings.docker.gh_token = true;
+    selected.git = Some(r"C:\Program Files\Git\cmd\git.exe".into());
+    let plan = clone_plan(
+        &request,
+        &settings,
+        &selected,
+        r"C:\Users\Max O'Neil\Traygent",
+    )
+    .unwrap();
+    assert!(plan.args.last().unwrap().len() <= MAX_ENCODED_CHARS);
 }
 
 #[test]

@@ -2,8 +2,7 @@
 //! options and the exit handling around the agent call (docs/SPEC.md → Launch rules).
 use super::*;
 
-const DOCKER: &str = "C:\\Program Files\\Docker\\Docker\\resources\\bin\\docker.exe";
-const GH: &str = r"C:\Program Files\GitHub CLI\gh.exe";
+const TRAYGENT: &str = r"C:\Program Files\Traygent\traygent.exe";
 const EXIT: &str =
     "if (-not $tgFailed -and ($null -eq $tgCode -or $tgCode -in 0,130,-1073741510)) \
                     { [Environment]::Exit(0) }";
@@ -203,8 +202,7 @@ fn a_local_start_closes_after_a_normal_end_only() {
 fn a_docker_start_drops_the_token_before_it_closes() {
     let mut settings = console();
     settings.docker.gh_token = true;
-    let mut found = resolved(None);
-    found.gh = Some(GH.into());
+    let found = resolved(None);
     let plan = plan(
         &request(AgentId::Claude, EnvId::Docker, r"C:\Code\demo"),
         &settings,
@@ -216,9 +214,9 @@ fn a_docker_start_drops_the_token_before_it_closes() {
         .split_once("; $tgCode=$null; $tgFailed=$false; try { ")
         .unwrap();
     assert!(rest.starts_with(&format!(
-        "$env:GH_TOKEN=(& '{GH}' auth token 2>$null); & '{DOCKER}' 'run' "
+        "$env:GH_TOKEN=(& '{TRAYGENT}' '--docker-github-token' '42' 2>$null | Out-String).Trim(); if ($LASTEXITCODE"
     )));
-    // gh's exit code is overwritten by docker's before it is read.
+    // The vault helper's status is checked before the docker invocation.
     assert!(rest.contains(
         "'--allow-dangerously-skip-permissions'; $tgCode=$LASTEXITCODE } catch { $tgFailed=$true; throw } "
     ));

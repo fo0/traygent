@@ -23,7 +23,12 @@ pub fn ps_literal(text: &str) -> String {
 
 /// `& '<program>' '<arg>' …` — the call operator with every part a literal.
 pub fn invoke(program: &str, args: &[String]) -> String {
-    let mut line = format!("& {}", ps_literal(program));
+    format!("& {}{}", ps_literal(program), literal_args(args))
+}
+
+/// Every argv element as one PowerShell literal, preceded by a space.
+pub fn literal_args(args: &[String]) -> String {
+    let mut line = String::new();
     for arg in args {
         line.push(' ');
         line.push_str(&ps_literal(arg));

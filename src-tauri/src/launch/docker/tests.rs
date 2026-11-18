@@ -5,8 +5,18 @@ use crate::models::{EnvId, PermissionId, SessionMode, TerminalId};
 
 mod socket;
 
+#[test]
+fn a_codex_shim_must_run_before_it_can_skip_installation() {
+    let init = init_script(AgentId::Codex, false);
+    let (before, after) = init
+        .split_once("npm install -g --include=optional @openai/codex@latest || exit 1")
+        .unwrap();
+    assert!(before.contains("if ! runuser -u node -- /home/node/.local/bin/codex --version"));
+    let (after_install, _) = after.split_once("if ! codex_login status").unwrap();
+    assert!(after_install.contains("runuser -u node -- /home/node/.local/bin/codex --version ||"));
+}
+
 const DOCKER: &str = "C:\\Program Files\\Docker\\Docker\\resources\\bin\\docker.exe";
-const GH: &str = r"C:\Program Files\GitHub CLI\gh.exe";
 
 fn console() -> AppSettings {
     AppSettings {
@@ -74,24 +84,28 @@ fn init_scripts_are_lf_only_and_end_in_the_cli() {
     for (agent, last) in [
         (
             AgentId::Claude,
-            "exec runuser -u node -- /home/node/.local/bin/claude \"$@\"\n",
+            "exec runuser -u node -- env PATH=\"/home/node/.local/bin:$PATH\" /home/node/.local/bin/claude \"$@\"\n",
         ),
         (
             AgentId::Opencode,
-            "exec runuser -u node -- /home/node/.opencode/bin/opencode --standalone \"$@\"\n",
+            "exec runuser -u node -- env PATH=\"/home/node/.local/bin:$PATH\" /home/node/.opencode/bin/opencode --standalone \"$@\"\n",
         ),
         (
             AgentId::Codex,
-            "exec runuser -u node -- /home/node/.local/bin/codex \"$@\"\n",
+            "exec runuser -u node -- env PATH=\"/home/node/.local/bin:$PATH\" /home/node/.local/bin/codex -c \"sqlite_home=$CODEX_SQLITE_HOME\" \"$@\"\n",
         ),
     ] {
         let script = init_script(agent, false);
         assert!(!script.contains('\r'));
         assert!(script.ends_with(last), "{agent:?}");
     }
-    let claude = init_script(AgentId::Claude, false);
-    assert!(claude.contains("-mmin +60 -exec rm -rf {} +"));
-    assert!(claude.contains("ln -s \"$V/config\" /home/node/.claude"));
+    for agent in [AgentId::Claude, AgentId::Codex] {
+        let init = init_script(agent, false);
+        assert!(!init.contains("rm -rf"));
+        for chown in init.lines().filter(|line| line.starts_with("chown -R ")) {
+            assert!(!chown.contains("/.claude") && !chown.contains("/.codex"));
+        }
+    }
 }
 
 #[cfg(unix)]
@@ -118,7 +132,7 @@ fn init_scripts_and_loader_are_valid_bash() {
 }
 
 #[test]
-fn claude_reuses_the_starter_volumes_and_project_dir() {
+fn claude_mounts_the_host_config_and_state_and_reuses_the_tools_and_project_dir() {
     let mut req = request(AgentId::Claude, EnvId::Docker, r"C:\Code\RepoWatch");
     req.options.permission = PermissionId::Bypass;
     req.options.model = "opus[1m]".into();
@@ -140,17 +154,25 @@ fn claude_reuses_the_starter_volumes_and_project_dir() {
         "--name",
         "traygent-claude-repowatch-7a494d81-a1b2c3",
         "-v",
-        r"C:\Code\RepoWatch:/workspace",
+        r"C:\Code\RepoWatch:/workspace/repowatch-7a494d81",
+        "-w",
+        "/workspace/repowatch-7a494d81",
         "-v",
-        "claude-code-config:/home/node/.claude-volume",
+        r"C:\Agent Home:/home/node/.claude:rw",
+        "-v",
+        r"C:\Users\Max\.claude.json:/home/node/.claude/.claude.json:rw",
         "-v",
         "claude-code-tools:/home/node/.local",
         "-e",
         "HOME=/home/node",
         "-e",
-        "CLAUDE_CONFIG_DIR=/home/node/.claude-volume/config",
+        "CLAUDE_CONFIG_DIR=/home/node/.claude",
         "-e",
-        "PATH=/home/node/.local/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin",
+        "ANTHROPIC_API_KEY",
+        "-e",
+        "CLAUDE_CODE_OAUTH_TOKEN",
+        "-e",
+        "PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin",
         "-e",
         "CLAUDE_CODE_PROJECT_DIR_NAME=repowatch-7a494d81",
         "-e",
@@ -171,8 +193,6 @@ fn claude_reuses_the_starter_volumes_and_project_dir() {
         "TERM=xterm-256color",
         "-e",
         "COLORTERM=truecolor",
-        "-w",
-        "/workspace",
         "node:22-trixie",
         "bash",
         "-c",
@@ -220,7 +240,7 @@ fn opencode_mounts_per_project_and_forwards_its_config_name_only() {
 }
 
 #[test]
-fn codex_gets_its_own_volumes_and_the_container_permission_mapping() {
+fn codex_mounts_the_host_home_and_uses_the_container_permission_mapping() {
     let mut req = request(AgentId::Codex, EnvId::Docker, r"C:\Code\RepoWatch");
     req.options.permission = PermissionId::Ask;
     req.session = SessionMode::Resume;
@@ -230,9 +250,13 @@ fn codex_gets_its_own_volumes_and_the_container_permission_mapping() {
     let joined = args.join(" ");
     assert!(joined.starts_with("run --rm -it --init --security-opt no-new-privileges --name "));
     assert!(joined.contains(
-        "-v traygent-codex-tools:/home/node/.local -v traygent-codex-home:/home/node/.codex"
+        r"-v traygent-codex-tools:/home/node/.local -v C:\Agent Home:/home/node/.codex:rw -e CODEX_HOME=/home/node/.codex"
     ));
     assert!(joined.contains("-e OPENAI_API_KEY"));
+    assert!(joined.contains("--tmpfs /home/node/.codex/tmp:rw,exec,nosuid,nodev,mode=0700"));
+    assert!(init_script(AgentId::Codex, false)
+        .contains("chown node:node /home/node/.codex/tmp || exit 1"));
+    assert!(joined.contains("-e CODEX_SQLITE_HOME=/home/node/.local/share/traygent-codex/sqlite"));
     assert!(joined.contains(
         "ghcr.io/me/codex:1 bash -c printenv TRAYGENT_INIT >/tmp/traygent-init.sh && . /tmp/traygent-init.sh traygent resume --sandbox danger-full-access --ask-for-approval on-request"
     ));
@@ -252,44 +276,29 @@ fn the_host_gitconfig_is_mounted_read_only_only_when_it_exists() {
 }
 
 #[test]
-fn the_gh_token_is_fetched_in_the_session_and_forwarded_name_only() {
+fn the_selected_account_token_is_fetched_in_the_session_and_forwarded_name_only() {
     let req = request(AgentId::Codex, EnvId::Docker, r"C:\x");
     let mut settings = console();
     settings.docker.gh_token = true;
     let mut found = resolved(None);
-    found.gh = Some(GH.into());
-    let plan = plan(&req, &settings, &found).unwrap();
-    let text = script(&plan);
-    // Fetch and call share one try; the token leaves the session however docker ends (S10),
-    // before a normal end closes the terminal. The exit code is docker's, not gh's.
-    assert!(text.contains(&format!(
-        "; try {{ $env:GH_TOKEN=(& '{GH}' auth token 2>$null); & '{DOCKER}' 'run' "
-    )));
-    assert_eq!(env_value(&text, "GIT_CONFIG_VALUE_2").unwrap(), GIT_HELPER);
-    assert!(text.contains(
-        "'approvals_reviewer=auto_review'; $tgCode=$LASTEXITCODE } catch { $tgFailed=$true; throw } \
-         finally { [Environment]::SetEnvironmentVariable('GH_TOKEN', $null); if (-not $tgFailed"
-    ));
-    assert_eq!(text.matches("try {").count(), 1);
-    assert_eq!(text.matches("$tgCode=$LASTEXITCODE").count(), 1);
-    assert_eq!(text.matches("GH_TOKEN=(").count(), 1);
+    let text = script(&plan(&req, &settings, &found).unwrap());
+    assert!(text.contains(r"; try { $env:GH_TOKEN=(& 'C:\Program Files\Traygent\traygent.exe' '--docker-github-token' '42' 2>$null | Out-String).Trim(); if ($LASTEXITCODE -ne 0"));
+    assert!(text.contains("finally { [Environment]::SetEnvironmentVariable('GH_TOKEN', $null)"));
     let args = docker_args(&text);
     let joined = args.join(" ");
-    assert!(joined.contains("-e GIT_CONFIG_COUNT=3"));
-    assert!(joined.contains("-e GIT_CONFIG_KEY_2=credential.https://github.com.helper -e GIT_CONFIG_VALUE_2 -e GH_TOKEN"));
+    assert!(joined.contains("-e GIT_CONFIG_COUNT=4"));
+    assert!(joined.contains(
+        "-e GIT_CONFIG_KEY_2=credential.https://github.com.helper -e GIT_CONFIG_VALUE_2="
+    ));
+    assert!(joined.contains(&format!("-e GIT_CONFIG_KEY_3=credential.https://github.com.helper -e GIT_CONFIG_VALUE_3={GIT_HELPER} -e GH_TOKEN")));
     assert!(!args.iter().any(|arg| arg.starts_with("GH_TOKEN=")));
-    // On but gh missing: a notice, no forwarding.
-    let missing = super::super::plan(&req, &settings, &resolved(None)).unwrap();
-    assert!(script(&missing).contains("gh nicht gefunden"));
-    assert!(!script(&missing).contains("Remove-Item"));
-    assert!(docker_args(&script(&missing)).contains(&"GIT_CONFIG_COUNT=2".to_string()));
-    // A relative gh path counts as not found.
-    let mut relative = resolved(None);
-    relative.gh = Some("gh.exe".into());
-    let relative = super::super::plan(&req, &settings, &relative).unwrap();
-    assert!(script(&relative).contains("gh nicht gefunden"));
-    // Off: gh is never called.
-    let off = super::super::plan(&req, &console(), &found).unwrap();
+    assert!(!text.contains("gh.exe"));
+    found.github_account_id = None;
+    assert_eq!(
+        plan(&req, &settings, &found).unwrap_err(),
+        crate::github::docker::NO_ACCOUNT
+    );
+    let off = plan(&req, &console(), &found).unwrap();
     assert!(!script(&off).contains("GH_TOKEN"));
 }
 
@@ -330,7 +339,7 @@ fn a_drive_root_mounts_without_a_trailing_backslash_problem() {
         )
         .unwrap(),
     ));
-    assert!(args.contains(&r"C:\:/workspace".to_string()));
+    assert!(args.contains(&format!(r"C:\:/workspace/{}", project_dir_name(r"C:\"))));
     assert!(args.contains(&format!(
         "CLAUDE_CODE_PROJECT_DIR_NAME={}",
         project_dir_name(r"C:\")

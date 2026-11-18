@@ -23,7 +23,7 @@ const PROFILE_DIR_FAILED: &str = "Der Profilordner konnte nicht angelegt werden.
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct Prepared {
     /// Normalized: the folder (derived for a repository start), options, ports, repo,
-    /// profile (none for the default one and outside the local environment) and Docker
+    /// profile (none for the default account) and Docker
     /// socket (false outside Docker).
     pub request: LaunchRequest,
     pub plan: LaunchPlan,
@@ -83,11 +83,22 @@ impl Service {
         let mut resolved = self.resolve(request.agent, request.env, clone, host, fs, nonce);
         resolved.profile_dir = profile_dir(request.agent, request.profile.as_deref(), host)?;
         let settings = &self.state.settings;
+        if request.env == EnvId::Docker {
+            resolved.docker_home = launch::docker::AgentHome::resolve(
+                request.agent,
+                host,
+                settings,
+                request.profile.as_deref(),
+            )?;
+        }
         let build = |resolved: &Resolved| match &target.clone_root {
             Some(root) => launch::clone_plan(&request, settings, resolved, root),
             None => launch::plan(&request, settings, resolved),
         };
         let plan = build(&resolved)?;
+        if let Some(home) = &resolved.docker_home {
+            home.prepare(fs, &settings.profile_share.claude)?;
+        }
         let fallback = (plan.terminal == TerminalId::WindowsTerminal)
             .then(|| build(&console_only(resolved)).ok())
             .flatten();
@@ -134,8 +145,7 @@ impl Service {
         Ok(Target { folder, clone_root })
     }
 
-    /// The profile a start uses: none for the default one and for every environment but the
-    /// local one (a container has its own home). Any other must be one of the agent's
+    /// The profile a start uses: none for the default account. Any other must be one of the agent's
     /// profiles — a recent whose profile was removed does not start. „Bearbeiten …“ of a recent
     /// stores its profile by the same rule.
     pub(super) fn launch_profile(
@@ -147,7 +157,9 @@ impl Service {
         let wanted = profile
             .map(str::trim)
             .filter(|id| !id.is_empty() && *id != DEFAULT_PROFILE);
-        let Some(id) = wanted.filter(|_| env == EnvId::Local) else {
+        let Some(id) =
+            wanted.filter(|_| env == EnvId::Local || crate::profiles::supported(agent, env))
+        else {
             return Ok(None);
         };
         let listed = self.state.settings.profiles.get(agent);
@@ -314,8 +326,6 @@ impl Service {
                 .filter(exists)
                 .or_else(|| host::first(fs, host::docker_candidates(host)))
         });
-        let gh = (env == EnvId::Docker && settings.docker.gh_token)
-            .then(|| host::first(fs, host::gh_candidates(host)));
         let gitconfig = (env == EnvId::Docker)
             .then(|| host.gitconfig().filter(exists))
             .flatten();
@@ -325,8 +335,10 @@ impl Service {
         Resolved {
             cli: cli.flatten(),
             docker: docker.flatten(),
-            gh: gh.flatten(),
+            traygent_exe: host.traygent_exe.clone(),
+            github_account_id: self.github_account().map(|account| account.id),
             gitconfig,
+            docker_home: None,
             git: git.flatten(),
             powershell: host.powershell(),
             wt: wt.flatten(),

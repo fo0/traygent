@@ -271,15 +271,24 @@ fn the_profile_follows_the_latest_start_and_the_id_ignores_it() {
         (plain.profile.as_deref(), plain.starts, list.len()),
         (None, 3, 1)
     );
-    // Only a local session has one; the default and a malformed id are stored as none.
+    // Docker keeps the same selection; the default and a malformed id are stored as none.
     assert_eq!(
-        upsert(&mut list, &with(Some("team"), EnvId::Docker), at(4)).profile,
-        None
+        upsert(&mut list, &with(Some("team"), EnvId::Docker), at(4))
+            .profile
+            .as_deref(),
+        Some("team")
     );
     for id in ["default", "", "Team", "..\\x", "a b"] {
-        assert_eq!(stored_profile(EnvId::Local, Some(id)), None, "{id}");
+        assert_eq!(
+            stored_profile(AgentId::Claude, EnvId::Local, Some(id)),
+            None,
+            "{id}"
+        );
     }
-    assert_eq!(stored_profile(EnvId::Wsl, Some("team")), None);
+    assert_eq!(
+        stored_profile(AgentId::Claude, EnvId::Wsl, Some("team")),
+        None
+    );
     let mut tampered = team;
     tampered.profile = Some("..\\..\\evil".into());
     assert_eq!(tidy(vec![tampered]).remove(0).profile, None);

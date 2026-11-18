@@ -11,7 +11,7 @@ fn a_file_without_profiles_loads_with_their_defaults() {
             "version": 1,
             "settings": { "terminal": "console", "agentUpdates": true },
             "recents": [{
-                "id": "x", "agent": "claude", "env": "local", "folder": "C:\\Code\\demo",
+                "id": "x", "agent": "claude", "env": "docker", "folder": "C:\\Code\\demo",
                 "options": {}, "lastStartedAt": "2026-11-03T09:00:00Z", "starts": 1
             }]
         })
@@ -64,7 +64,8 @@ fn profiles_and_recent_profiles_load_leniently() {
                 recent("C:\\b", "local", json!("..\\..\\x")),
                 recent("C:\\c", "docker", json!("team")),
                 recent("C:\\d", "local", json!("default")),
-                recent("C:\\e", "local", json!("gone"))
+                recent("C:\\e", "local", json!("gone")),
+                recent("C:\\f", "wsl", json!("team"))
             ]
         })
         .to_string(),
@@ -89,7 +90,7 @@ fn profiles_and_recent_profiles_load_leniently() {
     };
     assert_eq!(by_folder("C:\\a").as_deref(), Some("team"));
     assert_eq!(by_folder("C:\\b"), None, "a malformed id");
-    assert_eq!(by_folder("C:\\c"), None, "a container has its own home");
+    assert_eq!(by_folder("C:\\c").as_deref(), Some("team"));
     assert_eq!(
         by_folder("C:\\d"),
         None,
@@ -97,6 +98,7 @@ fn profiles_and_recent_profiles_load_leniently() {
     );
     // A removed profile stays on the recent; its start says „Profil nicht gefunden.“.
     assert_eq!(by_folder("C:\\e").as_deref(), Some("gone"));
+    assert_eq!(by_folder("C:\\f"), None);
     // What loaded saves and loads again unchanged.
     save(&dir.0, &state).unwrap();
     assert_eq!(load(&dir.0).state, state);

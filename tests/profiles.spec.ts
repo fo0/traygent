@@ -27,15 +27,14 @@ async function openAgents(page: Page) {
   return page.getByRole('dialog', { name: 'Einstellungen' });
 }
 
-test('the „Profil“ chip: Claude Code in Lokal only, for the next start', async ({
+test('the „Profil“ chip follows Claude Code into Docker for the next start', async ({
   page,
 }) => {
   await page.goto('/');
   await expect(chip(page)).toHaveAccessibleName('Profil: Standard');
   await expect(chip(page)).toHaveAttribute('title', /^Profil: Standard/);
   await composer(page).getByRole('radio', { name: 'Docker' }).check();
-  await expect(chip(page)).toHaveCount(0);
-  await composer(page).getByRole('radio', { name: 'Lokal' }).check();
+  await expect(chip(page)).toHaveAccessibleName('Profil: Standard');
   await composer(page).getByRole('radio', { name: 'Codex' }).check();
   await expect(chip(page)).toHaveCount(0);
   await composer(page).getByRole('radio', { name: 'Claude Code' }).check();
@@ -64,13 +63,14 @@ test('the „Profil“ chip: Claude Code in Lokal only, for the next start', asy
   await expect(chip(page)).toHaveAccessibleName('Profil: Standard');
 });
 
-for (const font of LAYOUT_FONTS)
-  test(`the chip keeps one row beside „Starten“ at 480 px in ${font}`, async ({
+for (const font of [undefined, ...LAYOUT_FONTS])
+  test(`the Docker profile chip keeps one row beside „Starten“ at 480 px in ${font ?? 'the system font'}`, async ({
     page,
   }) => {
     await page.setViewportSize({ width: 480, height: 760 });
     await page.goto('/');
-    await pinFont(page, font);
+    if (font) await pinFont(page, font);
+    await composer(page).getByRole('radio', { name: 'Docker' }).check();
     await expect(chip(page)).toBeVisible();
     const tops = await composer(page).evaluate((node) => {
       const parts = [

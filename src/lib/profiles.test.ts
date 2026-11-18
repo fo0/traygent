@@ -173,7 +173,7 @@ describe('profiles of a snapshot', () => {
     expect(defaultProfile(settings, 'claude')).toBe('default');
   });
 
-  it('refuse a start only with a Lokal profile the agent does not list', () => {
+  it('refuse unknown profiles in supported environments', () => {
     const snapshot = demoSnapshot();
     const start = { agent: 'claude' as const, env: 'local' as const };
     expect(launchProfileProblem(snapshot, start)).toBe('');
@@ -189,19 +189,19 @@ describe('profiles of a snapshot', () => {
         profile: 'team',
       }),
     ).toBe('Profil nicht gefunden.');
-    // A container has its own home: any profile is dropped, never refused.
+    // A stale Docker workspace must also surface the removed profile.
     expect(
       launchProfileProblem(snapshot, {
         ...start,
         env: 'docker',
         profile: 'alt',
       }),
-    ).toBe('');
+    ).toBe('Profil nicht gefunden.');
   });
 });
 
 describe('the profile of an edited recent', () => {
-  it('is offered for a Lokal entry of an agent with an extra profile', () => {
+  it('is offered for local and Docker entries of an agent with an extra profile', () => {
     const snapshot = demoSnapshot();
     const items = (
       agent: 'claude' | 'codex',
@@ -212,7 +212,7 @@ describe('the profile of an edited recent', () => {
       { id: 'default', label: 'Standard' },
       { id: 'team', label: 'Team' },
     ]);
-    expect(items('claude', 'docker', 'team')).toEqual([]);
+    expect(items('claude', 'docker', 'team')).toEqual(items('claude', 'local'));
     expect(items('codex', 'local')).toEqual([]);
     snapshot.settings.profiles.claude = [];
     snapshot.profiles = [];
@@ -224,14 +224,16 @@ describe('the profile of an edited recent', () => {
     ]);
   });
 
-  it('is stored as natively: none for „Standard“ and outside Lokal', () => {
+  it('is stored as natively for named and default profiles', () => {
     const { settings } = demoSnapshot();
     expect(editedProfile(settings, 'claude', 'local', ' team ')).toBe('team');
     for (const standard of [undefined, '', '  ', 'default'])
       expect(
         editedProfile(settings, 'claude', 'local', standard),
       ).toBeUndefined();
-    expect(editedProfile(settings, 'claude', 'docker', 'team')).toBeUndefined();
+    expect(editedProfile(settings, 'claude', 'docker', 'team')).toBe('team');
+    expect(editedProfile(settings, 'codex', 'docker', 'team')).toBeUndefined();
+    expect(editedProfile(settings, 'claude', 'wsl', 'team')).toBeUndefined();
     expect(editedProfile(settings, 'claude', 'local', 'gone')).toBeNull();
     expect(editedProfile(settings, 'codex', 'local', 'team')).toBeNull();
   });

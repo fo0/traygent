@@ -3,7 +3,7 @@
 use super::Service;
 use crate::detect::{Fs, Host};
 use crate::launch::{HiddenLogin, LaunchPlan};
-use crate::models::{AgentId, EnvId, LaunchRequest, ProfileStatus};
+use crate::models::{AgentId, LaunchRequest, ProfileStatus};
 use crate::profiles::status::{self, Facts, Key};
 use crate::profiles::{recipe, Homes, Linker, ProfileReport, SyncOutcome, SyncPlan};
 use chrono::{DateTime, Utc};
@@ -199,13 +199,13 @@ impl Service {
         self.apply_profiles(outcome)
     }
 
-    /// The sync before a local start of an agent that has extra profiles: all of that
+    /// The sync before a start of an agent that has extra profiles: all of that
     /// agent's profiles, `None` when there is nothing to sync. `request` is the prepared
     /// one. Run the plan without the service lock, then [`Service::finish_launch_sync`].
     pub fn launch_sync_plan(&self, request: &LaunchRequest) -> Option<SyncPlan> {
         let agent = request.agent;
         let extra = !self.state.settings.profiles.get(agent).is_empty();
-        (request.env == EnvId::Local && recipe(agent).is_some() && extra)
+        (crate::profiles::supported(agent, request.env) && extra)
             .then(|| self.profile_plan().only(agent))
     }
 

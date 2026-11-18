@@ -129,7 +129,7 @@ export interface LaunchRequest {
    * workspace row its stored value; omitted (false) when off.
    */
   dockerSocket?: boolean;
-  /** A profile of the agent (`local` only); omitted for `default`. */
+  /** The selected profile for local or Docker starts; omit for `default`. */
   profile?: string;
 }
 
@@ -180,7 +180,7 @@ export interface EnvStatus {
 export interface DockerSettings {
   /** Base image per agent. */
   images: Record<AgentId, string>;
-  /** Forward the host `gh auth token` name-only as GH_TOKEN. */
+  /** Forward the connected Traygent GitHub account's token as GH_TOKEN. */
   ghToken: boolean;
   /** Ports every new Docker session starts with; the composer can change them per start. */
   ports: string[];

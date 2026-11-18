@@ -54,7 +54,7 @@ export class Composer {
    */
   ports = $state<string[]>([]);
   /**
-   * The agent's profile (Lokal only); from its saved default, back to it
+   * The agent's profile, initialized from its saved default and reset
    * after every start and agent change.
    */
   profile = $state(DEFAULT_PROFILE);
@@ -171,7 +171,7 @@ export class Composer {
     else this.resetPorts();
   }
 
-  /** Whether a start sends the profile: an agent with profiles, Lokal. */
+  /** Whether this agent and environment support the selected profile. */
   get profileApplies() {
     return (
       !!this.#snapshot && profilesApply(this.#snapshot, this.agent, this.env)

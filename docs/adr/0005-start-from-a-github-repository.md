@@ -1,6 +1,6 @@
 # ADR-0005: Start a Session from a GitHub Repository
 
-- **Status:** Accepted; partly superseded — default clone root and the restart folder by [ADR-0006](0006-default-clone-root-in-a-traygent-folder.md)
+- **Status:** Accepted; partly superseded — default clone root and the restart folder by [ADR-0006](0006-default-clone-root-in-a-traygent-folder.md), Docker credential forwarding by [ADR-0012](0012-select-accounts-in-docker-sessions.md)
 - **Date:** 2026-11-04
 - **Decider(s):** owner
 - **Tags:** launch, github, auth, ui
@@ -27,7 +27,7 @@ We will connect **one** GitHub account, ported from RepoWatch: a personal access
 
 - One field for both: paste a path, paste a URL, or type a few letters of a repository name.
 - No clone step outside the terminal: progress, credential prompts and errors are visible where the session runs.
-- The GitHub token only reads the listing; cloning works without an account for every repository Git itself can reach.
+- The GitHub token only reads the listing _(superseded for opted-in Docker sessions by ADR-0012)_; cloning works without an account for every repository Git itself can reach.
 
 ### Negative / Trade-offs
 

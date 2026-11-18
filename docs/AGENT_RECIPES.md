@@ -36,11 +36,8 @@ Versions seen: Claude Code npm `2.1.317`; OpenCode `@opencode/cli` `2.2.5` (`lat
    `;`, `%`, quote or space, so neither wt.exe nor PowerShell's argument parser ever sees one; inside, every value
    stays a single-quoted literal. Over ~30000 encoded characters (Windows caps a command line at 32767) the launch
    fails with a German error. Secrets never appear in the script text: fetch them inside the session and forward
-   name-only (`docker run -e GH_TOKEN`; root `MEMORY.md` of agent-tools, verified pattern there). Fetch and call share
-   one `try { … } finally { … }`, so the token leaves the session however docker ends:
-   `try { $env:GH_TOKEN=(& '<gh.exe>' auth token 2>$null); & '<docker.exe>' …; $tgCode=$LASTEXITCODE }`
-   `catch { $tgFailed=$true; throw } finally { [Environment]::SetEnvironmentVariable('GH_TOKEN', $null); <close> }`.
-   The same `try` wraps every agent call (local too): `<close>` runs `[Environment]::Exit(0)` unless the call threw
+   by name (`docker run -e GH_TOKEN`). Read the selected vault credential after the host clone, immediately before Docker. Clear the session variable in `finally` even on failure.
+   The same `try` wraps every agent call (local too). Its `finally` block runs `[Environment]::Exit(0)` unless the call threw
    (`$tgFailed`) or `$tgCode` is set and not 0, 130 or -1073741510 (`0xC000013A`); Ctrl+C stops the script pipeline,
    so `$tgCode` stays `$null` and the `finally` still closes. Any other code falls through to
    `Write-Host ('[traygent] <Agent> wurde mit Code ' + $tgCode + ' beendet.')` and the `-NoExit` prompt
@@ -95,7 +92,7 @@ Versions seen: Claude Code npm `2.1.317`; OpenCode `@opencode/cli` `2.2.5` (`lat
 - **Extra args:** appended last (starter `CLAUDE_EXTRA_ARGS`). Order: perm · model · effort · session · extra.
 - **Environments:** `local`, `docker`.
 
-### Claude profiles (several accounts, local only — Traygent [ADR-0009](adr/0009-agent-profiles-with-linked-config-directories.md))
+### Claude profiles (several accounts, local and Docker — Traygent [ADR-0009](adr/0009-agent-profiles-with-linked-config-directories.md))
 
 - **Config dir:** `%USERPROFILE%\.claude` by default; the state file `.claude.json` sits _beside_ it
   (`%USERPROFILE%\.claude.json`) for the default home and _inside_ any directory named by `CLAUDE_CONFIG_DIR`.
@@ -129,61 +126,14 @@ Versions seen: Claude Code npm `2.1.317`; OpenCode `@opencode/cli` `2.2.5` (`lat
   junctions in its config dir, how it rewrites `settings.json` / `.claude.json` under a running session
   (BACKLOG #52), and whether its cleanup of `session-env` / `todos` is safe with two profiles running at once.
 
-### Claude in Docker (must match the starter — existing login keeps working)
+### Claude in Docker
 
-Volumes (ADR-0007/0009, starter `KONFIGURATION`): `claude-code-tools` → `/home/node/.local` (CLI binary),
-`claude-code-config` → `/home/node/.claude-volume`, `CLAUDE_CONFIG_DIR=/home/node/.claude-volume/config`, and
-`/home/node/.claude` a symlink to that config dir in every container. Never mount the config volume at `~/.claude`
-(ADR-0009: settings then land in the unread volume root and the refresh lock leaves the volume → daily `/login`).
+Traygent bind-mounts the selected host Claude profile read-write. The default Windows account keeps its global state in the sibling `%USERPROFILE%\.claude.json`; an explicit `CLAUDE_CONFIG_DIR` keeps it inside the config directory. The directory mount covers file-based credentials, settings, plugins, hooks and skills. Linux runs Claude as `node`, with the tools volume `claude-code-tools` at `/home/node/.local` and the workspace at `/workspace/<pdn>`. The session sets `CLAUDE_CODE_DISABLE_TERMINAL_TITLE=1` and retains the normal workspace trust prompt.
 
-```text
-docker run --rm -it --init --security-opt no-new-privileges   (UNVERIFIED for Claude on a real engine)
-  -v <HOSTDIR>:/workspace
-  -v claude-code-config:/home/node/.claude-volume
-  -v claude-code-tools:/home/node/.local
-  -e HOME=/home/node
-  -e CLAUDE_CONFIG_DIR=/home/node/.claude-volume/config
-  -e PATH=/home/node/.local/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
-  -e CLAUDE_CODE_PROJECT_DIR_NAME=<pdn>          (see below)
-  -e CLAUDE_CODE_DISABLE_TERMINAL_TITLE=1        (keeps Traygent's tab title; set locally too)
-  -e GIT_CONFIG_COUNT=2 -e GIT_CONFIG_KEY_0=safe.directory -e GIT_CONFIG_VALUE_0=*
-  -e GIT_CONFIG_KEY_1=core.autocrlf -e GIT_CONFIG_VALUE_1=input
-  [-v %USERPROFILE%\.gitconfig:/home/node/.gitconfig:ro]   (only if the file exists)
-  [-e GH_TOKEN]                                   (name-only, only when settings.docker.ghToken)
-  -e TRAYGENT_INIT -e TERM=xterm-256color -e COLORTERM=truecolor
-  -w /workspace
-  node:22-trixie
-  bash -c 'printenv TRAYGENT_INIT >/tmp/traygent-init.sh && . /tmp/traygent-init.sh' traygent <claude args...>
-```
-
-The starter also sets `CLAUDE_CODE_TRUST_WORKSPACE=1`; Traygent does not: with the per-folder project dir the trust
-prompt appears once per folder, and skipping it would let a repository's hooks run unasked.
-
-The container starts as root (image default), prepares, then `runuser -u node` (starter); neither needs setuid, so
-`no-new-privileges` applies as for the other two. `TRAYGENT_INIT` (set from
-Base64 in the PS script, LF only) — derived from the starter's `INSTALL_PROLOGUE_SH`, `INSTALL_CLAUDE_SH`, the
-stale-lock cleanup and the main run; `bash -n` clean; the `printenv`/`.` loader verified to keep `"$@"` intact
-(`opus[1m]`, `a b` arrive as single args):
-
-```bash
-V=/home/node/.claude-volume
-mkdir -p /home/node/.local/bin /home/node/.local/share "$V/config"
-chown -R node:node /home/node/.local "$V" 2>/dev/null
-[ -L /home/node/.claude ] || [ -e /home/node/.claude ] || ln -s "$V/config" /home/node/.claude
-find "$V" -maxdepth 2 -name '*.lock' -type d -mmin +60 -exec rm -rf {} + 2>/dev/null
-if [ ! -x /home/node/.local/bin/claude ]; then
-  echo '[traygent] Installiere Claude Code ins Volume claude-code-tools ...'
-  runuser -u node -- bash -c 'curl -fsSL https://claude.ai/install.sh | bash' || exit 1
-  [ -x /home/node/.local/bin/claude ] || { echo 'FEHLER: Claude Code Installation fehlgeschlagen'; exit 1; }
-fi
-cd /workspace || exit 1
-exec runuser -u node -- /home/node/.local/bin/claude "$@"
-```
+For the generated Docker argv and the initialization script, see [the launch builder](../src-tauri/src/launch/docker.rs). The storage decision and migration behavior are in [ADR-0011](adr/0011-share-host-agent-config-with-docker.md).
 
 **`CLAUDE_CODE_PROJECT_DIR_NAME`** (starter `PROJECT_DIR_INIT`; needs CLI ≥ 2.1.234 and `CLAUDE_CONFIG_DIR` set —
-docs confirm the latter): every folder is `/workspace`, so without it all folders share one session list, `--continue`
-target and auto-memory. Compute in Rust and pass as `-e` (identical result → Traygent and the Batch starter share the
-same per-folder sessions). Algorithm = the bash fragment byte for byte:
+docs confirm the latter): the variable selects the per-folder transcript directory. A distinct working directory also separates project MCP settings and trust, which use the absolute path. Compute the name in Rust and pass it as `-e`. Algorithm = the bash fragment byte for byte:
 `p` = host path, ASCII-lowercased, runs of whitespace collapsed to one space and leading/trailing whitespace dropped
 (the fragment's unquoted `echo -n $X`), one trailing `\` or `/` removed · `h` = first 8 hex of SHA-256(`p` as UTF-8,
 no newline) · `leaf` = part after the last `\` or `/` · `n` = every byte of `leaf` not in `[a-z0-9_-]` → `-`
@@ -193,15 +143,15 @@ no newline) · `leaf` = part after the last `\` or `/` · `n` = every byte of `l
 
 **Starter extras — v1 decision:**
 
-| extra                                                                                                                               | v1                                                                                                                                                                                                  | why                                                                                                                                                                                                    |
-| ----------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| `.gitconfig:ro` mount + `safe.directory=*`, `core.autocrlf=input`                                                                   | **keep**                                                                                                                                                                                            | without them `git commit` fails (no identity) and git refuses the bind mount (“dubious ownership”, uid mismatch)                                                                                       |
-| Corp-CA import (Rancher `rd-*.crt` → `update-ca-certificates`; starter default `USE_CORP_CA=true`)                                  | drop, BACKLOG                                                                                                                                                                                       | **this is the one that bites**: behind a TLS-inspecting proxy the first-run `curl … install.sh` and the API calls fail with certificate errors. Show the German error hint; spec already backlogs it   |
-| TLS insecure (`NODE_TLS_REJECT_UNAUTHORIZED=0` …)                                                                                   | drop                                                                                                                                                                                                | opt-in, unsafe                                                                                                                                                                                         |
-| GPU stages / Mesa, GitNexus, Caveman, repo mode (`claude-code-repos`), init.sh file, host seed/v1 migration (`:init_config_volume`) | drop                                                                                                                                                                                                | opt-in toggles or one-time migrations; a volume the starter already used is v2. A fresh volume just needs one `/login` (credentials are never seeded)                                                  |
-| docker socket + docker CLI (`DOCKER_SOCK`)                                                                                          | **kept since #46**, opt-in `docker.socket`, all three agents: `-v /var/run/docker.sock:/var/run/docker.sock`, the starter's static CLI install (fallback 27.5.1) and group fix, no probe container  | the agent can drive the host's Docker; the CLI lands in each agent's `/home/node/.local` volume (`docs/SPEC.md → Docker socket`)                                                                       |
-| ports                                                                                                                               | **kept**, `docker.ports` / per start                                                                                                                                                                | `docs/SPEC.md → Ports`                                                                                                                                                                                 |
-| gh CLI + `git-credential-gh`/GCM bridge                                                                                             | drop; with `ghToken` on use git only: `-e GIT_CONFIG_KEY_2=credential.https://github.com.helper -e GIT_CONFIG_VALUE_2=!f() { echo username=x-access-token; echo password=$GH_TOKEN; }; f` (COUNT=3) | GH_TOKEN alone does nothing for `git push` (no gh in `node:22-trixie`); this helper needs no install (UNVERIFIED in-container; set from Base64 inside the encoded script, so its `;` never reaches wt) |
+| extra                                                                                                                               | v1                                                                                                                                                                                                 | why                                                                                                                                                                                                  |
+| ----------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `.gitconfig:ro` mount + `safe.directory=*`, `core.autocrlf=input`                                                                   | **keep**                                                                                                                                                                                           | without them `git commit` fails (no identity) and git refuses the bind mount (“dubious ownership”, uid mismatch)                                                                                     |
+| Corp-CA import (Rancher `rd-*.crt` → `update-ca-certificates`; starter default `USE_CORP_CA=true`)                                  | drop, BACKLOG                                                                                                                                                                                      | **this is the one that bites**: behind a TLS-inspecting proxy the first-run `curl … install.sh` and the API calls fail with certificate errors. Show the German error hint; spec already backlogs it |
+| TLS insecure (`NODE_TLS_REJECT_UNAUTHORIZED=0` …)                                                                                   | drop                                                                                                                                                                                               | opt-in, unsafe                                                                                                                                                                                       |
+| GPU stages / Mesa, GitNexus, Caveman, repo mode (`claude-code-repos`), init.sh file, host seed/v1 migration (`:init_config_volume`) | drop                                                                                                                                                                                               | optional starter features; Traygent reads host credentials directly through the config mount                                                                                                         |
+| docker socket + docker CLI (`DOCKER_SOCK`)                                                                                          | **kept since #46**, opt-in `docker.socket`, all three agents: `-v /var/run/docker.sock:/var/run/docker.sock`, the starter's static CLI install (fallback 27.5.1) and group fix, no probe container | the agent can drive the host's Docker; the CLI lands in each agent's `/home/node/.local` volume (`docs/SPEC.md → Docker socket`)                                                                     |
+| ports                                                                                                                               | **kept**, `docker.ports` / per start                                                                                                                                                               | `docs/SPEC.md → Ports`                                                                                                                                                                               |
+| GitHub CLI and Git credentials                                                                                                      | Use Linux `gh` in every Docker agent and, with forwarding enabled, its Git credential helper for GitHub HTTPS.                                                                                     | Git and GitHub operations use the same Traygent-connected account. See [ADR-0012](adr/0012-select-accounts-in-docker-sessions.md).                                                                   |
 
 ## 2. OpenCode V2 (`opencode`)
 
@@ -329,43 +279,13 @@ default_reasoning_level,supported_reasoning_levels[{effort}],visibility,priority
   per account with `config.toml`, sessions and history shared — UNVERIFIED, keyring storage would bypass the
   directory (BACKLOG #53).
 
-### Codex in Docker (no starter — proposal consistent with the other two)
+### Codex in Docker
 
-Browser login cannot work in the container (callback on the container's localhost, no browser) → device code on
-first start, or an API key forwarded name-only. With no keyring in the container, `auto` falls back to the file in
-the `traygent-codex-home` volume (UNVERIFIED that `auto` is the default store).
+Bind-mount the host Codex home (`CODEX_HOME` or `%USERPROFILE%\.codex`) read-write at `/home/node/.codex`. This shares `auth.json`, `config.toml` and agent state. Credential refreshes reach the host through the same directory. `CODEX_SQLITE_HOME` points into the Linux tools volume because Windows and Linux SQLite clients cannot safely share WAL locks. A per-container tmpfs at `/home/node/.codex/tmp` holds the CLI’s temporary Linux helper executables. Local credentials held exclusively in an OS keyring require a separate authentication method inside Linux.
 
-```text
-docker run --rm -it --init --security-opt no-new-privileges
-  -v <HOSTDIR>:/workspace/<pdn>  -w /workspace/<pdn>
-  -v traygent-codex-tools:/home/node/.local
-  -v traygent-codex-home:/home/node/.codex
-  -e HOME=/home/node -e PATH=/home/node/.local/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
-  -e TRAYGENT_INIT -e TERM=xterm-256color -e COLORTERM=truecolor [-e OPENAI_API_KEY]
-  [git env / .gitconfig / GH_TOKEN exactly as Claude]
-  node:22-trixie
-  bash -c 'printenv TRAYGENT_INIT >/tmp/traygent-init.sh && . /tmp/traygent-init.sh' traygent <codex args...>
-```
+Keep the Linux CLI in `traygent-codex-tools` at `/home/node/.local`. Verify the cached CLI by running `codex --version`. An executable npm wrapper alone can survive a failed platform package install. If the probe fails, repair the installation and check the binary before proceeding to authentication. A first login can use device auth or `OPENAI_API_KEY` forwarded by name.
 
-```bash
-mkdir -p /home/node/.local/bin /home/node/.codex
-chown -R node:node /home/node/.local /home/node/.codex 2>/dev/null
-if [ ! -x /home/node/.local/bin/codex ]; then
-  echo '[traygent] Installiere Codex CLI ins Volume traygent-codex-tools ...'
-  runuser -u node -- env NPM_CONFIG_PREFIX=/home/node/.local npm install -g @openai/codex@latest || exit 1
-  [ -x /home/node/.local/bin/codex ] || { echo 'FEHLER: Codex Installation fehlgeschlagen'; exit 1; }
-fi
-if [ ! -s /home/node/.codex/auth.json ]; then
-  if [ -n "$OPENAI_API_KEY" ]; then printenv OPENAI_API_KEY | runuser -u node -- /home/node/.local/bin/codex login --with-api-key
-  else runuser -u node -- /home/node/.local/bin/codex login --device-auth; fi || exit 1
-fi
-exec runuser -u node -- /home/node/.local/bin/codex "$@"
-```
-
-Notes: npm (node is in the image) instead of `install.sh`, so binaries stay out of the auth volume. Consider
-`--no-daemon` in Docker (Codex otherwise uses a shared app-server daemon; pointless in a throwaway container —
-UNVERIFIED whether it matters). Device auth may have to be enabled in the ChatGPT account first (UNVERIFIED).
-Codex stores trusted projects per path in `config.toml`; `/workspace/<pdn>` keeps trust and `resume --last` per folder.
+The generated invocation is in [the launch builder](../src-tauri/src/launch/docker.rs). The workspace mounts at `/workspace/<pdn>` so project trust and `resume --last` remain per folder.
 
 ## 4. Catalog summary (`AgentCatalogEntry`)
 
@@ -404,7 +324,5 @@ Start installiert“). First start pulls ~0.4 GB image + CLI download: never sup
   before `docker image inspect`: it sits right before `bash` in the argv, where `--privileged` would become a flag.
 - Claude native auto-update runs inside the container and writes to `claude-code-tools` — fine; an update while
   another session runs keeps the old version alive (versioned dirs).
-- Stale `*.lock` dirs from hard-killed containers block token refresh (ADR-0008, claude-code#62600) — keep the 60-min
-  cleanup in the init.
-- Parallel first starts on an empty tools volume race the installer (two containers installing at once) — UNVERIFIED
+- Parallel Claude or OpenCode first starts on an empty tools volume can race the installer (two containers installing at once) — UNVERIFIED
   impact; optionally serialize Docker first-starts per agent in Traygent.
