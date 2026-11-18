@@ -1,0 +1,92 @@
+#!/bin/bash
+# Runs as the session user. Stdout contains only the selected bin directory.
+set -euo pipefail
+shopt -s inherit_errexit
+umask 077
+workspace=$PWD
+cd /
+cache=/home/node/.local/traygent-mise
+export MISE_DATA_DIR="$cache/data" MISE_CACHE_DIR="$cache/cache"
+export MISE_NO_CONFIG=1 MISE_NO_HOOKS=1 MISE_YES=1
+
+project_version() {
+    local file value
+    for file in "$workspace/.nvmrc" "$workspace/.node-version"; do
+        [[ -f $file && ! -L $file ]] || continue
+        value=$(head -c 128 -- "$file" | tr -d '\r' | sed 's/#.*//;s/^[[:space:]]*//;s/[[:space:]]*$//')
+        if [[ $value =~ ^v?([0-9]{1,3}(\.[0-9]{1,3}){0,2})$ ]]; then
+            echo "${BASH_REMATCH[1]}"
+        elif [[ $value == 'lts/*' || $value == lts ]]; then
+            echo lts
+        else
+            echo "[traygent] Die Versionsangabe in ${file##*/} wird übersprungen." >&2
+        fi
+        return
+    done
+}
+
+install_mise() {
+    # The filename includes the release so a future update uses its own verified binary.
+    local version=2026.11.9 arch sha tmp
+    mise="$cache/mise-$version"
+    [[ ! -x $mise ]] || return 0
+    case $(uname -m) in
+        x86_64) arch=x64; sha=f13f3e5ec88807e0161669b3aa07a91d84478cdf1e95b5b92b63f85a25d42395 ;;
+        aarch64) arch=arm64; sha=b8dd05af6447cee933928664982a8cb2fa646e6951cfc8539db23ce2554a7b04 ;;
+        *) echo '[traygent] Für diese Architektur fehlt eine mise-Version.' >&2; return 1 ;;
+    esac
+    tmp=$(mktemp "$cache/.mise.XXXXXXXX") || return 1
+    if curl -4 -fsSL --connect-timeout 10 --max-time 180 --retry 2 --retry-all-errors \
+        "https://github.com/jdx/mise/releases/download/v$version/mise-v$version-linux-$arch" -o "$tmp" &&
+        printf '%s  %s\n' "$sha" "$tmp" | sha256sum --check --status &&
+        chmod 755 "$tmp" && mv -fT -- "$tmp" "$mise"; then
+        return 0
+    fi
+    rm -f -- "$tmp"
+    return 1
+}
+
+node_bin() {
+    local request=$1 dir
+    if [[ $image_version == "$request" || $image_version == "$request".* ]]; then
+        dirname -- "$(command -v node)"
+    else
+        install_mise || return 1
+        if ! dir=$("$mise" where "node@$request" 2>/dev/null) || [[ ! -x "$dir/bin/node" ]]; then
+            echo "[traygent] mise installiert Node $request für Linux …" >&2
+            "$mise" install "node@$request" >&2 || return 1
+            dir=$("$mise" where "node@$request") || return 1
+        fi
+        [[ -x "$dir/bin/node" ]] || return 1
+        printf '%s/bin\n' "$dir"
+    fi
+}
+
+project=$(project_version)
+read -ra hooks <<< "${TRAYGENT_HOOK_NODES:-}"
+[[ -n $project || ${#hooks[@]} -gt 0 ]] || exit 0
+mkdir -p -- "$cache" /tmp/traygent-hook-node
+# Concurrent starts share downloads within this agent's Linux tools volume.
+exec 8<"$cache"
+flock -x 8
+image_version=$(node -p 'process.versions.node' 2>/dev/null || true)
+image_bin=$(command -v node || true)
+for pin in "${hooks[@]}"; do
+    [[ $pin =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]] || exit 1
+    if bin=$(node_bin "$pin"); then
+        ln -sfnT -- "$bin/node" "/tmp/traygent-hook-node/$pin"
+    else
+        echo "[traygent] Linux-Node $pin für Claude-Hooks ist nicht verfügbar." >&2
+    fi
+done
+bin=
+if [[ -n $project ]]; then
+    if ! bin=$(node_bin "$project"); then
+        echo "[traygent] Node $project ist nicht verfügbar. Die Session verwendet den PATH des Images." >&2
+        bin=
+    fi
+elif (( ${#hooks[@]} == 1 )) && [[ -L /tmp/traygent-hook-node/${hooks[0]} ]]; then
+    bin=$(dirname -- "$(readlink "/tmp/traygent-hook-node/${hooks[0]}")")
+fi
+# Leave the image's bin in its original position relative to the user's tools.
+if [[ -n $bin && "$bin/node" != "$image_bin" ]]; then printf '%s\n' "$bin"; fi

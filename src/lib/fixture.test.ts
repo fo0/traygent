@@ -134,9 +134,11 @@ describe('golden snapshot fixture', () => {
     }
     expectShape(
       settings.docker,
-      { required: ['images', 'ghToken', 'ports', 'socket'] },
+      { required: ['images', 'ghToken', 'ports', 'socket', 'manageNode'] },
       'docker',
     );
+    // mise supplies the Linux Node unless switched off.
+    expect(settings.docker.manageNode).toBe(true);
     expect(portListProblem(settings.docker.ports), 'docker.ports').toBe('');
     expect(Object.keys(settings.docker.images).sort()).toEqual(
       [...AGENTS].sort(),

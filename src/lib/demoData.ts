@@ -179,6 +179,7 @@ export function demoSettings(): AppSettings {
       ghToken: false,
       ports: [],
       socket: false,
+      manageNode: true,
     },
     github: { cloneRoot: '' },
     agentUpdates: false,

@@ -1,0 +1,12 @@
+#!/bin/bash
+# Claude executes this as an argv hook. Keep every subsequent argument literal.
+set -eu
+pin=$1
+shift
+[[ $pin =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]] || exit 1
+node=$(readlink -- "/tmp/traygent-hook-node/$pin") || {
+    echo "[traygent] Linux-Node $pin für diesen Hook fehlt. Netzwerk prüfen oder „Node-Version mit mise“ ausschalten." >&2
+    exit 1
+}
+export PATH="${node%/*}:$PATH"
+exec "$node" "$@"

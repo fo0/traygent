@@ -213,15 +213,14 @@ fn a_docker_start_drops_the_token_before_it_closes() {
     let (_, rest) = script
         .split_once("; $tgCode=$null; $tgFailed=$false; try { ")
         .unwrap();
-    assert!(rest.starts_with(&format!(
-        "$env:GH_TOKEN=(& '{TRAYGENT}' '--docker-github-token' '42' 2>$null | Out-String).Trim(); if ($LASTEXITCODE"
-    )));
+    let token = format!("$env:GH_TOKEN=(& '{TRAYGENT}' '--docker-github-token' '42' 2>$null | Out-String).Trim(); if ($LASTEXITCODE");
+    assert!(rest.find("'--docker-claude-hooks'").unwrap() < rest.find(&token).unwrap());
     // The vault helper's status is checked before the docker invocation.
     assert!(rest.contains(
         "'--allow-dangerously-skip-permissions'; $tgCode=$LASTEXITCODE } catch { $tgFailed=$true; throw } "
     ));
     assert!(script.ends_with(&format!(
-        "finally {{ [Environment]::SetEnvironmentVariable('GH_TOKEN', $null); {EXIT} }}; \
+        "finally {{ [Environment]::SetEnvironmentVariable('GH_TOKEN', $null); if ($tgHookLease) {{ $tgHookLease.Dispose() }}; {EXIT} }}; \
          Write-Host ''; Write-Host ('[traygent] Claude Code wurde mit Code ' + $tgCode + ' beendet.')"
     )));
     assert_eq!(script.matches("finally {").count(), 1);

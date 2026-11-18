@@ -21,6 +21,7 @@ fn defaults_match_the_spec() {
         assert_eq!(settings.docker.images.get(agent), "node:22-trixie");
     }
     assert!(!settings.docker.gh_token);
+    assert!(settings.docker.manage_node);
     assert_eq!(validate(&settings), Ok(()));
 }
 

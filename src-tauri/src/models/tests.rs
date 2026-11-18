@@ -92,6 +92,11 @@ fn ports_default_to_empty_lists_in_old_recents_and_settings() {
     let docker: DockerSettings = serde_json::from_value(json!({ "ghToken": true })).unwrap();
     assert!(docker.ports.is_empty());
     assert_eq!(serde_json::to_value(&docker).unwrap()["ports"], json!([]));
+    // Node management is on when absent and an explicit off round-trips as camelCase.
+    assert!(docker.manage_node);
+    let off: DockerSettings = serde_json::from_value(json!({ "manageNode": false })).unwrap();
+    assert!(!off.manage_node);
+    assert_eq!(serde_json::to_value(&off).unwrap()["manageNode"], false);
     let preset = PortPreset {
         port: 3000,
         label: "Next.js · Node".into(),

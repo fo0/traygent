@@ -189,6 +189,11 @@ export interface DockerSettings {
    * can drive the host's Docker (docs/SPEC.md → Docker socket).
    */
   socket: boolean;
+  /**
+   * Let mise supply the container's Linux Node for project version files and
+   * Claude's NVM hooks; off uses the Node of the chosen image. On by default.
+   */
+  manageNode: boolean;
 }
 
 /** A well-known dev-server port the panel offers as a checkbox. */
