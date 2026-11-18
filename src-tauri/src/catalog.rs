@@ -4,14 +4,16 @@ use crate::models::{
     SessionMode,
 };
 
-/// Codex models bundled with 0.166.0 (`codex debug models`, visibility `list`, by priority).
-const CODEX_MODELS: [&str; 9] = [
+/// Codex 0.170.0 models (`codex debug models --bundled`, visibility `list`, by priority).
+const CODEX_MODELS: [&str; 11] = [
+    "gpt-6.2-sol",
+    "gpt-6.2-astra",
+    "gpt-6.1-terra",
     "gpt-6.1-sol",
     "gpt-6-astra",
     "gpt-6-sol",
     "gpt-6-luna",
     "gpt-5.6-sol",
-    "gpt-6.1-terra",
     "gpt-5.6-terra",
     "gpt-5.6-luna",
     "gpt-5.5",

@@ -58,9 +58,10 @@ fn models_and_sessions_follow_the_recipes() {
     );
     assert_eq!(entry(AgentId::Opencode).models.len(), 1);
     let codex = entry(AgentId::Codex).models;
-    assert_eq!(codex.len(), 10);
-    assert_eq!(codex[1].id, "gpt-6.1-sol");
-    assert_eq!(codex[9].id, "gpt-5.5");
+    assert_eq!(codex.len(), 12);
+    assert_eq!(codex[1].id, "gpt-6.2-sol");
+    assert_eq!(codex[2].id, "gpt-6.2-astra");
+    assert_eq!(codex[11].id, "gpt-5.5");
     assert_eq!(
         entry(AgentId::Opencode).sessions,
         [SessionMode::New, SessionMode::Continue]

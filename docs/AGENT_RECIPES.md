@@ -250,11 +250,10 @@ is the starter's; harmless with root → `runuser` (no setuid needed). `--contin
 - **Detect:** `%LOCALAPPDATA%\Programs\OpenAI\Codex\bin\codex.exe` (install.ps1 `$defaultVisibleBinDir`, override
   `CODEX_INSTALL_DIR`; versions under `%USERPROFILE%\.codex\packages\standalone`), npm `%APPDATA%\npm\codex.cmd`.
   `codex --version` → `codex-cli 0.166.0`. Config/auth home `%USERPROFILE%\.codex` (`CODEX_HOME`).
-- **Model** `-m <slug>`; `freeModel: true`. Catalog (bundled with 0.166.0 via `codex debug models`, visibility
-  `list`, by priority): `gpt-6.1-sol`, `gpt-6-astra`, `gpt-6-sol`, `gpt-6-luna`, `gpt-5.6-sol`, `gpt-6.1-terra`,
-  `gpt-5.6-terra`, `gpt-5.6-luna`, `gpt-5.5`. `default` = no flag (which slug that is depends on account/config:
-  UNVERIFIED). Better: run `codex debug models` during detection (JSON `{models:[{slug,display_name,
-default_reasoning_level,supported_reasoning_levels[{effort}],visibility,priority}]}`), keep `visibility=="list"`.
+- **Model** `-m <slug>`; `freeModel: true`. Presets follow the bundled catalog from [Codex CLI 0.170.0](https://github.com/openai/codex/releases/tag/rust-v0.170.0)
+  (`codex debug models --bundled`, visibility `list`, by priority): `gpt-6.2-sol`, `gpt-6.2-astra`, `gpt-6.1-terra`,
+  `gpt-6.1-sol`, `gpt-6-astra`, `gpt-6-sol`, `gpt-6-luna`, `gpt-5.6-sol`, `gpt-5.6-terra`, `gpt-5.6-luna`, `gpt-5.5`.
+  `default` omits the flag so Codex uses its configured default.
 - **Effort** `-c model_reasoning_effort=<v>`: `low, medium, high, xhigh, max` (all listed models except gpt-5.5 which
   stops at `xhigh`; some add `ultra`). `default` = no flag. The value parses as a raw string when not valid TOML (help).
 - **Permissions** (local Windows; flags verified in `--help`, conflicts verified: `--approve-for-me` cannot be combined
@@ -289,16 +288,16 @@ The generated invocation is in [the launch builder](../src-tauri/src/launch/dock
 
 ## 4. Catalog summary (`AgentCatalogEntry`)
 
-| field           | claude                                        | opencode                                                   | codex                                                             |
-| --------------- | --------------------------------------------- | ---------------------------------------------------------- | ----------------------------------------------------------------- |
-| models          | default, fable, opus, sonnet, haiku, opusplan | default                                                    | default + `codex debug models` list (fallback: the 9 slugs above) |
-| freeModel       | true                                          | true (`provider/model`)                                    | true                                                              |
-| efforts         | default, low, medium, high, xhigh, max        | default, low, medium, high, xhigh, max (only with a model) | default, low, medium, high, xhigh, max                            |
-| sessions        | new, continue, resume                         | new, continue                                              | new, continue, resume                                             |
-| environments    | local, docker                                 | local, docker                                              | local, docker                                                     |
-| install.command | `irm https://claude.ai/install.ps1 \| iex`    | `npm install -g @opencode/cli@latest`                      | `irm https://chatgpt.com/codex/install.ps1 \| iex`                |
-| install.update  | `claude update`                               | `opencode upgrade`                                         | `codex update`                                                    |
-| docker image    | `node:22-trixie`                              | `node:22-trixie`                                           | `node:22-trixie`                                                  |
+| field           | claude                                        | opencode                                                   | codex                                              |
+| --------------- | --------------------------------------------- | ---------------------------------------------------------- | -------------------------------------------------- |
+| models          | default, fable, opus, sonnet, haiku, opusplan | default                                                    | default + the 11 bundled presets above             |
+| freeModel       | true                                          | true (`provider/model`)                                    | true                                               |
+| efforts         | default, low, medium, high, xhigh, max        | default, low, medium, high, xhigh, max (only with a model) | default, low, medium, high, xhigh, max             |
+| sessions        | new, continue, resume                         | new, continue                                              | new, continue, resume                              |
+| environments    | local, docker                                 | local, docker                                              | local, docker                                      |
+| install.command | `irm https://claude.ai/install.ps1 \| iex`    | `npm install -g @opencode/cli@latest`                      | `irm https://chatgpt.com/codex/install.ps1 \| iex` |
+| install.update  | `claude update`                               | `opencode upgrade`                                         | `codex update`                                     |
+| docker image    | `node:22-trixie`                              | `node:22-trixie`                                           | `node:22-trixie`                                   |
 
 Docker readiness per agent without starting a container: engine `ready` + `docker image inspect node:22-trixie`
 (else „Image wird beim ersten Start geladen“) + `docker volume inspect <tools volume>` (else „CLI wird beim ersten
