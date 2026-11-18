@@ -8,6 +8,7 @@
 
 pub mod api;
 pub mod discover;
+pub mod docker;
 #[cfg(test)]
 pub(crate) mod fakes;
 pub mod gh;

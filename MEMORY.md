@@ -34,7 +34,7 @@ Stable project knowledge. **Read at session start.**
 ### Agent profiles share everything but the sign-in
 
 - **Date:** 2026-11-13
-- **Decision:** One config dir per sign-in (`CLAUDE_CONFIG_DIR=%USERPROFILE%\.claude-<id>`, „Standard“ = `.claude`); shared dirs (+ user extras) are junctions into the default home; `settings.json` and the `.claude.json` subset merge three-way against a value base, sign-in keys per profile; other files whole (newest wins). Claude Code, local only. Detail: [ADR-0009](docs/adr/0009-agent-profiles-with-linked-config-directories.md), [ADR-0010](docs/adr/0010-three-way-merge-of-the-profiles-settings-and-state-file.md), `docs/SPEC.md → Profiles`.
+- **Decision:** One config dir per sign-in (`CLAUDE_CONFIG_DIR=%USERPROFILE%\.claude-<id>`, „Standard“ = `.claude`); shared dirs (+ user extras) are junctions into the default home; `settings.json` and the `.claude.json` subset merge three-way against a value base, sign-in keys per profile; other files whole (newest wins). Claude Code in local and Docker sessions ([ADR-0012](docs/adr/0012-select-accounts-in-docker-sessions.md)). Detail: [ADR-0009](docs/adr/0009-agent-profiles-with-linked-config-directories.md), [ADR-0010](docs/adr/0010-three-way-merge-of-the-profiles-settings-and-state-file.md), `docs/SPEC.md → Profiles`.
 
 ## Gotchas & Pitfalls
 
@@ -49,7 +49,7 @@ Stable project knowledge. **Read at session start.**
 - **Popup dismissal is generation-guarded**: blur hides after 120 ms, every tray gesture/focus/reopen bumps a generation that cancels stale hides — keep that when touching `tray_popup.rs` / `popup.rs`. (2026-11-03)
 - **Release git reads run without credentials** — they rely on the repository being public; if it goes private, pass the token explicitly. (2026-11-03)
 - **PR checks skip `rust-core` / `windows-desktop`** when the PR touches none of their paths (`changes` job in `ci.yml`); extend its patterns when Rust or release code starts reading files elsewhere. (2026-11-03)
-- **The GitHub token never reaches the clone** — it only reads `/user` and `/user/repos`; `git clone` runs in the session script on the user's own Git credentials (GCM). Never put it in a URL, env var, credential helper or `state.json` (vault entry `traygent` / `github-<id>`). (2026-11-04)
+- **GitHub credentials in sessions** — Windows Git uses its own credentials for the host clone. The optional Docker switch forwards the Traygent-connected account’s vault entry (`traygent` / `github-<id>`) as `GH_TOKEN` after the clone. Git HTTPS and the Linux GitHub CLI use it for the lifetime of that session ([ADR-0012](docs/adr/0012-select-accounts-in-docker-sessions.md)). (2026-11-18)
 - **gh has its own runner** (`github/process.rs`), not `detect::SystemRunner`: that one truncates output (a cut token), inherits the env (an inherited `GH_TOKEN` wins over the chosen sign-in), times out at 5 s; this one: minimal env, fails over 64 KiB, 20 s. (2026-11-04)
 - **`Link` header: split at `<…>`, not at commas** — GitHub echoes `affiliation=owner,collaborator,…` inside the next URL (`github/api.rs → next_page`). (2026-11-04)
 - **Cloud container setup** — Node 24 and PowerShell 7 are not preinstalled; Playwright needs `PLAYWRIGHT_CHROMIUM_EXECUTABLE=/opt/pw-browsers/chromium-<rev>/chrome-linux64/chrome`. Steps: `agent_docs/testing.md → Cloud container`. (2026-11-03)

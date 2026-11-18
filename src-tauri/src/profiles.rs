@@ -5,7 +5,7 @@
 //! profile's directory is always built from the user profile, the recipe's fixed names and a
 //! validated profile id ([`Homes`]) — no other path ever reaches the sync engine ([`sync`]).
 use crate::detect::{host::is_search_dir, Host};
-use crate::models::{AgentId, DEFAULT_PROFILE};
+use crate::models::{AgentId, EnvId, DEFAULT_PROFILE};
 
 pub mod files;
 pub mod foreign;
@@ -197,6 +197,11 @@ pub fn recipe(agent: AgentId) -> Option<&'static Recipe> {
         AgentId::Claude => Some(&CLAUDE),
         AgentId::Opencode | AgentId::Codex => None,
     }
+}
+
+/// Environments that can start or restore this agent with an account profile.
+pub fn supported(agent: AgentId, env: EnvId) -> bool {
+    env != EnvId::Wsl && recipe(agent).is_some()
 }
 
 /// `^[a-z0-9][a-z0-9-]{0,23}$` and not `default`: safe as part of a directory name.

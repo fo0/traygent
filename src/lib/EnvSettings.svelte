@@ -181,7 +181,7 @@
     </div>
     <label
       class="switch-row"
-      title="Übergibt das Token von „gh auth token“ als GH_TOKEN an den Container"
+      title="Verwendet das in Traygent verbundene GitHub-Konto für git und gh im Container"
     >
       <input
         type="checkbox"

@@ -25,7 +25,7 @@ Brand top left: icon + „Traygent“. Window ~480×760, frameless, tray popup l
   of that folder), `resume` (agent's session picker). Agents without support omit the option.
 - **Terminal** (`TerminalId`): `windowsTerminal` (wt.exe, default when found) or `console`
   (a new PowerShell console window). The session runs in that window; Traygent does not embed it.
-- **Profile** (`AgentProfile`, per agent, local starts only): a sign-in of one CLI in a config
+- **Profile** (`AgentProfile`, per agent, local and Docker starts): a sign-in of one CLI in a config
   directory of its own; everything else stays identical to the CLI's own home, the profile
   „Standard“ (id `default`) every agent with `catalog.profiles` has. Claude Code only so far;
   see _Profiles_ below.
@@ -63,7 +63,7 @@ Brand top left: icon + „Traygent“. Window ~480×760, frameless, tray popup l
      value), never the WebView's native select popup. Every agent's chips, Docker's „Ports“ included, keep one row beside
      „Starten“ in the default 480 px window.
    - „Profil“ (last chip before „Starten“, its list opens to the left): only for an agent with
-     `profiles`, environment Lokal and at least one extra profile. A 28 px mark only — the
+     `profiles`, environment Lokal or Docker and at least one extra profile. A 28 px mark only — the
      person icon for „Standard“, else the profile's initial on a round tile; the label is its
      accessible name and tooltip (`Profil: <label> · <account>`). The chosen profile not signed
      in → warning colour and „Nicht angemeldet“ (tooltip and list). Starts at the agent's saved
@@ -96,12 +96,12 @@ Brand top left: icon + „Traygent“. Window ~480×760, frameless, tray popup l
    „Ports“ popover, the folder suggestions). Hiding an environment is a display preference, not
    a ban: its recents keep their environment and ▶ restarts them unchanged. „Bearbeiten …“
    (#3) opens a staged dialog with the row's model, thinking level, permission, extra
-   arguments, (Docker) ports and (Lokal, an agent with at least one extra profile or an entry
+   arguments, (Docker) ports and (an agent with at least one extra profile or an entry
    that still stores one, #37) „Profil“ — „Standard“ and the agent's profiles; a stored profile
    removed since shows as „Standard“, and saving stores that. „Speichern“ stores them on the entry without a start
    (`update_recent`, validated like a start; the dialog also applies the npm-shim argument rule) — place, start time and count stay, the next ▶
    sends them. The profile follows the start rule (_Profiles_): absent, blank or `default`
-   and every Docker entry store none, an id the agent does not list is refused („Profil nicht
+   store none; local and Docker entries retain a chosen profile. An id the agent does not list is refused („Profil nicht
    gefunden.“). The agent, environment and folder define the entry and are not editable.
    A row's profile: ▶ restarts with it (one removed since is refused natively, „Profil nicht
    gefunden.“); „In Composer übernehmen“ takes it over, or the saved „Standard-Profil“ when it
@@ -184,8 +184,7 @@ Brand top left: icon + „Traygent“. Window ~480×760, frameless, tray popup l
   tooltip), default environment (one of the shown ones, WSL disabled; it moves to the first shown
   one when its own is hidden, the row hides with a single one), default agent, terminal
   (Windows Terminal / Konsole; with Windows Terminal, `sharedWindow` (default off) opens every
-  start as a tab of one window named `traygent`), Docker: image per agent (defaults from research), pass host gh
-  token (off by default), „Docker-Socket durchreichen“ (`docker.socket`, off by default, tooltip
+  start as a tab of one window named `traygent`), Docker: image per agent (defaults from research), forward the connected Traygent account’s token to Git and gh in the container (off by default), „Docker-Socket durchreichen“ (`docker.socket`, off by default, tooltip
   only; _Docker socket_). Rust stores the list each once in `local` · `docker` · `wsl` order and
   refuses one without Lokal or Docker („Mindestens eine Umgebung muss aktiv sein.“, „WSL ist noch
   nicht verfügbar.“) or without the default („Die Standard-Umgebung ist deaktiviert.“); a
@@ -355,10 +354,10 @@ Commands (Rust `#[tauri::command]`, German `Err` strings; panel calls only via `
   <Agent> möglich.“. An `agentProfile` that is not listed becomes `default`, so removing a
   profile never blocks the save; on load every entry that would not validate is dropped, the
   rest kept. Removing a profile leaves its directory, login included, on disk.
-- **Start** (local only; Docker normalizes `profile` away and keeps its one volume, ADR-0004):
+- **Start** (Lokal and Docker, ADR-0012):
   absent, blank or `default` = „Standard“; any other id must be listed („Profil nicht
   gefunden.“). No user profile → „Der Profilordner ist nicht verfügbar: kein Benutzerordner
-  gefunden.“. The script sets, after `Set-Location` and before the agent call,
+  gefunden.“. Docker mounts the chosen home read-write. On local starts the script sets, after `Set-Location` and before the agent call,
   `$env:CLAUDE_CONFIG_DIR='<profile dir>'` (Windows-absolute, else „Der Profilordner ist kein
   absoluter Windows-Pfad.“); for „Standard“ it emits
   `Remove-Item Env:CLAUDE_CONFIG_DIR -ErrorAction SilentlyContinue` while the agent has at
@@ -398,7 +397,7 @@ Commands (Rust `#[tauri::command]`, German `Err` strings; panel calls only via `
   characters).
 - **Triggers:** the first detection after the app started (later detections only read the
   statuses), `save_settings` when `profiles` or `profileShare` changed (otherwise a re-read),
-  `sync_profiles`, a local start (that agent only) and a background sync every 15 minutes
+  `sync_profiles`, a local or Docker start (that agent only) and a background sync every 15 minutes
   (`PROFILE_SYNC_INTERVAL`, fixed, no setting): the `traygent-profile-sync` thread checks once a
   minute and syncs every profile once 15 minutes have passed since the last sync of any kind
   finished (before the first one, since the app started), only while some agent has an extra
@@ -668,10 +667,7 @@ script>`; inside the script every argument is a PowerShell single-quoted literal
   the call stopped by Ctrl+C) closes the terminal with `[Environment]::Exit(0)`, after the Docker
   token cleanup; any other code stays open with „[traygent] <Agent> wurde mit Code <n> beendet.“
   The install terminal always stays open.
-- Docker: `docker run -it --rm` with the workspace bind-mounted, state in **named volumes**
-  (never bind-mounts for state — agent-tools ADR-0007), Claude reuses the starter's volume
-  layout so an existing login keeps working (research file has the recipe). The host Docker
-  socket is the one other bind mount, only when on (_Docker socket_).
+- Docker bind-mounts the workspace and, for Claude Code and Codex, the host agent configuration read-write (ADR-0011). Linux tools and OpenCode state use named volumes. The Git config is mounted read-only when present and the Docker socket is optional (_Docker socket_).
 - Detection: local — find the CLI on PATH + known install locations, run `<cli> --version` with
   a timeout, capped output, closed stdin, no console window (`CREATE_NO_WINDOW`); docker —
   `docker version --format {{.Server.Version}}` with timeout (CLI missing → `missing`, daemon

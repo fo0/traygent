@@ -133,14 +133,21 @@ fn a_docker_clone_resolves_git_and_docker() {
     let dir = TempDir::new("service-repo-docker");
     let service = Service::open(&dir.0);
     let fs = FakeFs::with(&[DOCKER, GIT]);
-    let req = repo_request(AgentId::Claude, EnvId::Docker, "traygent");
+    let mut req = repo_request(AgentId::Claude, EnvId::Docker, "traygent");
+    req.docker_socket = true;
     let prepared = service
         .prepare_launch(&req, &windows_host(), &fs, "n")
         .unwrap();
     let script = script(&prepared.plan);
     assert!(script.contains(&format!("& '{GIT}' 'clone'")));
-    assert!(script.contains(&format!("'-v' '{FOLDER}:/workspace'")));
-    assert_eq!(fs.created(), [ROOT]);
+    let workspace = format!(
+        "/workspace/{}",
+        crate::launch::docker::project_dir_name(FOLDER)
+    );
+    assert!(script.contains(&format!("'-v' '{FOLDER}:{workspace}'")));
+    assert!(script.contains(&format!("'-w' '{workspace}'")));
+    assert!(script.contains(r"'C:\Users\max\.claude:/home/node/.claude:rw'"));
+    assert_eq!(fs.created(), [r"C:\Users\max\.claude", ROOT]);
 }
 
 #[test]

@@ -38,7 +38,7 @@ Every start lands in **Workspaces**, so the next one is a single click.
 | ------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | ⚡ **One-click starts**               | Agent, folder, environment, Enter. Model, effort and permission default to your settings; the session mode starts at **Neu**.                            |
 | 🕘 **Workspaces**                     | Up to 20 folder · agent · environment rows; a click restarts one as it was, or lets the agent keep its own model and effort.                             |
-| 🐳 **Local or Docker**                | Run the agent on the host or in a container with named volumes for its state and optional port publishing.                                               |
+| 🐳 **Local or Docker**                | Run the agent on the host or in a container with shared host sign-in for Claude Code and Codex, plus optional port publishing.                           |
 | 🐙 **Start from a GitHub repository** | Paste a URL, type `owner/name` or search your repositories; Traygent clones it on first use and reuses the folder afterwards.                            |
 | 👥 **Several Claude accounts**        | One profile per sign-in; skills, plugins, settings, MCP servers and history stay the same in all of them, synced in the background every 15 minutes too. |
 | 🔍 **Detects what is installed**      | Agent CLIs, their versions and Docker are detected; a missing CLI offers its install command instead of a dead start.                                    |
@@ -80,7 +80,7 @@ Open http://127.0.0.1:1420. The preview is labelled **Demo**.
 
 ## Privacy and security
 
-- **Your GitHub token stays in the Windows Credential Manager.** It only checks your account and reads your repository list; it never reaches a clone, a command line, an environment variable or the state file. Cloning uses your own Git credentials. Exception, off by default: **GitHub-Token weitergeben** forwards `gh auth token` to Docker sessions as `GH_TOKEN`, by name only ([details](docs/USAGE.md#docker-sessions)).
+- **GitHub sign-in.** Traygent stores the connected account’s token in Windows Credential Manager. With **GitHub-Token weitergeben** enabled, Git and the GitHub CLI in Docker use that account. Host clones use your Windows Git credentials. [Docker sessions](docs/USAGE.md#docker-sessions).
 - **Profiles never touch your sign-in.** Traygent only checks that a profile's `.credentials.json` holds a sign-in and names its plan; it never copies it, keeps a token or starts the CLI for it ([details](docs/USAGE.md#several-accounts--profile)).
 - **No shell strings.** Every launch is an argument list of quoted literals ([ADR-0003](docs/adr/0003-launch-through-a-powershell-argv.md)).
 - **Docker ports bind to `127.0.0.1`** unless you type an IP.

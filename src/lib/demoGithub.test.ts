@@ -105,6 +105,21 @@ describe('demo GitHub commands', () => {
     }
   });
 
+  it('requires a connected account for Docker token forwarding', async () => {
+    const bridge = createDemoBridge(0);
+    const { settings } = await bridge.githubDisconnect();
+    const docker = request({ env: 'docker' });
+    expect((await bridge.launchSession(docker)).recent.env).toBe('docker');
+    settings.docker.ghToken = true;
+    await bridge.saveSettings(settings);
+    await expect(bridge.launchSession(docker)).rejects.toThrow(
+      'Für die Token-Weitergabe bitte unter GitHub ein Konto verbinden',
+    );
+    expect((await bridge.launchSession(request())).recent.env).toBe('local');
+    await bridge.githubConnectToken('ghp_demo1234');
+    expect((await bridge.launchSession(docker)).recent.env).toBe('docker');
+  });
+
   it('starts a repository in its clone folder and records it', async () => {
     const bridge = createDemoBridge(0);
     const { recent, snapshot } = await bridge.launchSession(request());

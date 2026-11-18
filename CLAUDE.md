@@ -112,7 +112,7 @@ Features: `default = []` · `updates` (update client) · `vault` (keyring, OS cr
 
 - Launching builds an argv, never a shell string; every argument is a quoted literal (rules: `docs/SPEC.md → Launch rules`).
 - The panel never spawns processes or reaches the network; both live in Rust.
-- Agent state in Docker lives in named volumes, never bind-mounts (agent-tools ADR-0007).
+- Docker mounts host Claude and Codex config read-write. Linux tools and OpenCode state use named volumes (ADR-0011).
 - **UI:** labels German; owner UX rules in `agent_docs/ux_rules.md` are binding — read before any UI change; they override older UI docs and ADRs.
 - Tests and demo: synthetic data, labelled mocks only; the browser preview is always labelled „Demo“.
 - Max file length: ~300 lines TS/Svelte, ~500 Rust (house threshold)

@@ -127,7 +127,6 @@ fn an_edit_stores_the_profile_normalized_like_a_start() {
         edit(&mut service, Some("team"));
         assert_eq!(edit(&mut service, standard), None, "{standard:?}");
     }
-    // A container has its own home: a Docker entry never stores a profile.
     let docker = service.record_launch(
         &request(AgentId::Claude, EnvId::Docker, r"C:\b"),
         Utc::now(),
@@ -143,7 +142,7 @@ fn an_edit_stores_the_profile_normalized_like_a_start() {
         )
         .unwrap();
     let edited = snapshot.recents.iter().find(|r| r.id == docker.id).unwrap();
-    assert_eq!(edited.profile, None);
+    assert_eq!(edited.profile.as_deref(), Some("team"));
 }
 
 #[test]

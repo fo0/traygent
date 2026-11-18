@@ -63,6 +63,14 @@
   gap: 4px;
   min-width: 0;
 }
+/* Fit Claude’s profile and ports alongside the three labelled choices. */
+.option-chips:has(.profile-chip):has(.ports-chip) {
+  column-gap: 2px;
+}
+.option-chips:has(.profile-chip):has(.ports-chip) .chip:not(.chip-icon) {
+  gap: 2px;
+  padding-inline: 3px;
+}
 /* „Starten“: about as tall as the chip row and only as wide as its label, so
    the chips keep one row at 480 px. */
 .composer-actions .composer-start {
@@ -70,6 +78,9 @@
   gap: 5px;
   min-height: 30px;
   padding: 0 10px;
+}
+.composer-actions:has(.profile-chip):has(.ports-chip) .composer-start {
+  padding-inline: 5px;
 }
 
 /* Footer: the Docker probe next to Demo/Lokal. */

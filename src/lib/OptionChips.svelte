@@ -44,7 +44,7 @@
   /** Hidden while the model cannot carry a thinking level (nothing is sent). */
   const efforts = $derived(effortChoices(entry, options.model));
   const sessions = $derived(composer.sessions);
-  /** Lokal and an agent with an extra profile only. */
+  /** An agent with an extra profile in a supported environment. */
   const profiles = $derived(composer.profiles);
   const modelTitle = $derived(
     invalidModel || choiceTitle('Modell', entry.models, options.model),

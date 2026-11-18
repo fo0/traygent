@@ -70,7 +70,7 @@ pub fn upsert(
         repo,
         options,
         ports: stored_ports(request.env, &request.ports),
-        profile: stored_profile(request.env, request.profile.as_deref()),
+        profile: stored_profile(request.agent, request.env, request.profile.as_deref()),
         keep_agent_model,
         docker_socket: stored_socket(request.env, request.docker_socket),
         last_started_at: timestamp(now),
@@ -118,12 +118,12 @@ pub fn stored_socket(env: EnvId, socket: bool) -> bool {
     socket && env == EnvId::Docker
 }
 
-/// The profile as a recent keeps it: an id of an extra profile, local sessions only; the
+/// The profile as a recent keeps it: an id of an extra profile of a supported agent; the
 /// default profile, another environment and a malformed id are stored as none. Whether the
 /// profile still exists is checked at the start.
-pub fn stored_profile(env: EnvId, profile: Option<&str>) -> Option<String> {
+pub fn stored_profile(agent: AgentId, env: EnvId, profile: Option<&str>) -> Option<String> {
     profile
-        .filter(|id| env == EnvId::Local && crate::profiles::is_valid_id(id))
+        .filter(|id| crate::profiles::supported(agent, env) && crate::profiles::is_valid_id(id))
         .map(str::to_string)
 }
 
@@ -140,7 +140,7 @@ pub fn tidy(mut list: Vec<RecentSession>) -> Vec<RecentSession> {
         recent.ports = stored_ports(recent.env, &recent.ports);
         recent.docker_socket = stored_socket(recent.env, recent.docker_socket);
         recent.repo = stored_repo(recent.repo.as_ref());
-        recent.profile = stored_profile(recent.env, recent.profile.as_deref());
+        recent.profile = stored_profile(recent.agent, recent.env, recent.profile.as_deref());
     }
     sort(&mut list);
     let mut seen = std::collections::HashSet::new();

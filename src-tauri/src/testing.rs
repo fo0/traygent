@@ -12,6 +12,7 @@ pub(crate) const NPM: &str = r"C:\Users\max\AppData\Roaming\npm";
 pub(crate) struct FakeFs {
     pub files: HashSet<String>,
     pub dirs: HashSet<String>,
+    pub links: HashSet<String>,
     pub created: Mutex<Vec<String>>,
     pub read_only: bool,
     /// Profile directories that hold someone else's data.
@@ -43,11 +44,21 @@ impl Fs for FakeFs {
     fn is_dir(&self, path: &str) -> bool {
         self.dirs.contains(path)
     }
+    fn is_link(&self, path: &str) -> bool {
+        self.links.contains(path)
+    }
+
     fn create_dir_all(&self, path: &str) -> std::io::Result<()> {
         if self.read_only {
             return Err(std::io::ErrorKind::PermissionDenied.into());
         }
         self.created.lock().unwrap().push(path.into());
+        Ok(())
+    }
+    fn ensure_json_file(&self, path: &str) -> std::io::Result<()> {
+        if self.is_dir(path) || (self.read_only && !self.is_file(path)) {
+            return Err(std::io::ErrorKind::PermissionDenied.into());
+        }
         Ok(())
     }
     fn refuses_sign_in(
@@ -72,6 +83,9 @@ pub(crate) fn windows_host() -> Host {
         program_files: Some(r"C:\Program Files".into()),
         system_root: Some(r"C:\Windows".into()),
         codex_install_dir: None,
+        codex_home: None,
+        claude_config_dir: None,
+        traygent_exe: Some(r"C:\Program Files\Traygent\traygent.exe".into()),
     }
 }
 

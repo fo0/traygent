@@ -221,7 +221,7 @@ pub struct LaunchRequest {
     #[serde(default)]
     pub ports: Vec<String>,
     /// The agent profile to start with; absent or `default` = the CLI's own home. Ignored
-    /// (normalized to none) outside the local environment.
+    /// (normalized to none) for agents without profile support in the selected environment.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub profile: Option<String>,
     /// A workspace row's start of a recent set to „Agent“ (#43): no model or effort flags,
@@ -332,7 +332,7 @@ impl<T: Default> PerAgent<T> {
 pub struct DockerSettings {
     /// Base image per agent.
     pub images: PerAgent<String>,
-    /// Forward the host `gh auth token` name-only as GH_TOKEN.
+    /// Forward the connected Traygent account's vault token by name as GH_TOKEN.
     pub gh_token: bool,
     /// Ports every new Docker session starts with; the composer can change them per start.
     pub ports: Vec<String>,

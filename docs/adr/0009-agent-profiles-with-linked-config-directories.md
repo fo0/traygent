@@ -1,6 +1,6 @@
 # ADR-0009: Agent Profiles With Linked Configuration Directories
 
-- **Status:** Accepted; partly superseded — the sync of `settings.json` and `.claude.json` and the list of shared entries by [ADR-0010](0010-three-way-merge-of-the-profiles-settings-and-state-file.md)
+- **Status:** Accepted; partly superseded — the sync of `settings.json` and `.claude.json` and the list of shared entries by [ADR-0010](0010-three-way-merge-of-the-profiles-settings-and-state-file.md), Docker config storage by [ADR-0011](0011-share-host-agent-config-with-docker.md), Docker profile selection by [ADR-0012](0012-select-accounts-in-docker-sessions.md)
 - **Date:** 2026-11-13
 - **Decider(s):** both
 - **Tags:** agents, profiles, accounts, sync
@@ -42,7 +42,7 @@ The model (`settings.profiles`, `settings.agentProfile`, `LaunchRequest.profile`
 ### Neutral
 
 - The Standard home is the sync source by definition; there is no setting for it.
-- Docker sessions keep their one volume ([ADR-0004](0004-docker-volumes-shared-with-the-batch-starter.md)) and ignore the profile.
+- Docker sessions keep their one volume ([ADR-0004](0004-docker-volumes-shared-with-the-batch-starter.md)) and ignore the profile. _(Docker config storage superseded by ADR-0011 and profile selection by ADR-0012.)_
 
 ## Alternatives Considered
 

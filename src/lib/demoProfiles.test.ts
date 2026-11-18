@@ -60,13 +60,12 @@ describe('demo profiles', () => {
     await expect(
       bridge.launchSession({ ...start, profile: 'weg' }),
     ).rejects.toThrow('Profil nicht gefunden.');
-    // A container has its own home: the profile is dropped, not refused.
     const docker = await bridge.launchSession({
       ...start,
       env: 'docker',
       profile: 'team',
     });
-    expect(docker.recent).not.toHaveProperty('profile');
+    expect(docker.recent.profile).toBe('team');
   });
 
   it('saves a new profile signed out and keeps the others’ sign-in', async () => {
@@ -165,7 +164,9 @@ describe('demo profiles', () => {
     const local = before.find(
       (r) => r.agent === 'claude' && r.env === 'local',
     )!;
-    const docker = before.find((r) => r.env === 'docker')!;
+    const docker = before.find(
+      (r) => r.agent === 'claude' && r.env === 'docker',
+    )!;
     const codex = before.find((r) => r.agent === 'codex')!;
     const stored = async (id: string, profile?: string) => {
       const { options } = before.find((r) => r.id === id)!;
@@ -184,8 +185,8 @@ describe('demo profiles', () => {
     expect(await stored(local.id, 'default')).toBeUndefined();
     await stored(local.id, 'team');
     expect(await stored(local.id)).toBeUndefined();
-    // A container has its own home: the profile is dropped, not refused.
-    expect(await stored(docker.id, 'team')).toBeUndefined();
+    expect(await stored(docker.id, 'team')).toBe('team');
+    expect(await stored(docker.id, 'default')).toBeUndefined();
     for (const [recent, profile] of [
       [local, 'gone'],
       [codex, 'team'],
