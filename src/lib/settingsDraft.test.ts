@@ -64,6 +64,17 @@ describe('SettingsDraft', () => {
     expect(draft.saved.agentUpdates).toBe(true);
   });
 
+  it('stages the Docker Node switch: on by default, off only once saved', () => {
+    const draft = new SettingsDraft(demoSettings());
+    expect(draft.value.docker.manageNode).toBe(true);
+    draft.value.docker.manageNode = false;
+    expect(draft.dirty).toBe(true);
+    expect(draft.saved.docker.manageNode).toBe(true);
+    draft.commit(draft.current());
+    expect(draft.dirty).toBe(false);
+    expect(draft.saved.docker.manageNode).toBe(false);
+  });
+
   it('marks invalid fields per tab group', () => {
     const draft = new SettingsDraft(demoSettings());
     draft.value.agents.claude.extraArgs = '--x "y"';

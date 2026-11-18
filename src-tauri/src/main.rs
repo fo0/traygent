@@ -16,5 +16,14 @@ fn main() {
     if let Some(code) = docker_credential::handle() {
         std::process::exit(code);
     }
+    // Before Tauri's single-instance handler, which would hand the call to a running tray.
+    let hooks = traygent_core::launch::docker::claude_hooks::handle(
+        std::env::args_os().skip(1),
+        &mut std::io::stdout().lock(),
+        &mut std::io::stderr(),
+    );
+    if let Some(code) = hooks {
+        std::process::exit(code);
+    }
     desktop::run();
 }

@@ -31,6 +31,7 @@ impl Default for DockerSettings {
             gh_token: false,
             ports: Vec::new(),
             socket: false,
+            manage_node: true,
         }
     }
 }

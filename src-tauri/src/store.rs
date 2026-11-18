@@ -179,6 +179,8 @@ fn parse_settings(object: &Map<String, Value>) -> AppSettings {
         settings.docker.gh_token = field(docker, "ghToken", false);
         settings.docker.ports = field(docker, "ports", Vec::new());
         settings.docker.socket = field(docker, "socket", false);
+        // Absent (a file from before the setting) or unreadable: on, like a fresh install.
+        settings.docker.manage_node = field(docker, "manageNode", defaults.docker.manage_node);
     }
     if let Some(github) = object.get("github").and_then(Value::as_object) {
         settings.github.clone_root = field(github, "cloneRoot", String::new());

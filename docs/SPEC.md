@@ -603,6 +603,12 @@ Commands (Rust `#[tauri::command]`, German `Err` strings; panel calls only via `
     change is committed through `apply_profiles` and emitted as `traygent:snapshot`. One watch
     per profile: another click replaces it, a removed profile or a panicking read ends it.
 
+## Linux runtimes in Docker
+
+`settings.docker.manageNode` defaults to true, including for existing installations. The Docker section of **Umgebung** stages this switch with the other environment settings. All three agents use the workspace's first available `.nvmrc` or `.node-version`. Supported values are numeric majors, minors or releases with an optional `v` prefix, plus `lts` and `lts/*`. An unsupported value produces a notice. When there is one hook pin and no project version, it also supplies the session's Node. Otherwise the image supplies the default.
+
+An exec-form Node hook in the selected Claude user settings can reference a mounted script by its Windows path. Traygent projects its argument list into Linux paths after profile sync and cloning. Each NVM hook can request its own exact release. Disabling mise selects the image runtime and retains path translation. The read-only settings projection belongs to this session. [ADR-0013](adr/0013-prepare-linux-node-for-docker-sessions.md)
+
 ## Ports (Docker sessions)
 
 - A Docker session can publish ports (`docker run -p`). The composer shows a „Ports“ chip only

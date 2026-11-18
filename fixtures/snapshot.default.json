@@ -34,7 +34,8 @@
       },
       "ghToken": false,
       "ports": [],
-      "socket": false
+      "socket": false,
+      "manageNode": true
     },
     "github": {
       "cloneRoot": ""

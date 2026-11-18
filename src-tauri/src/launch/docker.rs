@@ -10,6 +10,7 @@ use crate::recents::hex_prefix;
 use crate::settings;
 use sha2::{Digest, Sha256};
 
+pub mod claude_hooks;
 mod home;
 pub use home::AgentHome;
 
@@ -40,10 +41,10 @@ const CLAUDE_INIT: &[&str] = &[
     "chown -R node:node /home/node/.local 2>/dev/null",
     "if [ ! -x /home/node/.local/bin/claude ]; then",
     "  echo '[traygent] Installiere Claude Code ins Volume claude-code-tools ...'",
-    "  runuser -u node -- bash -c 'curl -fsSL https://claude.ai/install.sh | bash' || exit 1",
+    "  runuser -u node -- env PATH=\"$agent_path\" bash -c 'curl -fsSL https://claude.ai/install.sh | bash' || exit 1",
     "  [ -x /home/node/.local/bin/claude ] || { echo 'FEHLER: Claude Code Installation fehlgeschlagen'; exit 1; }",
     "fi",
-    "exec runuser -u node -- env PATH=\"/home/node/.local/bin:$PATH\" /home/node/.local/bin/claude \"$@\"",
+    "exec runuser -u node -- env PATH=\"$agent_path\" /home/node/.local/bin/claude \"$@\"",
 ];
 
 /// OpenCode V2's official installer into a volume (UNVERIFIED end to end); loopback joins
@@ -53,33 +54,47 @@ const OPENCODE_INIT: &[&str] = &[
     "chown -R node:node /home/node/.opencode /home/node/.local /home/node/.config 2>/dev/null",
     "if [ ! -x /home/node/.opencode/bin/opencode ]; then",
     "  echo '[traygent] Installiere OpenCode V2 ins Volume traygent-opencode-bin ...'",
-    "  runuser -u node -- bash -c 'curl -fsSL https://opencode.ai/v2/install | bash -s -- --no-modify-path' || exit 1",
+    "  runuser -u node -- env PATH=\"$agent_path\" bash -c 'curl -fsSL https://opencode.ai/v2/install | bash -s -- --no-modify-path' || exit 1",
     "  [ -x /home/node/.opencode/bin/opencode ] || { echo 'FEHLER: OpenCode Installation fehlgeschlagen'; exit 1; }",
     "fi",
     "export NO_PROXY=\"${NO_PROXY:+$NO_PROXY,}localhost,127.0.0.1,::1\"; export no_proxy=\"$NO_PROXY\"",
-    "exec runuser -u node -- env PATH=\"/home/node/.local/bin:$PATH\" /home/node/.opencode/bin/opencode --standalone \"$@\"",
+    "exec runuser -u node -- env PATH=\"$agent_path\" /home/node/.opencode/bin/opencode --standalone \"$@\"",
 ];
 
 /// An npm shim can survive a missing native package. Probe the binary as the session user
 /// and serialize repairs across containers sharing the tools volume.
+///
+/// On the Docker Desktop bind, files the Windows CLI created appear as root-owned mode 0777.
+/// The TUI enforces 0644 on `installation_id` with `fchmod`, which only the owner may call
+/// (EPERM, #55). Only that file goes to node; its value stays shared with the host CLI.
 const CODEX_INIT: &[&str] = &[
     "chown node:node /home/node/.codex/tmp || exit 1",
+    "codex_id=/home/node/.codex/installation_id",
+    "if [ -e \"$codex_id\" ] || [ -L \"$codex_id\" ]; then",
+    "  [ -f \"$codex_id\" ] && [ ! -L \"$codex_id\" ] && [ \"$(stat -c %h \"$codex_id\")\" = 1 ] || { echo '[traygent] installation_id muss eine reguläre Datei ohne Verknüpfungen sein.' >&2; exit 1; }",
+    "  if [ \"$(stat -c %u \"$codex_id\")\" != \"$(id -u node)\" ]; then",
+    "    chown -h node:node \"$codex_id\" || { echo '[traygent] Die Dateirechte für die Codex-Installations-ID konnten nicht vorbereitet werden.' >&2; exit 1; }",
+    "  fi",
+    "fi",
     "mkdir -p /home/node/.local/bin \"$CODEX_SQLITE_HOME\" || exit 1",
     "chown -R node:node /home/node/.local 2>/dev/null",
+    "as_codex() { runuser -u node -- /home/node/.local/bin/codex \"$@\"; }",
     "(",
     "  flock -x 9 || exit 1",
-    "  if ! runuser -u node -- /home/node/.local/bin/codex --version >/dev/null 2>&1; then",
+    "  if ! as_codex --version >/dev/null 2>&1; then",
     "    echo '[traygent] Installiere oder repariere Codex CLI im Volume traygent-codex-tools ...'",
     "    runuser -u node -- env NPM_CONFIG_PREFIX=/home/node/.local npm install -g --include=optional @openai/codex@latest || exit 1",
-    "    runuser -u node -- /home/node/.local/bin/codex --version || { echo 'FEHLER: Codex CLI konnte nach der Installation nicht gestartet werden'; exit 1; }",
+    "    as_codex --version || { echo 'FEHLER: Codex CLI konnte nach der Installation nicht gestartet werden'; exit 1; }",
     "  fi",
     ") 9</home/node/.local || exit 1",
-    "codex_login() { runuser -u node -- /home/node/.local/bin/codex -c \"sqlite_home=$CODEX_SQLITE_HOME\" login \"$@\"; }",
+    "codex_login() { as_codex -c \"sqlite_home=$CODEX_SQLITE_HOME\" login \"$@\"; }",
     "if ! codex_login status >/dev/null 2>&1; then",
     "  if [ -n \"$OPENAI_API_KEY\" ]; then printenv OPENAI_API_KEY | codex_login --with-api-key",
     "  else codex_login --device-auth; fi || exit 1",
     "fi",
-    "exec runuser -u node -- env PATH=\"/home/node/.local/bin:$PATH\" /home/node/.local/bin/codex -c \"sqlite_home=$CODEX_SQLITE_HOME\" \"$@\"",
+    "codex_cli=(/home/node/.local/bin/codex)",
+    "if [[ $(readlink -f /home/node/.local/bin/codex) == *.js ]]; then codex_cli=(\"$(command -v node)\" /home/node/.local/bin/codex); fi",
+    "exec runuser -u node -- env PATH=\"$agent_path\" \"${codex_cli[@]}\" -c \"sqlite_home=$CODEX_SQLITE_HOME\" \"$@\"",
 ];
 
 /// `DOCKER_CLI_FALLBACK_VERSION` of the starter: used when the listing gives no version.
@@ -127,11 +142,14 @@ pub fn init_script(agent: AgentId, socket: bool) -> String {
         AgentId::Codex => CODEX_INIT,
     };
     let mut all = if socket { socket_init() } else { Vec::new() };
-    all.push(
-        include_str!("docker/install-gh.sh")
-            .trim_end()
-            .replace("\r\n", "\n"),
-    );
+    all.push(". /opt/traygent/install-gh.sh || exit 1".into());
+    // Only the session user loads or executes tools from its writable cache.
+    all.push("agent_path=/home/node/.local/bin:$PATH".into());
+    all.push("if [ \"${TRAYGENT_MANAGE_NODE:-0}\" = 1 ]; then".into());
+    all.push("  chown -h node:node /home/node/.local || exit 1".into());
+    all.push("  node_bin=$(runuser -u node -- /opt/traygent/prepare-node) || { echo '[traygent] Linux-Node konnte nicht vorbereitet werden. Bitte die Meldung oben prüfen.' >&2; exit 1; }".into());
+    all.push("  agent_path=${node_bin:+$node_bin:}$agent_path".into());
+    all.push("fi".into());
     all.extend(lines.iter().map(|line| line.to_string()));
     let mut script = all.join("\n");
     script.push('\n');
@@ -216,6 +234,17 @@ pub fn run(
     let mut env = vec![set_env_base64("TRAYGENT_INIT", &init)];
     let mut fetch = Vec::new();
     let mut cleanup = Vec::new();
+    let exe = resolved
+        .traygent_exe
+        .as_deref()
+        .filter(|path| super::is_windows_absolute(path))
+        .ok_or("Das Traygent-Programm für die Docker-Umgebung wurde nicht gefunden.")?;
+    let (install_dir, _) = exe.rsplit_once(['\\', '/']).expect("absolute executable");
+    let resources = format!(r"{install_dir}\docker");
+    env.push(format!(
+        "if (-not (Test-Path -LiteralPath {} -PathType Leaf)) {{ throw 'Die Docker-Dateien der Traygent-Installation fehlen. Bitte Traygent erneut installieren.' }}",
+        ps_literal(&format!(r"{resources}\install-gh.sh"))
+    ));
     let mut args = Vec::new();
     push(&mut args, &["run", "--rm", "-it", "--init"]);
     // Root prepares and `runuser` drops to node, neither needs setuid. UNVERIFIED for Claude
@@ -229,12 +258,36 @@ pub fn run(
         push(&mut args, &["-v", &format!("{DOCKER_SOCK}:{DOCKER_SOCK}")]);
     }
     push(&mut args, &["-w", &workspace]);
+    push(&mut args, &["-v", &format!("{resources}:/opt/traygent:ro")]);
+    let manage_node = if settings.docker.manage_node {
+        "1"
+    } else {
+        "0"
+    };
+    push(
+        &mut args,
+        &["-e", &format!("TRAYGENT_MANAGE_NODE={manage_node}")],
+    );
     match agent {
         AgentId::Claude => {
             let home = resolved
                 .docker_home
                 .as_ref()
                 .ok_or("Claude-Konfigurationsordner fehlt.")?;
+            let source = ps_literal(&home.directory);
+            let standard = ps_literal(home.shared_from.as_ref().unwrap_or(&home.directory));
+            // DeleteOnClose releases even when the terminal is killed during docker run.
+            fetch.push("$tgHookMount=@(); $tgHookFile=[IO.Path]::Combine([IO.Path]::GetTempPath(),('traygent-hooks-'+[guid]::NewGuid().ToString('N')+'.json')); \
+                $tgHookLease=[IO.FileStream]::new($tgHookFile,[IO.FileMode]::CreateNew,[IO.FileAccess]::ReadWrite,([IO.FileShare]::ReadWrite -bor [IO.FileShare]::Delete),4096,[IO.FileOptions]::DeleteOnClose)".into());
+            fetch.push(format!(
+                "$env:TRAYGENT_HOOK_NODES=(& {} '--docker-claude-hooks' {source} {standard} {} {} $tgHookFile '{manage_node}' | Out-String).Trim(); \
+                 if ($LASTEXITCODE -eq 2) {{ Write-Warning 'Claude verwendet die vorhandenen Einstellungen ohne Pfadanpassung.' }} \
+                 elseif ($LASTEXITCODE -ne 0) {{ throw 'Die Claude-Hooks für Docker konnten nicht vorbereitet werden.' }}; \
+                 if ($tgHookLease.Length) {{ $tgHookMount=@('-v',($tgHookFile+':/home/node/.claude/settings.json:ro')) }}",
+                ps_literal(exe), ps_literal(folder), ps_literal(&workspace)
+            ));
+            cleanup.push("if ($tgHookLease) { $tgHookLease.Dispose() }".into());
+            push(&mut args, &["-e", "TRAYGENT_HOOK_NODES"]);
             push(
                 &mut args,
                 &["-v", &format!("{}:/home/node/.claude:rw", home.directory)],
@@ -355,11 +408,6 @@ pub fn run(
             .github_account_id
             .filter(|id| *id != 0)
             .ok_or(NO_ACCOUNT)?;
-        let exe = resolved
-            .traygent_exe
-            .as_deref()
-            .filter(|path| super::is_windows_absolute(path))
-            .ok_or(UNAVAILABLE)?;
         // The explicit pipeline makes PowerShell 5.1 redirect stdout and wait for a
         // GUI-subsystem executable. A plain assignment would detach it without a pipe.
         fetch.push(format!(
@@ -384,7 +432,10 @@ pub fn run(
                 "GH_TOKEN",
             ],
         );
-        cleanup.push("[Environment]::SetEnvironmentVariable('GH_TOKEN', $null)".to_string());
+        cleanup.insert(
+            0,
+            "[Environment]::SetEnvironmentVariable('GH_TOKEN', $null)".to_string(),
+        );
     }
     // A missing source would make Docker create a directory there (EISDIR class).
     if let Some(gitconfig) = &resolved.gitconfig {

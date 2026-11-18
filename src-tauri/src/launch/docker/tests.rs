@@ -11,9 +11,11 @@ fn a_codex_shim_must_run_before_it_can_skip_installation() {
     let (before, after) = init
         .split_once("npm install -g --include=optional @openai/codex@latest || exit 1")
         .unwrap();
-    assert!(before.contains("if ! runuser -u node -- /home/node/.local/bin/codex --version"));
+    assert!(before.contains("if ! as_codex --version"));
+    assert!(before.contains("as_codex() { runuser -u node -- /home/node/.local/bin/codex"));
+    assert!(after.contains("codex_cli=(\"$(command -v node)\" /home/node/.local/bin/codex)"));
     let (after_install, _) = after.split_once("if ! codex_login status").unwrap();
-    assert!(after_install.contains("runuser -u node -- /home/node/.local/bin/codex --version ||"));
+    assert!(after_install.contains("as_codex --version ||"));
 }
 
 const DOCKER: &str = "C:\\Program Files\\Docker\\Docker\\resources\\bin\\docker.exe";
@@ -84,15 +86,15 @@ fn init_scripts_are_lf_only_and_end_in_the_cli() {
     for (agent, last) in [
         (
             AgentId::Claude,
-            "exec runuser -u node -- env PATH=\"/home/node/.local/bin:$PATH\" /home/node/.local/bin/claude \"$@\"\n",
+            "exec runuser -u node -- env PATH=\"$agent_path\" /home/node/.local/bin/claude \"$@\"\n",
         ),
         (
             AgentId::Opencode,
-            "exec runuser -u node -- env PATH=\"/home/node/.local/bin:$PATH\" /home/node/.opencode/bin/opencode --standalone \"$@\"\n",
+            "exec runuser -u node -- env PATH=\"$agent_path\" /home/node/.opencode/bin/opencode --standalone \"$@\"\n",
         ),
         (
             AgentId::Codex,
-            "exec runuser -u node -- env PATH=\"/home/node/.local/bin:$PATH\" /home/node/.local/bin/codex -c \"sqlite_home=$CODEX_SQLITE_HOME\" \"$@\"\n",
+            "exec runuser -u node -- env PATH=\"$agent_path\" \"${codex_cli[@]}\" -c \"sqlite_home=$CODEX_SQLITE_HOME\" \"$@\"\n",
         ),
     ] {
         let script = init_script(agent, false);
@@ -121,7 +123,15 @@ fn init_scripts_and_loader_are_valid_bash() {
     for script in AgentId::ALL
         .into_iter()
         .flat_map(|agent| [init_script(agent, false), init_script(agent, true)])
-        .chain([LOADER.to_string()])
+        .chain(
+            [
+                LOADER,
+                include_str!("../../../resources/docker/install-gh.sh"),
+                include_str!("../../../resources/docker/prepare-node"),
+                include_str!("../../../resources/docker/node-hook"),
+            ]
+            .map(String::from),
+        )
     {
         let status = std::process::Command::new("bash")
             .args(["-n", "-c", &script])
@@ -157,6 +167,12 @@ fn claude_mounts_the_host_config_and_state_and_reuses_the_tools_and_project_dir(
         r"C:\Code\RepoWatch:/workspace/repowatch-7a494d81",
         "-w",
         "/workspace/repowatch-7a494d81",
+        "-v",
+        r"C:\Program Files\Traygent\docker:/opt/traygent:ro",
+        "-e",
+        "TRAYGENT_MANAGE_NODE=1",
+        "-e",
+        "TRAYGENT_HOOK_NODES",
         "-v",
         r"C:\Agent Home:/home/node/.claude:rw",
         "-v",
@@ -260,6 +276,28 @@ fn codex_mounts_the_host_home_and_uses_the_container_permission_mapping() {
     assert!(joined.contains(
         "ghcr.io/me/codex:1 bash -c printenv TRAYGENT_INIT >/tmp/traygent-init.sh && . /tmp/traygent-init.sh traygent resume --sandbox danger-full-access --ask-for-approval on-request"
     ));
+}
+
+#[test]
+fn codex_hands_only_a_windows_created_installation_id_to_node_before_the_tui() {
+    let init = init_script(AgentId::Codex, false);
+    let lines: Vec<&str> = init.lines().collect();
+    let at = |needle: &str| lines.iter().position(|line| line.contains(needle)).unwrap();
+    let guard = at("codex_id=/home/node/.codex/installation_id");
+    let change_owner = at("chown -h node:node \"$codex_id\"");
+    assert!(guard < at("[ ! -L \"$codex_id\" ]"));
+    assert!(at("stat -c %h") < change_owner && at("id -u node") < change_owner);
+    assert!(lines[change_owner].ends_with("exit 1; }"));
+    assert!(guard < at("codex_login status") && guard < at("exec runuser"));
+    // The only host file whose ownership view changes; nothing recursive under .codex.
+    let host_chowns: Vec<&&str> = lines
+        .iter()
+        .filter(|line| line.contains("chown") && !line.contains("/home/node/.local"))
+        .collect();
+    assert_eq!(host_chowns.len(), 2, "{host_chowns:?}");
+    assert!(!init.contains("chown -R node:node /home/node/.codex"));
+    // Codex sets the mode itself once node owns the file; the init never widens it.
+    assert!(!lines.iter().any(|line| line.contains("chmod")));
 }
 
 #[test]

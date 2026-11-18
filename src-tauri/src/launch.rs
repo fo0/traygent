@@ -226,10 +226,15 @@ fn build(
             {
                 return Err(PROFILE_UNRESOLVED.into());
             }
-            if let Some(mounts) = profile_mounts {
-                script.push(mounts);
+            if agent == AgentId::Claude {
+                let linked = if let Some(mounts) = profile_mounts {
+                    script.push(mounts);
+                    " @tgProfileMounts"
+                } else {
+                    ""
+                };
                 call.push(format!(
-                    "& {} 'run' @tgProfileMounts{}",
+                    "& {} 'run'{linked} @tgHookMount{}",
                     ps_literal(docker),
                     quote::literal_args(&run.args[1..])
                 ));

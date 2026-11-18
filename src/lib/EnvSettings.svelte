@@ -181,6 +181,18 @@
     </div>
     <label
       class="switch-row"
+      title="mise installiert die Node-Versionen für das Projekt und seine Claude-Hooks unter Linux. Ausgeschaltet gilt die Version aus dem Docker-Image."
+    >
+      <input
+        type="checkbox"
+        class="switch-input"
+        bind:checked={draft.value.docker.manageNode}
+      />
+      <span class="switch" aria-hidden="true"></span>
+      <span>Node-Version mit mise</span>
+    </label>
+    <label
+      class="switch-row"
       title="Verwendet das in Traygent verbundene GitHub-Konto für git und gh im Container"
     >
       <input

@@ -112,11 +112,20 @@ test('Umgebung: default environment, terminal and Docker image save together', a
   await expect(socket).not.toBeChecked();
   await dialog.getByText('Docker-Socket durchreichen').click();
   await expect(socket).toBeChecked();
+  const node = dialog.getByRole('checkbox', { name: 'Node-Version mit mise' });
+  await expect(node).toBeChecked();
+  await dialog.getByText('Node-Version mit mise').click();
+  await expect(node).not.toBeChecked();
   await saveButton(page).click();
   await expect(dialog).toHaveCount(0);
   await expect(
     page.locator('form.composer').getByRole('radio', { name: 'Docker' }),
   ).toBeChecked();
+  const again = await openSettings(page);
+  await again.getByRole('tab', { name: 'Umgebung', exact: true }).click();
+  await expect(
+    again.getByRole('checkbox', { name: 'Node-Version mit mise' }),
+  ).not.toBeChecked();
 });
 
 test('Umgebung: hidden environments leave the composer; the last one stays on', async ({
