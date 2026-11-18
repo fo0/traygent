@@ -1,4 +1,4 @@
-# Keep the writable tools volume off the root shell's search path.
+# Sourced by the container init. Keep writable tools off the root shell's PATH.
 install_gh() {
 [ ! -L /home/node/.local/bin ] && mkdir -p /home/node/.local/bin && chown -h node:node /home/node/.local/bin &&
 runuser -u node -- env PATH="/home/node/.local/bin:$PATH" bash -s <<'TRAYGENT_GH'

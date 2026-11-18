@@ -27,6 +27,7 @@ fn sample() -> Persisted {
     settings.docker.gh_token = true;
     settings.docker.ports = vec!["127.0.0.1:5173:5173".into()];
     settings.docker.socket = true;
+    settings.docker.manage_node = false;
     settings.agents.get_mut(AgentId::Codex).permission = PermissionId::Bypass;
     settings.github.clone_root = r"D:\src".into();
     settings.profiles.claude = vec![
@@ -99,6 +100,7 @@ fn save_then_load_round_trips_with_a_version() {
     assert_eq!(value["settings"]["agentUpdates"], true);
     assert_eq!(value["settings"]["debug"], true);
     assert_eq!(value["settings"]["docker"]["socket"], true);
+    assert_eq!(value["settings"]["docker"]["manageNode"], false);
     assert_eq!(value["recents"][0]["dockerSocket"], true);
     assert_eq!(
         value["settings"]["profiles"],
@@ -474,4 +476,20 @@ fn the_docker_socket_loads_leniently_and_only_for_docker_recents() {
     assert!(!settings.docker.socket && settings.docker.gh_token);
     dir.write(r#"{"version":1,"settings":{"docker":{"ghToken":true}}}"#);
     assert!(!load(&dir.0).state.settings.docker.socket);
+}
+
+#[test]
+fn node_management_defaults_on_and_keeps_an_explicit_off() {
+    let dir = TempDir::new("manage-node");
+    // A file from before the setting, with or without a Docker group, reads on.
+    dir.write(r#"{"version":1,"settings":{"docker":{"ghToken":true}}}"#);
+    assert!(load(&dir.0).state.settings.docker.manage_node);
+    dir.write(r#"{"version":1,"settings":{"terminal":"console"}}"#);
+    assert!(load(&dir.0).state.settings.docker.manage_node);
+    // An unreadable value resets only itself to on; an explicit off stays off.
+    dir.write(r#"{"version":1,"settings":{"docker":{"manageNode":"no","socket":true}}}"#);
+    let settings = load(&dir.0).state.settings;
+    assert!(settings.docker.manage_node && settings.docker.socket);
+    dir.write(r#"{"version":1,"settings":{"docker":{"manageNode":false}}}"#);
+    assert!(!load(&dir.0).state.settings.docker.manage_node);
 }

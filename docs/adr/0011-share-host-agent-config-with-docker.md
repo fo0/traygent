@@ -1,6 +1,6 @@
 # ADR-0011: Share Host Agent Configuration With Docker
 
-- **Status:** Accepted
+- **Status:** Accepted, partly superseded for Claude user settings by [ADR-0013](0013-prepare-linux-node-for-docker-sessions.md)
 - **Date:** 2026-11-18
 - **Decider(s):** user
 - **Tags:** docker, authentication, storage

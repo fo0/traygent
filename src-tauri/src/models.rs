@@ -339,6 +339,10 @@ pub struct DockerSettings {
     /// Mount the host Docker socket into every new Docker session, so the agent can drive
     /// the host's Docker (docs/SPEC.md → Docker socket).
     pub socket: bool,
+    /// Let mise supply the container's Linux Node for project version files and Claude's NVM
+    /// hooks; off uses the Node of the chosen image. On by default, also for files saved
+    /// before the setting.
+    pub manage_node: bool,
 }
 
 /// A well-known dev-server port the panel offers as a checkbox.

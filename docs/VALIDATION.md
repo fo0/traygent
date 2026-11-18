@@ -25,6 +25,13 @@ The Windows Rust suite had the same 57 profile-test failures on the baseline che
 
 In the profile and GitHub follow-up, two synthetic Claude identities stayed separate across Windows PowerShell 5.1 Docker launches. Each session could read a shared skill through an NTFS junction and write its own global settings. In an offline Linux container, Git and gh 2.104.0 both obtained the connected account’s credential through the release executable’s Windows vault helper. A competing environment token and Git credential helpers were covered separately with synthetic data.
 
+## Interactive Docker startup and Node hooks (2026-11-18)
+
+Windows PowerShell 5.1 ran the commands from `Service::prepare_launch` in a Windows pseudoconsole on Docker Desktop 29.9.3. The test used synthetic Windows homes, isolated tool caches and `--network none` for the agent sessions. A separate cold setup downloaded the pinned mise binary and Linux Node 24.21.0.
+
+- Claude Code 2.1.327 invoked synthetic `SessionStart` and `UserPromptSubmit` hooks configured with an absolute Windows NVM executable and a script path containing spaces. Both scripts recorded Linux and Node 24.21.0, including in a named profile whose hooks directory was an NTFS junction into Standard. Disabling mise produced the image's Node 22.23.5 for both. The prompt hook blocked the synthetic prompt before inference. The Windows settings file retained its SHA-256.
+- Codex 0.169.1 reproduced OS error 1 with a Windows-created `installation_id`. A syscall trace showed `fchmod(fd, 0644) = -1 EPERM`. The corrected launch reached the interactive `/status` response with the saved model, xhigh effort and full access. The test sent no model prompt. The ID's contents and Windows access control list matched before and after.
+
 ## Test boundaries
 
 Mocks do not establish native tray/DPI acceptance, real agent CLIs, Docker or terminal windows. Test those on an owner-controlled Windows system. Windows popup behavior has separate [native validation boundaries](WINDOWS_POPUP_VALIDATION.md). Windows EXEs have no Authenticode certificate. Standard unsigned builds install updates in the app ([release process](RELEASES.md)); the `update-install` browser spec exercises the offer, progress, failed verification and retry, but does not prove an actual Windows upgrade.
