@@ -7,7 +7,7 @@
 **Coding agents within reach.**<br />
 Start Claude Code, OpenCode or Codex from your Windows tray — in one click, locally or in Docker.
 
-[![Release](https://github.com/fo0/traygent/actions/workflows/release.yml/badge.svg?branch=main)](https://github.com/fo0/traygent/actions/workflows/release.yml)
+[![Desktop Release](https://github.com/fo0/traygent/actions/workflows/desktop-release.yml/badge.svg?branch=main)](https://github.com/fo0/traygent/actions/workflows/desktop-release.yml)
 [![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
 ![Platform: Windows x64](https://img.shields.io/badge/platform-Windows%20x64-0078d4.svg)
 ![Built with Tauri 2](https://img.shields.io/badge/built%20with-Tauri%202-24c8db.svg)
@@ -112,7 +112,7 @@ pnpm build:installer   # unsigned NSIS installer (Windows) → src-tauri/target/
 
 No environment variables or `.env` file are needed to build, run or test; optional build-time and test variables (for example `PLAYWRIGHT_CHROMIUM_EXECUTABLE`, `POWERSHELL_EXECUTABLE`) are listed in [agent_docs/env-vars.md](agent_docs/env-vars.md).
 
-[CI](.github/workflows/ci.yml) runs on pull requests: lint, typecheck, unit and release-helper tests, the frontend build, Playwright, and — when their files change — Rust fmt/Clippy/tests and a Windows job that builds the desktop shell and runs the Win32 popup and isolated autostart-registry tests. [Release](.github/workflows/release.yml) is started by hand on `main`, runs CI for that commit and publishes an unsigned Windows EXE ([release process](docs/RELEASES.md)). README screenshots: `pnpm capture:readme`.
+[CI](.github/workflows/ci.yml) runs on pull requests: lint, typecheck, unit and release-helper tests, the frontend build, Playwright, and — when their files change — Rust fmt/Clippy/tests and a Windows job that builds the desktop shell and runs the Win32 popup and isolated autostart-registry tests. [Desktop Release](.github/workflows/desktop-release.yml) is started by hand on `main`, runs CI for that commit and publishes an unsigned Windows EXE ([release process](docs/RELEASES.md)). README screenshots: `pnpm capture:readme`.
 
 ## Documentation
 

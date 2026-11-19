@@ -14,7 +14,7 @@ Stable project knowledge. **Read at session start.**
 ### Unsigned Windows releases, versions from the run timestamp
 
 - **Date:** 2026-11-03 (inherited)
-- **Decision:** The manual _Release_ Action publishes an unsigned NSIS EXE (`createUpdaterArtifacts: false` in `src-tauri/tauri.release.conf.json`). The version is `YYYY.MMDD.HHmm` (UTC) from the run creation time, stamped only into the build workspace — Git keeps `0.1.0`. Detail: `docs/RELEASES.md`.
+- **Decision:** The manual _Desktop Release_ Action publishes an unsigned NSIS EXE (`createUpdaterArtifacts: false` in `src-tauri/tauri.release.conf.json`). The version is `YYYY.MMDD.HHmm` (UTC) from the run creation time, stamped only into the build workspace — Git keeps `0.1.0`. Detail: `docs/RELEASES.md`.
 
 ### Unsigned builds update in the app
 
@@ -38,14 +38,14 @@ Stable project knowledge. **Read at session start.**
 
 ## Gotchas & Pitfalls
 
-- **Releases are manual only** — _Actions → Release → Run workflow_ on `main` runs `ci.yml` for that commit, then builds and publishes; merges never release. Never start one unprompted. (2026-11-03)
+- **Releases are manual only** — _Actions → Desktop Release → Run workflow_ on `main` runs `ci.yml` for that commit, then builds and publishes; merges never release. Never start one unprompted. (2026-11-03)
 - **`pnpm lint` is `prettier --check . && eslint .`** — prettier covers Markdown and JSON too. The husky pre-commit hook (lint-staged → prettier, `rustfmt` for `*.rs`) is installed by `pnpm install`. Never `--no-verify`. (2026-11-03)
 - **Cargo features** — `default = []` (serde, serde_json, chrono, and `sha2` as a regular dependency: recent ids, Docker project dir name, update digests), `updates` (reqwest, semver), `vault` (keyring; `KeyringVault` compiles only with it, `--features updates,vault` type-checks it on Linux), `desktop` (Tauri + plugins, pulls `updates` + `vault`). Linux checks use `--features updates`; `--features desktop` is built and tested in the Windows CI job. With `libwebkit2gtk-4.1-dev libayatana-appindicator3-dev librsvg2-dev libxdo-dev` and a built `dist/`, `cargo clippy --features desktop` also runs on Linux. (2026-11-03)
 - **Type-check `cfg(windows)` code from Linux** — `rustup target add x86_64-pc-windows-gnu`, `apt-get install gcc-mingw-w64-x86-64`, then `cargo clippy --manifest-path src-tauri/Cargo.toml --target x86_64-pc-windows-gnu --features desktop --all-targets -- -D warnings` (needs a built `dist/`). It checks, it does not run. (2026-11-03)
 - **Golden snapshot fixture** — `fixtures/snapshot.default.json` is written by a Rust test and checked against `Snapshot` by `src/lib/fixture.test.ts`. After a model or catalog change: `TRAYGENT_UPDATE_FIXTURES=1 cargo test --manifest-path src-tauri/Cargo.toml --features updates the_default_native_snapshot`, then `pnpm exec prettier --write fixtures/snapshot.default.json`. `fixtures/profile-share-names.json` likewise: after a recipe or name-rule change rerun with `TRAYGENT_UPDATE_FIXTURES=1 … the_name_lists_match_their_fixture`, then prettier; it holds `handledDirs` / `handledFiles`, to which `profileShare.ts → BUILT_IN_SHARE` is pinned. (2026-11-03, 2026-11-13)
 - **Spawned terminals inherit Traygent's PATH** — detection also reads the registry PATH, so a fresh install is found and launched by absolute path, but tools the agent calls itself (Git, node) stay missing until a re-login or a Traygent restart. A registry PATH refresh for the terminal is in BACKLOG. (2026-11-03)
 - **PowerShell 5.1 quoting** — no `"` and no empty element in any native argv, no trailing `\` on folders, JSON/scripts only as Base64 env, `;` as `\;` for wt.exe, secrets name-only: [ADR-0003](docs/adr/0003-launch-through-a-powershell-argv.md). Never build a cmd string. (2026-11-03)
-- **`release:test` skips the workflow tests without PowerShell 7**; `POWERSHELL_EXECUTABLE=<path>/pwsh` runs them for real. Every `run:` line of `release.yml` executes there with mocked `gh`, `pnpm`, `cargo`, `rustup` — a new tool in a release step needs a mock. (2026-11-03)
+- **`release:test` skips the workflow tests without PowerShell 7**; `POWERSHELL_EXECUTABLE=<path>/pwsh` runs them for real. Every `run:` line of `desktop-release.yml` executes there with mocked `gh`, `pnpm`, `cargo`, `rustup` — a new tool in a release step needs a mock. (2026-11-03)
 - **Popup dismissal is generation-guarded**: blur hides after 120 ms, every tray gesture/focus/reopen bumps a generation that cancels stale hides — keep that when touching `tray_popup.rs` / `popup.rs`. (2026-11-03)
 - **Release git reads run without credentials** — they rely on the repository being public; if it goes private, pass the token explicitly. (2026-11-03)
 - **PR checks skip `rust-core` / `windows-desktop`** when the PR touches none of their paths (`changes` job in `ci.yml`); extend its patterns when Rust or release code starts reading files elsewhere. (2026-11-03)
