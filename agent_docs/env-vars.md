@@ -2,16 +2,16 @@
 
 The app needs none at runtime. All of these are optional.
 
-| Variable                         | Kind                  | Read in                                                     | Purpose                                                                                                                         |
-| -------------------------------- | --------------------- | ----------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------- |
-| `TRAYGENT_UPDATER_PUBLIC_KEY`    | compile-time / script | `src-tauri/src/desktop_updates.rs`, `scripts/updater.mjs`   | Tauri updater public key for separately signed builds; unset in the standard unsigned release                                   |
-| `PLAYWRIGHT_CHROMIUM_EXECUTABLE` | test                  | `playwright.config.ts`, `scripts/capture-support.mjs`       | Use a preinstalled Chromium                                                                                                     |
-| `E2E_PORT`                       | test                  | `playwright.config.ts`                                      | Dev-server port for the Playwright run (default `1420`); give parallel suites distinct ports                                    |
-| `STARTUP_REVIEW_DIR`             | test                  | `tests/startup.spec.ts`                                     | When set, the startup spec writes dialog screenshots there; unset skips the captures                                            |
-| `POWERSHELL_EXECUTABLE`          | test                  | `scripts/release-workflow.test.mjs`                         | PowerShell 7 binary for the workflow tests                                                                                      |
-| `CI`                             | test                  | `playwright.config.ts`, `scripts/release-workflow.test.mjs` | Forbid `.only`, one retry, no server reuse; PowerShell tests mandatory                                                          |
-| `TRAYGENT_UPDATE_FIXTURES`       | test                  | `src-tauri/src/service/tests.rs`                            | When set, the golden-fixture test rewrites `fixtures/snapshot.default.json` instead of comparing; run prettier on it afterwards |
-| `REVIEW_BASE_URL`                | script                | `scripts/capture-support.mjs`                               | Dev-server URL for `pnpm capture:readme` (default `http://127.0.0.1:1420`)                                                      |
+| Variable                         | Kind                  | Read in                                                     | Purpose                                                                                                                                  |
+| -------------------------------- | --------------------- | ----------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------- |
+| `TRAYGENT_UPDATER_PUBLIC_KEY`    | compile-time / script | `src-tauri/src/desktop_updates.rs`, `scripts/updater.mjs`   | Tauri updater public key for separately signed builds; unset in the standard unsigned release                                            |
+| `PLAYWRIGHT_CHROMIUM_EXECUTABLE` | test                  | `playwright.config.ts`, `scripts/capture-support.mjs`       | Use a preinstalled Chromium; unset, Playwright launches its own downloaded Chromium                                                      |
+| `E2E_PORT`                       | test                  | `playwright.config.ts`                                      | Dev-server port for the Playwright run (default `1420`); give parallel suites distinct ports                                             |
+| `STARTUP_REVIEW_DIR`             | test                  | `tests/startup.spec.ts`                                     | When set, the startup spec writes dialog screenshots there; unset skips the captures                                                     |
+| `POWERSHELL_EXECUTABLE`          | test                  | `scripts/release-workflow.test.mjs`                         | PowerShell 7 binary for the workflow tests (default `pwsh` from `PATH`); if it does not run, the tests are skipped, under `CI` they fail |
+| `CI`                             | test                  | `playwright.config.ts`, `scripts/release-workflow.test.mjs` | Forbid `.only`, one retry, no server reuse; PowerShell tests mandatory                                                                   |
+| `TRAYGENT_UPDATE_FIXTURES`       | test                  | `src-tauri/src/service/tests.rs`                            | When set, the golden-fixture test rewrites `fixtures/snapshot.default.json` instead of comparing; run prettier on it afterwards          |
+| `REVIEW_BASE_URL`                | script                | `scripts/capture-support.mjs`                               | Dev-server URL for `pnpm capture:readme` (default `http://127.0.0.1:1420`)                                                               |
 
 ## Runtime environment read by the app
 

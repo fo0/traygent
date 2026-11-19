@@ -3,6 +3,7 @@ import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
 import { startState } from './agents';
 import { Composer } from './composerState.svelte';
+import { DEMO_CATALOG } from './demoData';
 import { envsProblem } from './environments';
 import { portListProblem } from './ports';
 import type { Snapshot } from './types';
@@ -171,6 +172,11 @@ describe('golden snapshot fixture', () => {
         entry.id === 'claude',
       );
       expect(entry.models[0]?.id, `${entry.id}: first model`).toBe('default');
+      if (entry.id === 'codex') {
+        expect(
+          DEMO_CATALOG.find((demo) => demo.id === 'codex')?.models,
+        ).toEqual(entry.models);
+      }
       for (const choice of [...entry.models, ...entry.efforts])
         expectShape(choice, CHOICE, `${entry.id} choice`);
       expect(entry.permissions.map((p) => p.id)).toEqual(PERMISSIONS);

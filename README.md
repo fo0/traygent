@@ -110,6 +110,8 @@ cargo test --locked --manifest-path src-tauri/Cargo.toml --features updates   # 
 pnpm build:installer   # unsigned NSIS installer (Windows) → src-tauri/target/release/bundle/nsis/
 ```
 
+No environment variables or `.env` file are needed to build, run or test; optional build-time and test variables (for example `PLAYWRIGHT_CHROMIUM_EXECUTABLE`, `POWERSHELL_EXECUTABLE`) are listed in [agent_docs/env-vars.md](agent_docs/env-vars.md).
+
 [CI](.github/workflows/ci.yml) runs on pull requests: lint, typecheck, unit and release-helper tests, the frontend build, Playwright, and — when their files change — Rust fmt/Clippy/tests and a Windows job that builds the desktop shell and runs the Win32 popup and isolated autostart-registry tests. [Desktop Release](.github/workflows/desktop-release.yml) is started by hand on `main`, runs CI for that commit and publishes an unsigned Windows EXE ([release process](docs/RELEASES.md)). README screenshots: `pnpm capture:readme`.
 
 ## Documentation
