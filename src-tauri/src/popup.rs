@@ -81,9 +81,13 @@ pub fn place(icon: Rect, monitor: Rect, work: Rect, size: (u32, u32), gap: u32) 
             cy - i64::from(height) / 2,
         ),
     };
+    // A zero-sized work area still gets a 1 px frame; the upper bound never drops below
+    // the lower one, which would make `clamp` panic.
+    let max_x = (work.right() - i64::from(width)).max(i64::from(work.x));
+    let max_y = (work.bottom() - i64::from(height)).max(i64::from(work.y));
     Rect {
-        x: x.clamp(i64::from(work.x), work.right() - i64::from(width)) as i32,
-        y: y.clamp(i64::from(work.y), work.bottom() - i64::from(height)) as i32,
+        x: x.clamp(i64::from(work.x), max_x) as i32,
+        y: y.clamp(i64::from(work.y), max_y) as i32,
         width,
         height,
     }
@@ -211,6 +215,12 @@ mod tests {
         }
         let tiny = r(-300, 200, 280, 400);
         assert_eq!(place(r(-50, 602, 24, 24), tiny, tiny, (480, 760), 6), tiny);
+        let empty = r(10, 20, 0, 0);
+        let monitor = r(0, 0, 1920, 1080);
+        assert_eq!(
+            place(r(5, 5, 24, 24), monitor, empty, (480, 760), 6),
+            r(10, 20, 1, 1)
+        );
     }
 
     #[test]
