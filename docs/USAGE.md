@@ -36,6 +36,7 @@ One composer, no prose:
 - Options as symbols: the chosen model as a one-letter badge (Opus **O**, Sonnet **S**, Haiku **H**; Codex models by their own word: Sol **S**, Astra **A**, Terra **T**, Luna **L**), the thinking level as signal bars, the permission as a symbol.
 - A click anywhere on the row (or **▶**) starts that session again with exactly those settings — once per press, so a double-click never starts it twice.
 - **Ctrl+1** … **Ctrl+9** start the first nine rows the same way from anywhere in the panel, the folder field included; a held key starts once, and the row's tooltip names its key.
+- With the keyboard on a row's **▶**, **↑** / **↓** move to the row above or below, **Home** / **End** to the first or last row.
 - The **⋯** menu offers **In Composer übernehmen** (copy into the composer), **Bearbeiten …** (edit the model, thinking level, permission, extra arguments, Docker ports, **Docker-Socket durchreichen** and — for an agent with profiles — the **Profil** the row starts with, without starting it; a profile removed meanwhile shows as **Standard**; **Modell & Denken**: **Traygent** sets the stored model and thinking level on every start, **Agent** passes neither so the agent keeps what it last used, e.g. after `/model`), **Ordner öffnen** (open the folder in Explorer), **Pfad kopieren** (copy the folder path) and **Entfernen** (remove) with **Rückgängig** (undo) for 8 seconds.
 
 ## Status and refresh

@@ -4,6 +4,7 @@ import {
   RestartGate,
   repeatClick,
   repeatKey,
+  rowStep,
 } from './rowStart';
 
 /** A start the test settles by hand. */
@@ -65,5 +66,22 @@ describe('one start per press', () => {
     gateB.run('b', failing);
     await flush();
     expect(gateB.run('b', pending().start)).toBe(true);
+  });
+});
+
+describe('arrow keys between rows', () => {
+  it('steps by one without wrapping and jumps to the ends', () => {
+    expect(rowStep('ArrowDown', 0, 3)).toBe(1);
+    expect(rowStep('ArrowDown', 2, 3)).toBe(2);
+    expect(rowStep('ArrowUp', 2, 3)).toBe(1);
+    expect(rowStep('ArrowUp', 0, 3)).toBe(0);
+    expect(rowStep('Home', 2, 3)).toBe(0);
+    expect(rowStep('End', 0, 3)).toBe(2);
+  });
+  it('leaves other keys and a start outside the list alone', () => {
+    expect(rowStep('Enter', 1, 3)).toBeNull();
+    expect(rowStep('ArrowLeft', 1, 3)).toBeNull();
+    expect(rowStep('ArrowDown', -1, 3)).toBeNull();
+    expect(rowStep('ArrowDown', 0, 0)).toBeNull();
   });
 });

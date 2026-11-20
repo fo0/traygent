@@ -2,6 +2,7 @@
   import RecentRow from './RecentRow.svelte';
   import { minuteClock } from './clock';
   import { profileLabel } from './profiles';
+  import { rowKeys } from './rowStart';
   import type { AgentId, RecentSession, Snapshot } from './types';
 
   // „Workspaces“: one single-line row per (folder, agent, env), newest first.
@@ -30,7 +31,8 @@
 </script>
 
 {#if snapshot.recents.length}
-  <ul class="recent-list">
+  <!-- ↑ / ↓, Home and End move between the rows' starts (rowStart.ts). -->
+  <ul class="recent-list" use:rowKeys>
     {#each snapshot.recents as recent, index (recent.id)}
       <RecentRow
         {recent}

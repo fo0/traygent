@@ -224,3 +224,30 @@ test('Ctrl+1 … Ctrl+9 start the row at that place, once per press', async ({
     .poll(() => launches(page))
     .toEqual([second, snapshot.recents[0]!.folder]);
 });
+
+test('↑ / ↓, Home and End move between the rows’ starts', async ({ page }) => {
+  await serve(page);
+  await page.goto('/');
+  const start = (index: number) =>
+    rows(page).nth(index).locator('.recent-start');
+  await start(0).focus();
+  await page.keyboard.press('ArrowDown');
+  await expect(start(1)).toBeFocused();
+  await page.keyboard.press('End');
+  await expect(start(5)).toBeFocused();
+  // The last row stays put; no wrap to the top.
+  await page.keyboard.press('ArrowDown');
+  await expect(start(5)).toBeFocused();
+  await page.keyboard.press('ArrowUp');
+  await expect(start(4)).toBeFocused();
+  await page.keyboard.press('Home');
+  await expect(start(0)).toBeFocused();
+  // „⋯“ keeps its arrow keys: ↓ opens its menu.
+  await rows(page)
+    .nth(0)
+    .getByRole('button', { name: /^Aktionen für / })
+    .focus();
+  await page.keyboard.press('ArrowDown');
+  await expect(page.getByRole('menu')).toBeVisible();
+  expect(await launches(page)).toEqual([]);
+});
