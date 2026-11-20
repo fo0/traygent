@@ -2,23 +2,18 @@
  * The IPC data model, mirrored by src-tauri/src/models.rs (camelCase JSON).
  * This file is the contract: the Rust side mirrors it field by field, the
  * golden fixture `fixtures/snapshot.default.json` (written by a Rust test)
- * must satisfy `Snapshot`. Product rules: docs/SPEC.md. The agent-update and
- * GitHub groups live in sibling modules and are re-exported here.
+ * must satisfy `Snapshot`. Product rules: docs/SPEC.md. The agent-update,
+ * GitHub, profile and desktop-shell groups live in sibling modules and are
+ * re-exported here.
  */
 import type { AgentUpdateStatus } from './agentUpdateTypes';
 import type { GithubState } from './githubTypes';
 import type { AgentProfile, ProfileShare, ProfileStatus } from './profileTypes';
 
-export type { AgentUpdateState, AgentUpdateStatus } from './agentUpdateTypes';
-export type {
-  GithubAccount,
-  GithubSource,
-  GithubState,
-  LocalAccount,
-  LocalAccounts,
-  RepoSummary,
-} from './githubTypes';
+export type * from './agentUpdateTypes';
+export type * from './githubTypes';
 export type * from './profileTypes';
+export type * from './shellTypes';
 
 /** The coding agents Traygent starts. */
 export type AgentId = 'claude' | 'opencode' | 'codex';
@@ -298,29 +293,4 @@ export interface LaunchOutcome {
   snapshot: Snapshot;
   /** German, not fatal: the session did start. */
   warning?: string;
-}
-
-/** Mirrors `StartupStatus` and its `Status` in src-tauri/src/startup.rs. */
-export interface StartupStatus {
-  status:
-    | 'unsupported'
-    | 'disabled'
-    | 'enabled'
-    | 'disabledByWindows'
-    | 'unknownApproval'
-    | 'conflict';
-  registered: boolean;
-}
-/** Mirrors `UpdateInfo` in src-tauri/src/updates.rs. */
-export interface UpdateInfo {
-  version: string;
-  notes: string;
-  /** RFC 3339 UTC publication time, when known. */
-  date: string | null;
-}
-/** Mirrors `DownloadProgress` in src-tauri/src/desktop_updates.rs. */
-export interface DownloadProgress {
-  downloaded: number;
-  total: number | null;
-  stage: 'downloading' | 'verifying' | 'installing';
 }

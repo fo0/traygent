@@ -451,11 +451,11 @@ pub fn sync_agent(
         let base = |pair: &Pair| read_base(&pair.dir, name).filter(|_| pair.usable);
         let bases: Vec<Option<Entries>> = pairs.iter().map(base).collect();
         for (index, pair) in pairs.iter_mut().enumerate() {
-            let others = bases
+            let seed = bases
                 .iter()
                 .enumerate()
-                .filter(|(other, _)| *other != index);
-            let seed = others.flat_map(|(_, base)| base.clone()).next();
+                .filter(|(other, _)| *other != index)
+                .find_map(|(_, base)| base.clone());
             pair.seeds.extend(seed.map(|seed| (name, seed)));
         }
     }
