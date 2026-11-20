@@ -31,9 +31,10 @@
 
 {#if snapshot.recents.length}
   <ul class="recent-list">
-    {#each snapshot.recents as recent (recent.id)}
+    {#each snapshot.recents as recent, index (recent.id)}
       <RecentRow
         {recent}
+        shortcut={index < 9 ? index + 1 : 0}
         {snapshot}
         now={$minuteClock}
         profile={recent.profile

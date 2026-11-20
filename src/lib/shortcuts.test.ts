@@ -48,6 +48,29 @@ describe('shortcutFor', () => {
     expect(shortcutFor(press('l'))).toBeNull();
     expect(shortcutFor(press('l', { ctrlKey: true, altKey: true }))).toBeNull();
   });
+  it('maps Ctrl+1 … Ctrl+9 (any layout) to a workspace row, never with Shift', () => {
+    expect(shortcutFor(press('1', { ctrlKey: true }))).toEqual({
+      kind: 'workspace',
+      index: 0,
+    });
+    expect(shortcutFor(press('9', { metaKey: true }))).toEqual({
+      kind: 'workspace',
+      index: 8,
+    });
+    // AZERTY: the top-row key types „&“, its physical key is still Digit1.
+    expect(shortcutFor(press('&', { ctrlKey: true, code: 'Digit1' }))).toEqual({
+      kind: 'workspace',
+      index: 0,
+    });
+    expect(shortcutFor(press('0', { ctrlKey: true }))).toBeNull();
+    expect(shortcutFor(press('1'))).toBeNull();
+    expect(
+      shortcutFor(
+        press('!', { ctrlKey: true, shiftKey: true, code: 'Digit1' }),
+      ),
+    ).toBeNull();
+    expect(shortcutFor(press('1', { ctrlKey: true, altKey: true }))).toBeNull();
+  });
   it('maps a plain Escape and leaves Alt combinations to the layout', () => {
     expect(shortcutFor(press('Escape'))).toEqual({ kind: 'escape' });
     expect(shortcutFor(press('Escape', { ctrlKey: true }))).toBeNull();
@@ -75,6 +98,7 @@ function actions(overrides: Partial<ShortcutActions> = {}) {
     blocked: () => false,
     refresh: vi.fn(),
     folder: vi.fn(() => true),
+    workspace: vi.fn(() => true),
     escape: vi.fn(() => true),
     ...overrides,
   };
@@ -116,6 +140,25 @@ describe('createShortcuts', () => {
     const inDialog = actions({ blocked: () => true });
     createShortcuts(inDialog)(keydown('l', { ctrlKey: true }));
     expect(inDialog.folder).not.toHaveBeenCalled();
+  });
+
+  it('starts a workspace row once per press and only when it exists', () => {
+    const handlers = actions();
+    const handle = createShortcuts(handlers);
+    const first = keydown('2', { ctrlKey: true });
+    handle(first);
+    expect(handlers.workspace).toHaveBeenCalledWith(1);
+    expect(first.preventDefault).toHaveBeenCalled();
+    const repeat = keydown('2', { ctrlKey: true, repeat: true });
+    handle(repeat);
+    expect(repeat.preventDefault).toHaveBeenCalled();
+    expect(handlers.workspace).toHaveBeenCalledTimes(1);
+    const missing = keydown('9', { ctrlKey: true });
+    createShortcuts(actions({ workspace: vi.fn(() => false) }))(missing);
+    expect(missing.preventDefault).not.toHaveBeenCalled();
+    const inDialog = actions({ blocked: () => true });
+    createShortcuts(inDialog)(keydown('1', { ctrlKey: true }));
+    expect(inDialog.workspace).not.toHaveBeenCalled();
   });
 
   it('prevents Escape only when something handled it', () => {
