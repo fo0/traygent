@@ -43,10 +43,11 @@
       <strong>Version {currentVersion}</strong>
       {#if native && checkedAt}<span>Zuletzt geprüft {checkedAt}</span>{/if}
     </div>
-    {#if native}<button
+    {#if native}<!-- Off via aria-disabled: it keeps focus while checking. --><button
+        type="button"
         class="secondary-button"
-        disabled={busy}
-        onclick={onCheck}
+        aria-disabled={busy ? 'true' : undefined}
+        onclick={() => !busy && onCheck()}
         ><Icon name="refresh" size={14} />Nach Updates suchen</button
       >{/if}
   </div>
