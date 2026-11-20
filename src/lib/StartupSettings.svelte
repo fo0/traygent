@@ -30,12 +30,16 @@
   {:else if status === 'unsupported'}
     <p class="field-help">{note}</p>
   {:else}
+    <!-- A read or write is off via aria-disabled: switch and buttons keep
+         focus meanwhile (a read also runs whenever the window gets focus). -->
     <label class="startup-option">
       <input
         type="checkbox"
         checked={autostart.checked}
-        disabled={autostart.busy || !autostart.editable}
+        disabled={!autostart.editable}
+        aria-disabled={autostart.busy ? 'true' : undefined}
         aria-describedby={note ? 'startup-status' : undefined}
+        onclick={(event) => autostart.busy && event.preventDefault()}
         onchange={(event) => {
           autostart.stage(event.currentTarget.checked);
           event.currentTarget.checked = autostart.checked;
@@ -52,22 +56,27 @@
     {#if autostart.loaded && !autostart.editable}
       <div class="startup-actions">
         <button
+          type="button"
           class="secondary-button"
-          disabled={autostart.busy}
-          onclick={autostart.read}
+          aria-disabled={autostart.busy ? 'true' : undefined}
+          onclick={() => void autostart.read()}
           ><Icon name="refresh" size={14} />Status prüfen</button
         >
         {#if vetoed}
           <button
+            type="button"
             class="secondary-button"
-            disabled={autostart.busy}
-            onclick={autostart.openWindowsSettings}
+            aria-disabled={autostart.busy ? 'true' : undefined}
+            onclick={() =>
+              !autostart.busy && void autostart.openWindowsSettings()}
             >Windows-Autostart öffnen</button
           >
           {#if autostart.current?.registered}<button
+              type="button"
               class="text-button"
-              disabled={autostart.busy}
-              onclick={autostart.remove}>Autostarteintrag entfernen</button
+              aria-disabled={autostart.busy ? 'true' : undefined}
+              onclick={() => !autostart.busy && void autostart.remove()}
+              >Autostarteintrag entfernen</button
             >{/if}
         {/if}
       </div>

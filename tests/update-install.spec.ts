@@ -16,6 +16,8 @@ type UpdateMock = {
   installFail: boolean;
   total: number | null;
   stageDelay: number;
+  /** How long a check takes, ms. */
+  checkDelay: number;
 };
 let mock: TauriMock<UpdateMock>;
 
@@ -44,6 +46,7 @@ test.beforeEach(async ({ page }) => {
         if (cmd === 'snapshot' || cmd === 'refresh_detection')
           return structuredClone(snapshot);
         if (cmd === 'check_update') {
+          await new Promise((resolve) => setTimeout(resolve, state.checkDelay));
           if (state.checkFail)
             throw 'Update-Prüfung fehlgeschlagen – Verbindung prüfen.';
           return state.current
@@ -88,6 +91,7 @@ test.beforeEach(async ({ page }) => {
         installFail: false,
         total: 10_000_000,
         stageDelay: 600,
+        checkDelay: 0,
       },
     },
   );
@@ -185,14 +189,17 @@ test('a failed install keeps the update and offers „Erneut versuchen“', asyn
 test('a current version reads „Aktuell.“ and offers no installation', async ({
   page,
 }) => {
-  await mock.configure({ current: true });
+  await mock.configure({ current: true, checkDelay: 300 });
   await page
     .getByRole('button', { name: 'Einstellungen', exact: true })
     .click();
   await page.getByRole('tab', { name: /^Updates/ }).click();
   const panel = page.getByRole('region', { name: 'App-Update' });
-  await panel.getByRole('button', { name: 'Nach Updates suchen' }).click();
+  const check = panel.getByRole('button', { name: 'Nach Updates suchen' });
+  await check.click();
   await expect(panel.getByRole('status')).toHaveText('Aktuell.');
+  // The check never drops the focus to <body>.
+  await expect(check).toBeFocused();
   await expect(panel.getByText(/^Zuletzt geprüft \d\d:\d\d$/)).toBeVisible();
   await expect(panel.getByRole('button', { name: 'Installieren' })).toHaveCount(
     0,

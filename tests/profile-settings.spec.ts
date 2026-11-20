@@ -68,6 +68,10 @@ test('Settings → Agenten → „Profile“: an added profile signs in before �
   const standard = dialog.getByRole('combobox', { name: 'Standard-Profil' });
   await choose(standard, 'Team');
   await list.getByRole('button', { name: 'Team entfernen' }).click();
+  // Focus never drops to <body>: the next row's remove takes it.
+  await expect(
+    list.getByRole('button', { name: 'Kunde A entfernen' }),
+  ).toBeFocused();
   await expect(standard).toHaveText('Standard');
   await choose(standard, 'Kunde A');
 
@@ -92,6 +96,10 @@ test('an added profile survives „Abbrechen“; the staged edits beside it do n
   await page.goto('/');
   let dialog = await openAgents(page);
   await dialog.getByRole('button', { name: 'Team entfernen' }).click();
+  // The last extra row is gone: „Standard“'s details toggle takes the focus.
+  await expect(
+    dialog.getByRole('button', { name: 'Standard Details' }),
+  ).toBeFocused();
   const field = dialog.getByRole('textbox', { name: 'Neues Profil' });
   await field.fill('Kunde');
   await field.press('Enter');

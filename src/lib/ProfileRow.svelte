@@ -94,6 +94,20 @@
   /** What was typed; the staged label is its trimmed copy. */
   let text = $state(untrack(() => label));
 
+  /**
+   * Focus moves to the next row's remove (the previous row's, or its details
+   * toggle on „Standard“) first; the removed row is gone.
+   */
+  function remove() {
+    const row = toggle?.closest('li');
+    const next = row?.nextElementSibling ?? row?.previousElementSibling;
+    (
+      next?.querySelector<HTMLElement>('.profile-remove') ??
+      next?.querySelector<HTMLElement>('.profile-toggle')
+    )?.focus();
+    draft.removeProfile(agent, id);
+  }
+
   function rename(value: string) {
     text = value;
     const item = list[index];
@@ -165,8 +179,7 @@
         class="icon-button small profile-remove"
         aria-label={`${shown} entfernen`}
         title="Entfernen"
-        onclick={() => draft.removeProfile(agent, id)}
-        ><Icon name="trash" size={14} /></button
+        onclick={remove}><Icon name="trash" size={14} /></button
       >{/if}
   </div>
   {#if open}<div id={detail} class="field-grid profile-detail">
