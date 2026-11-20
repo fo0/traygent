@@ -37,7 +37,7 @@
   white-space: nowrap;
   border-radius: 6px;
 }
-.app-footer > button:hover:not(:disabled) {
+.app-footer > button:hover:not(:disabled):not([aria-disabled='true']) {
   color: var(--text-2);
 }
 .empty-state {

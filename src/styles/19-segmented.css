@@ -12,7 +12,7 @@
   font-weight: 600;
   white-space: nowrap;
 }
-.text-button:hover:not(:disabled) {
+.text-button:hover:not(:disabled):not([aria-disabled='true']) {
   background: var(--accent-soft);
 }
 

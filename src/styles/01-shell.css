@@ -117,7 +117,7 @@
     background 0.15s,
     color 0.15s;
 }
-.icon-button:hover:not(:disabled) {
+.icon-button:hover:not(:disabled):not([aria-disabled='true']) {
   background: var(--hover);
   color: var(--text);
 }
