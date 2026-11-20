@@ -57,6 +57,24 @@ test('F5 refreshes once without reloading; the footer shows the time', async ({
   ).toBeVisible();
 });
 
+test('a pressed refresh button keeps its focus while the panel refreshes', async ({
+  page,
+}) => {
+  await page.goto('/');
+  for (const refresh of [
+    page.locator('.app-bar').getByRole('button', { name: 'Aktualisieren' }),
+    page.locator('.app-footer').getByRole('button', { name: /^Aktualisier/ }),
+  ]) {
+    await expect(refresh).toBeEnabled();
+    await refresh.focus();
+    await page.keyboard.press('Enter');
+    await expect(refresh).toHaveAttribute('aria-disabled', 'true');
+    await expect(refresh).toBeFocused();
+    await expect(refresh).not.toHaveAttribute('aria-disabled');
+    await expect(refresh).toBeFocused();
+  }
+});
+
 test('Ctrl+L focuses the folder field and selects its text', async ({
   page,
 }) => {

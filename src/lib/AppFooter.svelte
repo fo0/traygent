@@ -53,8 +53,9 @@
   </div>
   <button
     class:spinning={detecting}
-    onclick={() => onRefresh()}
-    disabled={refreshing || !canRefresh}
+    onclick={() => !refreshing && onRefresh()}
+    disabled={!canRefresh}
+    aria-disabled={refreshing ? 'true' : undefined}
     title={detecting
       ? 'Erkennung läuft …'
       : demo

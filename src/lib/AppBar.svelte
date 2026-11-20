@@ -53,8 +53,9 @@
       title={detecting
         ? 'Erkennung läuft …'
         : `${demo ? 'Demo' : 'Agenten und Docker'} neu erkennen (F5)`}
-      onclick={() => onRefresh()}
-      disabled={refreshing || !canRefresh}
+      onclick={() => !refreshing && onRefresh()}
+      disabled={!canRefresh}
+      aria-disabled={refreshing ? 'true' : undefined}
       ><Icon name="refresh" size={17} /></button
     ><button
       class="icon-button"
