@@ -25,6 +25,7 @@
 
   let {
     recent,
+    shortcut,
     snapshot,
     now,
     profile,
@@ -38,6 +39,8 @@
     onInstall,
   }: {
     recent: RecentSession;
+    /** Its Ctrl+digit start (1–9), 0 for none. */
+    shortcut: number;
     snapshot: Snapshot;
     /** The shared minute clock, for the relative time. */
     now: number;
@@ -144,7 +147,7 @@
       ? `${label} ist lokal nicht installiert`
       : target.kind === 'blocked'
         ? target.reason
-        : `${label} erneut starten · ${details}`,
+        : `${label} erneut starten${shortcut ? ` (Strg+${shortcut})` : ''} · ${details}`,
   );
 
   let open = $state(false);
@@ -240,6 +243,7 @@
       class="recent-start"
       aria-label={`${label} in ${name} starten${argsNote}`}
       aria-describedby={`${uid}-folder`}
+      aria-keyshortcuts={shortcut ? `Control+${shortcut}` : undefined}
       title={restartTitle}
       aria-disabled={target.kind === 'blocked' || launching
         ? 'true'

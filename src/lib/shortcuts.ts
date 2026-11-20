@@ -1,5 +1,8 @@
 export type Shortcut =
-  { kind: 'refresh' } | { kind: 'folder' } | { kind: 'escape' };
+  | { kind: 'refresh' }
+  | { kind: 'folder' }
+  | { kind: 'workspace'; index: number }
+  | { kind: 'escape' };
 
 type KeyPress = Pick<
   KeyboardEvent,
@@ -17,6 +20,11 @@ export interface ShortcutActions {
    */
   folder: () => boolean;
   /**
+   * Ctrl+1 … Ctrl+9: starts the „Workspaces“ row at `index` (0-based) as a
+   * press on it would; returns whether that row exists.
+   */
+  workspace: (index: number) => boolean;
+  /**
    * Escape on `target`; returns whether something handled it. Menus and
    * dialogs handle their own Escape before this runs.
    */
@@ -31,6 +39,14 @@ function isLetter(event: KeyPress, letter: string) {
     : event.code === `Key${letter.toUpperCase()}`;
 }
 
+/** A digit 1–9 by its key; other layouts fall back to the physical key. */
+function digit(event: KeyPress) {
+  const match = /^[1-9]$/.test(event.key)
+    ? event.key
+    : /^Digit([1-9])$/.exec(event.code)?.[1];
+  return match ? Number(match) : null;
+}
+
 /** Maps a key press to a panel shortcut, independent of focus and state. */
 export function shortcutFor(event: KeyPress): Shortcut | null {
   const command = event.ctrlKey || event.metaKey;
@@ -40,6 +56,8 @@ export function shortcutFor(event: KeyPress): Shortcut | null {
     return { kind: 'refresh' };
   if (command && !event.shiftKey && isLetter(event, 'l'))
     return { kind: 'folder' };
+  const number = command && !event.shiftKey ? digit(event) : null;
+  if (number) return { kind: 'workspace', index: number - 1 };
   if (!command && event.key === 'Escape') return { kind: 'escape' };
   return null;
 }
@@ -47,7 +65,8 @@ export function shortcutFor(event: KeyPress): Shortcut | null {
 /**
  * Window keydown handler for the panel shortcuts. A reload is always
  * suppressed, since it would drop open dialogs and typed input; while a dialog
- * is open nothing else runs. A held refresh key refreshes once.
+ * is open nothing else runs. A held refresh key refreshes once, a held
+ * workspace key starts once.
  */
 export function createShortcuts(actions: ShortcutActions) {
   return (event: KeyboardEvent) => {
@@ -59,10 +78,18 @@ export function createShortcuts(actions: ShortcutActions) {
       // A held F5 repeats keydown; one refresh per press, not one per repeat.
       if (event.repeat) return;
     }
+    // A held Ctrl+1 never starts a second session; a failed start leaves no
+    // cooldown that would refuse the repeats.
+    if (shortcut.kind === 'workspace' && event.repeat) {
+      event.preventDefault();
+      return;
+    }
     if (handled || event.isComposing || actions.blocked()) return;
     if (shortcut.kind === 'refresh') actions.refresh();
     else if (shortcut.kind === 'folder') {
       if (actions.folder()) event.preventDefault();
+    } else if (shortcut.kind === 'workspace') {
+      if (actions.workspace(shortcut.index)) event.preventDefault();
     } else if (actions.escape(event.target)) event.preventDefault();
   };
 }

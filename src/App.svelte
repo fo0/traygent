@@ -65,6 +65,15 @@
       field?.select();
       return !!field;
     },
+    // The same press as a click on the row's ▶, with its guards and its
+    // „Installieren …“ for a missing CLI.
+    workspace: (index) => {
+      const start = document.querySelectorAll<HTMLButtonElement>(
+        '.recent-list .recent-start',
+      )[index];
+      start?.click();
+      return !!start;
+    },
     // Menus handle their own Escape; the dashboard has nothing else to close.
     escape: () => false,
   });

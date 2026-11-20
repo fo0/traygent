@@ -208,7 +208,7 @@ test('a restart names the extra arguments it passes', async ({ page }) => {
   await expect(restart).toHaveAttribute(
     'title',
     new RegExp(
-      `^Codex erneut starten · ${literal(recent.folder)} · .* · Extra-Argumente: ${literal(args)} · \\d\\d\\.`,
+      `^Codex erneut starten \\(Strg\\+2\\) · ${literal(recent.folder)} · .* · Extra-Argumente: ${literal(args)} · \\d\\d\\.`,
     ),
   );
   // Assistive tech hears the arguments once, in the name; the description

@@ -195,3 +195,59 @@ test('a held Enter never starts again', async ({ page }) => {
   await start.press('Enter');
   await expect.poll(() => launches(page)).toEqual([folder, folder]);
 });
+
+test('Ctrl+1 … Ctrl+9 start the row at that place, once per press', async ({
+  page,
+}) => {
+  const snapshot = await serve(page, true);
+  await page.goto('/');
+  const second = snapshot.recents[1]!.folder;
+  await expect(rows(page).nth(1).locator('.recent-start')).toHaveAttribute(
+    'aria-keyshortcuts',
+    'Control+2',
+  );
+  // From the folder field too: Ctrl+digit types nothing there.
+  await page.getByRole('combobox', { name: 'Ordner oder Repo' }).focus();
+  await page.keyboard.down('Control');
+  await page.keyboard.down('2');
+  await expect(page.getByRole('alert')).toHaveText('Ordner existiert nicht.');
+  // A held key auto-repeats; a failed start leaves no cooldown to stop it.
+  await page.keyboard.down('2');
+  await page.keyboard.up('2');
+  await page.keyboard.up('Control');
+  expect(await launches(page)).toEqual([second]);
+  // No seventh row in the six-row snapshot: nothing starts, so the next
+  // start is the only one after it.
+  await page.keyboard.press('Control+7');
+  await page.keyboard.press('Control+1');
+  await expect
+    .poll(() => launches(page))
+    .toEqual([second, snapshot.recents[0]!.folder]);
+});
+
+test('↑ / ↓, Home and End move between the rows’ starts', async ({ page }) => {
+  await serve(page);
+  await page.goto('/');
+  const start = (index: number) =>
+    rows(page).nth(index).locator('.recent-start');
+  await start(0).focus();
+  await page.keyboard.press('ArrowDown');
+  await expect(start(1)).toBeFocused();
+  await page.keyboard.press('End');
+  await expect(start(5)).toBeFocused();
+  // The last row stays put; no wrap to the top.
+  await page.keyboard.press('ArrowDown');
+  await expect(start(5)).toBeFocused();
+  await page.keyboard.press('ArrowUp');
+  await expect(start(4)).toBeFocused();
+  await page.keyboard.press('Home');
+  await expect(start(0)).toBeFocused();
+  // „⋯“ keeps its arrow keys: ↓ opens its menu.
+  await rows(page)
+    .nth(0)
+    .getByRole('button', { name: /^Aktionen für / })
+    .focus();
+  await page.keyboard.press('ArrowDown');
+  await expect(page.getByRole('menu')).toBeVisible();
+  expect(await launches(page)).toEqual([]);
+});
