@@ -11,6 +11,8 @@ type MockState = {
   readError: boolean;
   writeError: boolean;
   delay: number;
+  /** How long a read takes, ms. */
+  readDelay: number;
 };
 async function setup(page: Page, status = 'disabled') {
   const mock = await installTauriMock<Snapshot, MockState>(
@@ -20,6 +22,7 @@ async function setup(page: Page, status = 'disabled') {
         if (cmd === 'snapshot' || cmd === 'refresh_detection')
           return structuredClone(snapshot);
         if (cmd === 'autostart_status') {
+          await new Promise((resolve) => setTimeout(resolve, state.readDelay));
           if (state.readError)
             throw 'Windows-Autostart konnte nicht gelesen werden.';
           return { status: state.status, registered: state.registered };
@@ -47,6 +50,7 @@ async function setup(page: Page, status = 'disabled') {
         readError: false,
         writeError: false,
         delay: 0,
+        readDelay: 0,
       },
     },
   );
@@ -167,6 +171,14 @@ test('external removal and Task Manager changes refresh on focus and explicit re
   await expect(
     page.getByRole('button', { name: 'Autostarteintrag entfernen' }),
   ).toHaveCount(0);
+  // A read on window focus never drops the switch's focus to <body>.
+  await checkbox.focus();
+  await mock.configure({ readDelay: 300 });
+  const panel = page.locator('.startup-panel');
+  await page.evaluate(() => window.dispatchEvent(new Event('focus')));
+  await expect(panel).toHaveAttribute('aria-busy', 'true');
+  await expect(panel).toHaveAttribute('aria-busy', 'false');
+  await expect(checkbox).toBeFocused();
   expect(await mutations(page)).toBe(0);
 });
 
@@ -211,9 +223,16 @@ test('foreign registrations cannot be edited; future Windows formats stay unknow
   await expect(
     page.getByRole('button', { name: 'Autostarteintrag entfernen' }),
   ).toHaveCount(0);
-  await mock.configure({ status: 'unknownApproval', registered: true });
-  await page.getByRole('button', { name: 'Status prüfen' }).click();
+  await mock.configure({
+    status: 'unknownApproval',
+    registered: true,
+    readDelay: 300,
+  });
+  const check = page.getByRole('button', { name: 'Status prüfen' });
+  await check.click();
   await expect(page.getByText(/Windows-Freigabe unbekannt/)).toBeVisible();
+  // The read never drops the focus to <body>.
+  await expect(check).toBeFocused();
   await expect(checkbox).toBeDisabled();
   expect(await mutations(page)).toBe(0);
 });
