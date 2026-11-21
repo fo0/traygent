@@ -49,8 +49,9 @@
    * Docker socket, as a new session, once per press (`rowStart.ts`). A session started from a repository
    * sends its folder with the repository: Rust reuses the folder while it
    * exists and clones into the current Klon-Ordner only when it is gone, so a
-   * clone that failed is tried again (#40). Its profile goes as stored; one
-   * removed since is refused natively with a German message.
+   * clone that failed is tried again (#40). Its profile goes as stored; the row
+   * blocks a start whose profile was removed since (#61), and Rust refuses one
+   * that slips through with a German message — never another profile.
    */
   function restart(recent: RecentSession) {
     const entry = snapshot ? catalogEntry(snapshot, recent.agent) : undefined;
