@@ -23,7 +23,7 @@ export interface AgentUpdateText {
 
 /** The German state text of one agent's update row. */
 export function agentUpdateText(status: AgentUpdateStatus): AgentUpdateText {
-  const { version, from } = status;
+  const { version, from, by } = status;
   switch (status.state) {
     case 'running':
       return { text: 'wird aktualisiert …' };
@@ -40,7 +40,10 @@ export function agentUpdateText(status: AgentUpdateStatus): AgentUpdateText {
     case 'current':
       return { text: version ? `aktuell · ${version}` : 'aktuell' };
     case 'inUse':
-      return { text: 'in Benutzung – übersprungen' };
+      return {
+        text: 'in Benutzung – übersprungen',
+        ...(by && { title: by, detail: by }),
+      };
     case 'failed':
       return { text: 'fehlgeschlagen', tone: 'fail' };
   }

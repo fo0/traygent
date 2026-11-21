@@ -24,20 +24,18 @@ pub const LIST_TIMEOUT: Duration = Duration::from_secs(20);
 const END_MARKER: &str = "traygent-end";
 
 /// Lists the processes that may hold an agent CLI, already filtered and deduplicated so the
-/// runner's output cap never hides one: `exe <image>` for a CLI binary, `pkg <match>` for a
-/// node or bun process whose command line names an agent's npm package, `pkg unknown` for
-/// one whose command line cannot be read (another user's or an elevated process; it counts
-/// for every agent), then the end marker. The Claude desktop app is `Claude.exe` too: a
-/// process from its install folders (UNVERIFIED paths, conventional) is no CLI, one without
-/// a readable path still counts.
+/// runner's output cap never hides one: `exe <image> <path>` for a binary named like a CLI
+/// (the path is missing when it cannot be read), `pkg <match>` for a node or bun process
+/// whose command line names an agent's npm package, `pkg unknown` for one whose command line
+/// cannot be read (another user's or an elevated process; it counts for every agent), then
+/// the end marker. Which binary is a CLI is decided here in Rust ([`bundled`]).
 /// Windows PowerShell 5.1; no double quote anywhere (docs/adr/0003).
 const LIST_SCRIPT: &str = r"$ErrorActionPreference = 'Stop'
 $packages = 'claude-code|@opencode|opencode-ai|@openai[\\/]codex|codex\.js'
-$desktop = '\\AnthropicClaude\\|\\WindowsApps\\Claude_'
 $found = foreach ($process in Get-CimInstance Win32_Process -Property Name,ExecutablePath,CommandLine) {
   $name = ([string]$process.Name).ToLowerInvariant()
   if ($name -match '^(claude|opencode2?|codex)\.exe$') {
-    if ([string]$process.ExecutablePath -notmatch $desktop) { 'exe ' + $name }
+    ('exe ' + $name + ' ' + [string]$process.ExecutablePath).Trim()
   }
   elseif ($name -match '^(node|bun)\.exe$') {
     $line = [string]$process.CommandLine
@@ -49,6 +47,41 @@ $found = foreach ($process in Get-CimInstance Win32_Process -Property Name,Execu
 }
 $found | Sort-Object -Unique
 'traygent-end'";
+
+/// Install folders of programs that ship their own binary under a CLI's image name and keep
+/// it running in the background: the Claude desktop app (also `Claude.exe`) and the Codex
+/// desktop app as Store packages or under `AnthropicClaude`, and the editor extensions of
+/// both agents. The CLI's update command replaces none of them, so they do not hold the CLI
+/// (#78). Lower case, matched anywhere in the path; UNVERIFIED paths, conventional.
+const BUNDLED: [&str; 5] = [
+    r"\anthropicclaude\",
+    r"\windowsapps\claude_",
+    r"\windowsapps\openai.",
+    r"\extensions\anthropic.claude-code-",
+    r"\extensions\openai.chatgpt-",
+];
+
+/// The folder of Store packages and of their app execution aliases.
+const STORE: &str = r"\windowsapps\";
+
+/// `by` of a skipped agent when the process list could not be read.
+pub const LIST_UNREADABLE: &str = "Prozessliste nicht lesbar";
+/// `by` of a skipped agent when only a node or bun process without a readable command line
+/// holds it.
+pub const PROCESS_UNREADABLE: &str = "node- oder bun-Prozess ohne lesbare Befehlszeile";
+
+/// Whether a binary at this path belongs to another program's bundle; one without a
+/// readable path never does, so it still counts as the CLI. Neither does the CLI the run
+/// updates (`cli`, its resolved path): its own path is never a bundle, and when it is a
+/// Store install (an app execution alias under `WindowsApps`) no Store package is one.
+fn bundled(path: &str, cli: &str) -> bool {
+    let (path, cli) = (path.to_lowercase(), cli.to_lowercase());
+    let store = cli.contains(STORE);
+    path != cli
+        && BUNDLED
+            .iter()
+            .any(|folder| path.contains(folder) && !(store && folder.starts_with(STORE)))
+}
 
 /// The PowerShell argv of the process list; the script travels as `-EncodedCommand`, so
 /// nothing of it reaches PowerShell's argument parsing (docs/adr/0003).
@@ -80,26 +113,56 @@ pub fn due(enabled: bool, uptime: Duration, since_last_run: Option<Duration>) ->
         }
 }
 
-/// The agent one line of the process list belongs to; `None` for `pkg unknown` (any agent)
-/// and for a line the script never prints.
-fn line_agent(line: &str) -> Option<AgentId> {
-    let (kind, name) = line.split_once(' ')?;
-    match (kind, name) {
-        ("exe", "claude.exe") => Some(AgentId::Claude),
-        ("exe", "opencode.exe" | "opencode2.exe") => Some(AgentId::Opencode),
-        ("exe", "codex.exe") => Some(AgentId::Codex),
-        ("pkg", "claude-code") => Some(AgentId::Claude),
-        ("pkg", "@opencode" | "opencode-ai") => Some(AgentId::Opencode),
-        ("pkg", "@openai\\codex" | "@openai/codex" | "codex.js") => Some(AgentId::Codex),
+/// What one line of the process list says.
+#[derive(Debug, PartialEq, Eq)]
+enum Line<'a> {
+    /// A process holds this agent's CLI; the text names it for the status.
+    Holds(AgentId, &'a str),
+    /// A binary named like a CLI inside another program's bundle: no CLI.
+    Bundled,
+    /// `pkg unknown`: it may hold any agent.
+    Unknown,
+}
+
+/// Reads one line of the process list for a run on the CLI at `cli`; `None` for a line the
+/// script never prints.
+fn read_line<'a>(line: &'a str, cli: &str) -> Option<Line<'a>> {
+    let (kind, rest) = line.split_once(' ')?;
+    match kind {
+        "exe" => {
+            let (name, path) = rest.split_once(' ').unwrap_or((rest, ""));
+            let agent = match name {
+                "claude.exe" => AgentId::Claude,
+                "opencode.exe" | "opencode2.exe" => AgentId::Opencode,
+                "codex.exe" => AgentId::Codex,
+                _ => return None,
+            };
+            let path = path.trim();
+            Some(match path {
+                "" => Line::Holds(agent, name),
+                path if bundled(path, cli) => Line::Bundled,
+                path => Line::Holds(agent, path),
+            })
+        }
+        "pkg" => match rest {
+            "unknown" => Some(Line::Unknown),
+            "claude-code" => Some(Line::Holds(AgentId::Claude, line)),
+            "@opencode" | "opencode-ai" => Some(Line::Holds(AgentId::Opencode, line)),
+            "@openai\\codex" | "@openai/codex" | "codex.js" => {
+                Some(Line::Holds(AgentId::Codex, line))
+            }
+            _ => None,
+        },
         _ => None,
     }
 }
 
-/// Which agents a running process uses. Fails closed — every agent in use — on a host
-/// without the Windows process list, a runner error, a non-success exit, a missing end
-/// marker or a line the script never prints.
-pub fn in_use(host: &Host, runner: &dyn Runner) -> PerAgent<bool> {
-    let all = || PerAgent::from_fn(|_| true);
+/// What holds each agent's CLI, read for a run on the CLI at `cli`: `None` when no process uses it, else the process for the
+/// status — a path, an image name or a `pkg` line. Fails closed — every agent held, by
+/// [`LIST_UNREADABLE`] — on a host without the Windows process list, a runner error, a
+/// non-success exit, a missing end marker or a line the script never prints.
+pub fn in_use(host: &Host, runner: &dyn Runner, cli: &str) -> PerAgent<Option<String>> {
+    let all = || PerAgent::from_fn(|_| Some(LIST_UNREADABLE.to_string()));
     if !host.windows {
         return all();
     }
@@ -117,11 +180,22 @@ pub fn in_use(host: &Host, runner: &dyn Runner) -> PerAgent<bool> {
     if lines.pop() != Some(END_MARKER) {
         return all();
     }
-    let mut used = PerAgent::<bool>::default();
+    let mut used = PerAgent::<Option<String>>::default();
+    let mut unknown = false;
     for line in lines {
-        match line_agent(line) {
-            Some(agent) => *used.get_mut(agent) = true,
+        match read_line(line, cli) {
+            Some(Line::Holds(agent, by)) => {
+                used.get_mut(agent).get_or_insert_with(|| by.to_string());
+            }
+            Some(Line::Bundled) => {}
+            Some(Line::Unknown) => unknown = true,
             None => return all(),
+        }
+    }
+    if unknown {
+        for agent in AgentId::ALL {
+            used.get_mut(agent)
+                .get_or_insert_with(|| PROCESS_UNREADABLE.to_string());
         }
     }
     used
@@ -134,6 +208,7 @@ pub fn status(agent: AgentId, state: AgentUpdateState, now: DateTime<Utc>) -> Ag
         state,
         version: None,
         from: None,
+        by: None,
         at: crate::recents::timestamp(now),
     }
 }
@@ -196,7 +271,7 @@ pub fn update_agent(
 }
 
 /// One agent's turn in a run: `inUse` while a process uses its CLI (or the process list
-/// cannot be read), else the update.
+/// cannot be read), naming that process in `by`, else the update.
 pub fn run_agent(
     agent: AgentId,
     cli: &Candidate,
@@ -205,8 +280,11 @@ pub fn run_agent(
     runners: &Runners,
     clock: &dyn Fn() -> DateTime<Utc>,
 ) -> AgentUpdateStatus {
-    if *in_use(host, runners.list).get(agent) {
-        return status(agent, AgentUpdateState::InUse, clock());
+    if let Some(by) = in_use(host, runners.list, &cli.path).get(agent).clone() {
+        return AgentUpdateStatus {
+            by: Some(by),
+            ..status(agent, AgentUpdateState::InUse, clock())
+        };
     }
     update_agent(agent, cli, host, fs, runners, clock)
 }

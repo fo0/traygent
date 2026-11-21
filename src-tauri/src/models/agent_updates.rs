@@ -29,6 +29,10 @@ pub struct AgentUpdateStatus {
     /// The version before the run; only for `updated`.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub from: Option<String>,
+    /// What kept the update from running; only for `inUse`: the process's path, image name
+    /// or `pkg` line, or a German reason when the process list could not be read.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub by: Option<String>,
     /// RFC 3339 time the state was reached.
     pub at: String,
 }

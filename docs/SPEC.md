@@ -321,8 +321,11 @@ Commands (Rust `#[tauri::command]`, German `Err` strings; panel calls only via `
   update command that runs into its timeout is ended with its whole process tree.
 - An agent is skipped (`inUse`) while a process of its CLI runs: its executable, or a `node` /
   `bun` process whose command line names its package — sessions started outside Traygent count;
-  the Claude desktop app (`Claude.exe` in its own install folders) does not, and a `node` / `bun`
-  process with an unreadable command line counts for every agent.
+  a same-named binary inside another program's bundle does not (the Claude and Codex desktop
+  apps, the editor extensions of both — `agent_updates.rs → BUNDLED`; never the resolved CLI itself; one without a readable
+  path still counts), and a `node` / `bun` process with an unreadable command line counts for
+  every agent. `AgentUpdateStatus.by` names what held a skipped agent — the process's path,
+  image name or `pkg` line, or a German reason — and is the row's tooltip (#78).
   The process list comes from `Get-CimInstance Win32_Process` through Windows PowerShell; a list
   that cannot be read, times out or is incomplete skips every agent (fail closed).
 - `Snapshot.agentUpdates` holds one `AgentUpdateStatus` per agent that had a run since the app
