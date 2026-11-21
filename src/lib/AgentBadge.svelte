@@ -7,23 +7,31 @@
   // The agent's product mark; its name is the accessible name. No tooltip:
   // the row's start covers the badge and names the agent (and the profile)
   // in its own. A profile other than „Standard“ sits on the tile's corner as
-  // its initial (#33), so it takes no width from the folder name.
+  // its initial (#33), so it takes no width from the folder name; one removed
+  // since is a warning „?“ named by its state, never its raw id (#61).
   let {
     agent,
     label,
     profile = '',
+    profileRemoved = false,
   }: {
     agent: AgentId;
     label: string;
     /** The profile's label, `''` for „Standard“. */
     profile?: string;
+    /** `profile` names a removed profile („Profil entfernt“). */
+    profileRemoved?: boolean;
   } = $props();
 </script>
 
 <span class="agent-tile"
   ><span class="agent-badge" role="img" aria-label={label}
     ><Icon name={AGENT_ICONS[agent]} size={13} /></span
-  >{#if profile}<ProfileMark
+  >{#if profileRemoved}<ProfileMark
+      label="?"
+      name={profile}
+      warn
+    />{:else if profile}<ProfileMark
       label={profile}
       name={`Profil ${profile}`}
     />{/if}</span

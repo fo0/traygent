@@ -21,6 +21,7 @@
   import { repeatClick, repeatKey } from './rowStart';
   import type { AgentId, RecentSession, Snapshot } from './types';
   import { repoLabel } from './target';
+  import { PROFILE_REMOVED_REASON } from './profiles';
   import { optionsProblem } from './validation';
 
   let {
@@ -29,6 +30,7 @@
     snapshot,
     now,
     profile,
+    profileRemoved,
     launching,
     onRestart,
     onAdopt,
@@ -46,6 +48,11 @@
     now: number;
     /** The label of the row's profile, `''` for „Standard“. */
     profile: string;
+    /**
+     * Its stored profile is no longer listed: the start is blocked, never
+     * sent with another profile (#61 in BACKLOG.md).
+     */
+    profileRemoved: boolean;
     /** A start runs; the row's start waits for it. */
     launching: boolean;
     /** Starts exactly these options again, as a new session. */
@@ -93,9 +100,10 @@
     optionsProblem(recent, shimStart(snapshot, recent.agent, recent.env)),
   );
   const start = $derived(startState(snapshot, recent));
+  const blockedBy = $derived(profileRemoved ? PROFILE_REMOVED_REASON : problem);
   const target = $derived(
-    start.kind === 'ready' && problem
-      ? { kind: 'blocked' as const, reason: problem }
+    start.kind === 'ready' && blockedBy
+      ? { kind: 'blocked' as const, reason: blockedBy }
       : start,
   );
   /**
@@ -131,7 +139,7 @@
       recent.folder,
       repo,
       env.label,
-      profile && `Profil: ${profile}`,
+      profile && (profileRemoved ? profile : `Profil: ${profile}`),
       optionTitle,
       `Freigabe: ${permission.label}`,
       ports.length && portsTitle,
@@ -195,7 +203,7 @@
 </script>
 
 <li class="recent-row">
-  <AgentBadge agent={recent.agent} {label} {profile} />
+  <AgentBadge agent={recent.agent} {label} {profile} {profileRemoved} />
   <span class="recent-text"
     ><span class="recent-name">{name}</span>{#if parent}<span
         class="recent-parent"><bdi>{parent}</bdi></span

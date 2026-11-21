@@ -21,6 +21,10 @@ export const STANDARD_LABEL = 'Standard';
 export const MAX_PROFILES = 8;
 /** A start or an edit names a profile the agent does not list, as natively. */
 export const PROFILE_MISSING = 'Profil nicht gefunden.';
+/** How a recent names a stored profile the agent no longer lists (#61). */
+export const PROFILE_REMOVED = 'Profil entfernt';
+/** Why its start is blocked: it never falls back to another profile. */
+export const PROFILE_REMOVED_REASON = `${PROFILE_REMOVED} · in „Bearbeiten …“ ein anderes wählen`;
 const MAX_LABEL_CHARS = 24;
 const ID = /^[a-z0-9][a-z0-9-]{0,23}$/;
 // eslint-disable-next-line no-control-regex
@@ -190,6 +194,20 @@ export function profileLabel(
 ) {
   if (!id || id === DEFAULT_PROFILE) return STANDARD_LABEL;
   return agentProfiles(snapshot, agent).find((p) => p.id === id)?.label ?? id;
+}
+
+/**
+ * Whether a recent's start names a profile the agent no longer lists, so
+ * Rust would refuse it (`editedProfile`). It never starts with another one:
+ * the row blocks its start instead (#61 in BACKLOG.md).
+ */
+export function recentProfileRemoved(
+  settings: Pick<AppSettings, 'profiles'>,
+  recent: Pick<LaunchRequest, 'agent' | 'env' | 'profile'>,
+) {
+  return (
+    editedProfile(settings, recent.agent, recent.env, recent.profile) === null
+  );
 }
 
 /** The first character of a label, upper case: the profile's mark. */

@@ -13,6 +13,7 @@ import {
   profileInitial,
   profileLabel,
   profilesProblem,
+  recentProfileRemoved,
   renameProblem,
 } from './profiles';
 import type { AgentProfile } from './types';
@@ -171,6 +172,35 @@ describe('profiles of a snapshot', () => {
     expect(defaultProfile(settings, 'claude')).toBe('team');
     settings.profiles.claude = [];
     expect(defaultProfile(settings, 'claude')).toBe('default');
+  });
+
+  it('flag a recent whose stored profile is gone, never one Rust starts (#61)', () => {
+    const { settings } = demoSnapshot();
+    const recent = { agent: 'claude' as const, env: 'local' as const };
+    expect(recentProfileRemoved(settings, recent)).toBe(false);
+    for (const profile of ['team', 'default', ''])
+      expect(recentProfileRemoved(settings, { ...recent, profile })).toBe(
+        false,
+      );
+    settings.profiles.claude = [];
+    expect(recentProfileRemoved(settings, { ...recent, profile: 'team' })).toBe(
+      true,
+    );
+    expect(
+      recentProfileRemoved(settings, {
+        ...recent,
+        env: 'docker',
+        profile: 'team',
+      }),
+    ).toBe(true);
+    // Where no profile applies, Rust ignores the stored one: no block.
+    expect(
+      recentProfileRemoved(settings, {
+        agent: 'codex',
+        env: 'docker',
+        profile: 'team',
+      }),
+    ).toBe(false);
   });
 
   it('refuse unknown profiles in supported environments', () => {

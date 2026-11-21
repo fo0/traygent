@@ -159,3 +159,46 @@ test('natively: ▶ restarts with the stored profile, a warning stays, sign-in n
   await expect(noteIn(dialog)).toHaveText('Profile synchronisiert.');
   expect(await readCalls(page, 'sync_profiles')).toHaveLength(1);
 });
+
+test('natively: a row whose profile was removed names it so and never starts (#61)', async ({
+  page,
+}) => {
+  const base = nativeSnapshot();
+  // „Team“ removed in the settings: the recent still stores it.
+  const snapshot: Snapshot = {
+    ...base,
+    settings: {
+      ...base.settings,
+      profiles: { ...base.settings.profiles, claude: [] },
+    },
+    profiles: base.profiles.filter((p) => p.id !== 'team'),
+  };
+  await installTauriMock<Snapshot, Record<string, never>>(
+    page,
+    (snapshot) => async (cmd) => {
+      if (cmd === 'snapshot' || cmd === 'refresh_detection') return snapshot;
+      if (cmd === 'launch_session') throw 'Profil nicht gefunden.';
+      return null;
+    },
+    { arg: snapshot, state: {} },
+  );
+  await page.goto('/');
+  const notes = row(page, 'Notizen');
+  // The tile names the state, never the raw id.
+  const mark = notes.getByRole('img', { name: 'Profil entfernt' });
+  await expect(mark).toHaveText('?');
+  await expect(mark).toHaveAttribute('data-warn', 'true');
+  await expect(notes.getByRole('img', { name: /team/i })).toHaveCount(0);
+  // ▶ is blocked up front, its tooltip says why.
+  const start = notes.getByRole('button', { name: /starten$/ });
+  await expect(start).toHaveAttribute('aria-disabled', 'true');
+  await expect(start).toHaveAttribute(
+    'title',
+    'Profil entfernt · in „Bearbeiten …“ ein anderes wählen',
+  );
+  await start.click({ force: true });
+  const index = snapshot.recents.findIndex((r) => r.profile === 'team');
+  await page.keyboard.press(`Control+${index + 1}`);
+  await page.waitForTimeout(300);
+  expect(await readCalls(page, 'launch_session')).toHaveLength(0);
+});

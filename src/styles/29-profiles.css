@@ -47,6 +47,13 @@
 .recent-row:hover .agent-tile .profile-mark {
   box-shadow: 0 0 0 1.5px var(--hover);
 }
+/* A removed profile (#61): a „?“ in the warning colour, like bypass. */
+.agent-tile .profile-mark[data-warn='true'],
+.recent-row:hover .agent-tile .profile-mark[data-warn='true'] {
+  background: var(--raised);
+  box-shadow: 0 0 0 1.5px var(--wait-line);
+  color: var(--wait);
+}
 
 /* Open the profile list to the left so it fits beside „Starten“. */
 .profile-chip {
