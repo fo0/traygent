@@ -70,7 +70,9 @@ Brand top left: icon + „Traygent“. Window ~480×760, frameless, tray popup l
      „Standard-Profil“, back to it after every start and agent change; a removed profile falls
      back to it. Sent only when it applies and is not `default`.
    - Primary button „Starten“ bottom right; Enter starts. Missing CLI → button becomes
-     „Installieren …“ (opens Settings → Agenten for that agent) — never a dead start.
+     „Installieren …“ (opens Settings → Agenten for that agent) — never a dead start. While
+     blocked, the reason is the button's tooltip; a press shows it as an error line below the
+     button until nothing blocks.
    - Options start from the agent's saved defaults; changing them on the dashboard affects the
      next start only (not the defaults).
 3. **Workspaces** (recent sessions — where RepoWatch lists repositories): one single-line row per
@@ -626,6 +628,9 @@ An exec-form Node hook in the selected Claude user settings can reference a moun
   is never exposed to the LAN by accident. Both sides validate; Rust normalizes and is the
   authority. Duplicate host ports (same protocol, overlapping ranges) are refused; at most 20
   entries.
+- The custom field takes several entries at once, separated by blanks, commas or semicolons
+  (`3000, 5173 8080:80`): all are added, or — when one is refused — none, and the field keeps
+  the text with the first entry's reason.
 - The service inside the container must listen on `0.0.0.0` (tooltip hint, no prose).
 
 ## Docker socket (Docker sessions, #46)

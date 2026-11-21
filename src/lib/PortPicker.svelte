@@ -2,7 +2,7 @@
   import Icon from './Icon.svelte';
   import {
     EXPOSED,
-    addPort,
+    addPorts,
     exposedIp,
     portListProblem,
     presetPort,
@@ -47,7 +47,7 @@
   }
   function add() {
     if (!text.trim()) return;
-    const result = addPort(value, text);
+    const result = addPorts(value, text);
     if (!result.list) {
       typed = result.problem;
       return;
@@ -117,7 +117,7 @@
       type="text"
       aria-label="Eigener Port"
       placeholder="Eigener Port"
-      title="PORT, HOST:CONTAINER oder IP:HOST:CONTAINER, Bereich A-B, optional /udp"
+      title="PORT, HOST:CONTAINER oder IP:HOST:CONTAINER, Bereich A-B, optional /udp; mehrere durch Komma oder Leerzeichen getrennt"
       spellcheck="false"
       autocomplete="off"
       aria-invalid={typed ? 'true' : undefined}

@@ -82,6 +82,11 @@
 .composer-actions:has(.profile-chip):has(.ports-chip) .composer-start {
   padding-inline: 5px;
 }
+/* Why a press on „Starten“ did nothing, under it until nothing blocks. */
+.composer-error {
+  margin: 0;
+  text-align: right;
+}
 
 /* Footer: the Docker probe next to Demo/Lokal. */
 .docker-state {
