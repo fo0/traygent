@@ -135,6 +135,10 @@ test('an available update installs in the app: changelog, progress, check, resta
     .click();
   const bar = panel.getByRole('progressbar', { name: 'Lädt … 42 %' });
   await expect(bar).toHaveAttribute('value', '42');
+  // „Installieren“ gave way to the progress: its box takes the focus, not
+  // <body>, and keeps it through every phase.
+  const phaseBox = panel.locator('.update-phase');
+  await expect(phaseBox).toBeFocused();
   await page.screenshot({
     path: testInfo.outputPath('update-downloading-360.png'),
   });
@@ -148,6 +152,7 @@ test('an available update installs in the app: changelog, progress, check, resta
   await expect(panel.getByRole('button', { name: 'Installieren' })).toHaveCount(
     0,
   );
+  await expect(phaseBox).toBeFocused();
   expect(
     await panel.evaluate((node) => node.scrollWidth <= node.clientWidth),
   ).toBe(true);
@@ -177,12 +182,16 @@ test('a failed install keeps the update and offers „Erneut versuchen“', asyn
   await expect(
     panel.getByText(`Version ${VERSION} verfügbar`, { exact: true }),
   ).toBeVisible();
+  // The focus went to the progress box and comes back with the button.
+  const retry = panel.getByRole('button', { name: 'Erneut versuchen' });
+  await expect(retry).toBeFocused();
   await mock.configure({ installFail: false });
-  await panel.getByRole('button', { name: 'Erneut versuchen' }).click();
+  await retry.click();
   await expect(panel.getByRole('alert')).toHaveCount(0);
   await expect(
     panel.getByText('Wird installiert – Traygent startet neu …'),
   ).toBeVisible();
+  await expect(panel.locator('.update-phase')).toBeFocused();
   expect(await readCalls(page, 'install_update')).toHaveLength(2);
 });
 

@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { onMount } from 'svelte';
+  import { onMount, tick, untrack } from 'svelte';
   import Icon from './Icon.svelte';
   import { startupNote, type Autostart } from './autostart.svelte';
 
@@ -13,6 +13,37 @@
     status === 'disabledByWindows' || status === 'unknownApproval',
   );
   onMount(() => void autostart.read());
+
+  // The repair buttons leave once Windows reports an editable state (or
+  // „Autostarteintrag entfernen“ alone once the entry is gone): the focus
+  // moves to a remaining repair button, else to the now usable switch,
+  // instead of dropping to <body>.
+  let actions: HTMLDivElement | undefined = $state();
+  let checkbox: HTMLInputElement | undefined = $state();
+  /** A repair button had the focus right before the buttons changed. */
+  let refocus = false;
+  const repairs = $derived([
+    autostart.loaded && !autostart.editable,
+    vetoed,
+    autostart.current?.registered,
+  ]);
+  $effect.pre(() => {
+    void repairs;
+    refocus = untrack(() => !!actions?.contains(document.activeElement));
+  });
+  $effect(() => {
+    void repairs;
+    if (!refocus) return;
+    refocus = false;
+    void tick().then(() => {
+      const focused = document.activeElement;
+      if (focused && focused !== document.body) return;
+      const repair = actions?.isConnected
+        ? actions.querySelector('button')
+        : null;
+      (repair ?? checkbox)?.focus();
+    });
+  });
 </script>
 
 <svelte:window onfocus={() => void autostart.read()} />
@@ -35,6 +66,7 @@
     <label class="startup-option">
       <input
         type="checkbox"
+        bind:this={checkbox}
         checked={autostart.checked}
         disabled={!autostart.editable}
         aria-disabled={autostart.busy ? 'true' : undefined}
@@ -54,7 +86,7 @@
         {note}
       </p>{/if}
     {#if autostart.loaded && !autostart.editable}
-      <div class="startup-actions">
+      <div class="startup-actions" bind:this={actions}>
         <button
           type="button"
           class="secondary-button"
