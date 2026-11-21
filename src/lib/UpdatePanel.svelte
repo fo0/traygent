@@ -62,8 +62,12 @@
       const focused = document.activeElement;
       if (target === 'box' && (!focused || focused === document.body))
         phaseBox?.focus();
-      else if (target === 'button' && focused === phaseBox)
-        installButton?.focus();
+      else if (
+        target === 'button' &&
+        focused === phaseBox &&
+        installButton?.isConnected
+      )
+        installButton.focus();
     });
   });
 </script>
