@@ -17,6 +17,11 @@ export interface AgentUpdateStatus {
   version?: string;
   /** Version before, only for `updated`. */
   from?: string;
+  /**
+   * What kept the update from running, only for `inUse`: the process's path,
+   * image name or `pkg` line, or a German reason for an unreadable list.
+   */
+  by?: string;
   /** RFC 3339 time this state was reached. */
   at: string;
 }

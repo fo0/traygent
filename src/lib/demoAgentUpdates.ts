@@ -65,7 +65,8 @@ function result(
       version: nextPatch(version),
       at,
     };
-  if (agent === 'opencode') return { agent, state: 'inUse', at };
+  if (agent === 'opencode')
+    return { agent, state: 'inUse', by: 'opencode.exe (Demo)', at };
   return version
     ? { agent, state: 'current', version, at }
     : { agent, state: 'current', at };

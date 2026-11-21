@@ -56,7 +56,7 @@ Stable project knowledge. **Read at session start.**
 - **Colours live in `src/styles/00-tokens.css` only** (dark set plus two identical light blocks); `tokens.test.ts` rejects literals elsewhere and checks WCAG AA pairs. Playwright runs dark by default (`playwright.config.ts`). (2026-11-03)
 - **App icons come from geometry** in `scripts/generate-icons.mjs` (writes `src-tauri/icons/*`, `source.svg` included); `pnpm icons:check` fails on drift. The tray icon embeds `icons/32x32.png`. (2026-11-03)
 
-- **Agent CLI updates fail closed** — the in-use check (`agent_updates.rs → LIST_SCRIPT`) needs its end marker and only known lines; a new line kind in the script must be added to `line_agent`, or every agent reads as in use. (2026-11-10)
+- **Agent CLI updates fail closed** — the in-use check (`agent_updates.rs → LIST_SCRIPT`) needs its end marker and only known lines; a new line kind in the script must be added to `read_line`, or every agent reads as in use. `exe` lines carry the path; a same-named binary of another program counts unless its folder is in `BUNDLED` (#78). (2026-11-21)
 
 - **A hidden child that starts the CLI through PowerShell is ended with `detect/runner.rs → kill_tree`** (absolute `taskkill /T /F`, bounded wait), then `Child::kill`: `Child::kill` alone ends only `powershell.exe` and leaves `claude.exe` / `node.exe` running. The hidden sign-in's stdout and stderr go to the null device — its output can hold a sign-in URL or code and must never sit in memory, a log or the panel (`profiles/login.rs`). (2026-11-14)
 

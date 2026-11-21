@@ -18,6 +18,13 @@ describe('agentUpdateText', () => {
     expect(agentUpdateText(status({ state: 'inUse' }))).toEqual({
       text: 'in Benutzung – übersprungen',
     });
+    // The process that held the CLI is the tooltip, read as part of the row.
+    const by = 'C:\\Demo\\codex.exe';
+    expect(agentUpdateText(status({ state: 'inUse', by }))).toEqual({
+      text: 'in Benutzung – übersprungen',
+      title: by,
+      detail: by,
+    });
     expect(agentUpdateText(status({ state: 'failed' }))).toEqual({
       text: 'fehlgeschlagen',
       tone: 'fail',

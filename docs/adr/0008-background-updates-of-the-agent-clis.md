@@ -26,7 +26,7 @@ A CLI counts as in use while a process of it runs — its own executable, or a `
 ### Negative / Trade-offs
 
 - A session that starts between the check and the update can still meet a CLI that is being replaced — one opened by hand, or one Traygent started a moment before the check, whose CLI process does not exist yet. Only starts through Traygent during the update itself are refused.
-- Another program with the same image name (`claude.exe`, `codex.exe`) blocks that CLI's update while it is open; only the Claude desktop app's install folders are excluded.
+- Another program with the same image name (`claude.exe`, `codex.exe`) blocks that CLI's update while it is open; only known bundles are excluded — the Claude and Codex desktop apps and the editor extensions of both (#78). The status names the blocking process.
 - A CLI that is always open never updates — the status says „in Benutzung“.
 - The update command's output is not shown; a failure is one word, and the user falls back to the command in Settings → Agenten.
 - A PowerShell start per agent in every run; machines that block PowerShell get „in Benutzung“ forever (fail closed).
