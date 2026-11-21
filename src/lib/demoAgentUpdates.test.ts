@@ -187,9 +187,6 @@ describe('demo update_agents', () => {
       ['opencode', 'inUse'],
       ['codex', 'current'],
     ]);
-    expect(
-      snapshot.agentUpdates.find((s) => s.agent === 'opencode')?.reason,
-    ).toBe('process');
     expect(snapshot.agentUpdatesRunning).toBe(false);
   });
 });

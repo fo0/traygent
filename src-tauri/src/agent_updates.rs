@@ -5,7 +5,7 @@
 //! every status to the service. The in-use check fails closed: a process list that cannot
 //! be read counts every agent as in use, so an update never replaces a running CLI.
 use crate::detect::{self, Candidate, Fs, Host, RunError, Runner};
-use crate::models::{AgentId, AgentInUseReason, AgentUpdateState, AgentUpdateStatus, PerAgent};
+use crate::models::{AgentId, AgentUpdateState, AgentUpdateStatus, PerAgent};
 use chrono::{DateTime, Utc};
 use std::time::Duration;
 
@@ -22,8 +22,6 @@ pub const LIST_TIMEOUT: Duration = Duration::from_secs(20);
 
 /// Last line of the process list; without it the output was cut or the script failed.
 const END_MARKER: &str = "traygent-end";
-/// A node or bun process whose command line cannot be read; it counts for every agent.
-const UNREADABLE_LINE: &str = "pkg unknown";
 
 /// Lists the processes that may hold an agent CLI, already filtered and deduplicated so the
 /// runner's output cap never hides one: `exe <image>` for a CLI binary, `pkg <match>` for a
@@ -97,13 +95,11 @@ fn line_agent(line: &str) -> Option<AgentId> {
     }
 }
 
-/// Which agents a running process uses, and why (`None`: free). Fails closed — every agent
-/// in use for [`AgentInUseReason::ProcessList`] — on a host without the Windows process list,
-/// a runner error, a non-success exit, a missing end marker or a line the script never
-/// prints. A `pkg unknown` line marks every agent not already named by its own process as
-/// [`AgentInUseReason::UnreadableProcess`].
-pub fn in_use(host: &Host, runner: &dyn Runner) -> PerAgent<Option<AgentInUseReason>> {
-    let all = || PerAgent::from_fn(|_| Some(AgentInUseReason::ProcessList));
+/// Which agents a running process uses. Fails closed — every agent in use — on a host
+/// without the Windows process list, a runner error, a non-success exit, a missing end
+/// marker or a line the script never prints.
+pub fn in_use(host: &Host, runner: &dyn Runner) -> PerAgent<bool> {
+    let all = || PerAgent::from_fn(|_| true);
     if !host.windows {
         return all();
     }
@@ -121,19 +117,11 @@ pub fn in_use(host: &Host, runner: &dyn Runner) -> PerAgent<Option<AgentInUseRea
     if lines.pop() != Some(END_MARKER) {
         return all();
     }
-    let mut used = PerAgent::<Option<AgentInUseReason>>::default();
-    let mut unreadable = false;
+    let mut used = PerAgent::<bool>::default();
     for line in lines {
         match line_agent(line) {
-            Some(agent) => *used.get_mut(agent) = Some(AgentInUseReason::Process),
-            None if line == UNREADABLE_LINE => unreadable = true,
+            Some(agent) => *used.get_mut(agent) = true,
             None => return all(),
-        }
-    }
-    if unreadable {
-        for agent in AgentId::ALL {
-            used.get_mut(agent)
-                .get_or_insert(AgentInUseReason::UnreadableProcess);
         }
     }
     used
@@ -147,7 +135,6 @@ pub fn status(agent: AgentId, state: AgentUpdateState, now: DateTime<Utc>) -> Ag
         version: None,
         from: None,
         at: crate::recents::timestamp(now),
-        reason: None,
     }
 }
 
@@ -208,8 +195,8 @@ pub fn update_agent(
     }
 }
 
-/// One agent's turn in a run: `inUse` with its reason while a process uses its CLI (or the
-/// process list cannot be read), else the update.
+/// One agent's turn in a run: `inUse` while a process uses its CLI (or the process list
+/// cannot be read), else the update.
 pub fn run_agent(
     agent: AgentId,
     cli: &Candidate,
@@ -218,11 +205,8 @@ pub fn run_agent(
     runners: &Runners,
     clock: &dyn Fn() -> DateTime<Utc>,
 ) -> AgentUpdateStatus {
-    if let Some(reason) = *in_use(host, runners.list).get(agent) {
-        return AgentUpdateStatus {
-            reason: Some(reason),
-            ..status(agent, AgentUpdateState::InUse, clock())
-        };
+    if *in_use(host, runners.list).get(agent) {
+        return status(agent, AgentUpdateState::InUse, clock());
     }
     update_agent(agent, cli, host, fs, runners, clock)
 }

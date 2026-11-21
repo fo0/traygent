@@ -326,30 +326,11 @@ fn agent_update_statuses_are_camel_case_and_skip_unknown_versions() {
         version: None,
         from: None,
         at: "2026-11-10T08:00:00Z".into(),
-        reason: None,
     };
     assert_eq!(
         serde_json::to_value(&skipped).unwrap(),
         json!({ "agent": "codex", "state": "inUse", "at": "2026-11-10T08:00:00Z" })
     );
-    // Why it was in use (#48 in BACKLOG.md): additive, camelCase, absent when unknown.
-    let reasons = [
-        (AgentInUseReason::Process, "process"),
-        (AgentInUseReason::UnreadableProcess, "unreadableProcess"),
-        (AgentInUseReason::ProcessList, "processList"),
-    ];
-    for (reason, text) in reasons {
-        let with = AgentUpdateStatus {
-            reason: Some(reason),
-            ..skipped.clone()
-        };
-        let value = serde_json::to_value(&with).unwrap();
-        assert_eq!(value["reason"], json!(text));
-        assert_eq!(
-            serde_json::from_value::<AgentUpdateStatus>(value).unwrap(),
-            with
-        );
-    }
     let updated = AgentUpdateStatus {
         state: AgentUpdateState::Updated,
         version: Some("0.167.0".into()),
