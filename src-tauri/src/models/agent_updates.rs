@@ -17,6 +17,20 @@ pub enum AgentUpdateState {
     Failed,
 }
 
+/// Why an agent counted as in use (`inUse` only, #48 in BACKLOG.md).
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub enum AgentInUseReason {
+    /// A process of this agent's CLI runs: its executable, or a node / bun process naming
+    /// its package.
+    Process,
+    /// A node or bun process whose command line cannot be read (another user's or an
+    /// elevated one); it counts for every agent.
+    UnreadableProcess,
+    /// The process list could not be read, timed out or was incomplete (fail closed).
+    ProcessList,
+}
+
 /// The last update run of one agent's local CLI since the app started.
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -31,4 +45,7 @@ pub struct AgentUpdateStatus {
     pub from: Option<String>,
     /// RFC 3339 time the state was reached.
     pub at: String,
+    /// Why the agent counted as in use; only for `inUse`.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub reason: Option<AgentInUseReason>,
 }

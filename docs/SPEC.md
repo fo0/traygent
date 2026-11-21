@@ -326,9 +326,11 @@ Commands (Rust `#[tauri::command]`, German `Err` strings; panel calls only via `
   The process list comes from `Get-CimInstance Win32_Process` through Windows PowerShell; a list
   that cannot be read, times out or is incomplete skips every agent (fail closed).
 - `Snapshot.agentUpdates` holds one `AgentUpdateStatus` per agent that had a run since the app
-  started, in catalog order: `running`, `updated` (`from` → `version`), `current`, `inUse`,
-  `failed`, each with its time `at`; `Snapshot.agentUpdatesRunning` is true while a run is in
-  progress. `update_agents` returns before the first agent turns `running`. Every change emits
+  started, in catalog order: `running`, `updated` (`from` → `version`), `current`, `inUse`
+  (with `reason`: `process` — its CLI runs, `unreadableProcess` — a `node` / `bun` command line
+  cannot be read, `processList` — the list cannot be read; #48), `failed`, each with its time
+  `at`; the row shows the reason in German in its tooltip and to assistive tech.
+  `Snapshot.agentUpdatesRunning` is true while a run is in progress. `update_agents` returns before the first agent turns `running`. Every change emits
   `traygent:snapshot`; a detection follows every run (one already running reruns), so versions
   and paths refresh. Nothing is persisted.
 - A local `launch_session` of an agent in `running` is refused („<Agent> wird gerade

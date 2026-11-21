@@ -124,6 +124,45 @@ test('natively the button stays off while a run is in progress', async ({
   expect(await readCalls(page, 'update_agents')).toEqual([]);
 });
 
+test('natively an agent in use says why, in the tooltip and to assistive tech (#48)', async ({
+  page,
+}) => {
+  const at = new Date().toISOString();
+  const snapshot = nativeSnapshot({
+    agentUpdates: [
+      { agent: 'claude', state: 'inUse', reason: 'unreadableProcess', at },
+      { agent: 'codex', state: 'inUse', at },
+    ],
+  });
+  await installTauriMock<Snapshot, Record<string, never>>(
+    page,
+    (snapshot) => async (cmd) => {
+      if (cmd === 'snapshot') return snapshot;
+      if (cmd === 'autostart_status')
+        return { status: 'disabled', registered: false };
+      return null;
+    },
+    { arg: snapshot, state: {} },
+  );
+  await page.goto('/');
+  const dialog = await openUpdates(page);
+  const rows = dialog
+    .getByRole('list', { name: 'Agenten-Updates' })
+    .getByRole('listitem');
+  const reason =
+    'Ein node- oder bun-Prozess ist nicht lesbar (anderer Benutzer oder Administrator)';
+  const state = rows.nth(0).locator('.agent-update-state');
+  await expect(state).toHaveAttribute('title', reason);
+  await expect(rows.nth(0)).toHaveAccessibleName(
+    `Claude Code in Benutzung – übersprungen (${reason}) gerade eben`,
+  );
+  await expect(state.getByText(`(${reason})`)).toHaveClass('sr-only');
+  // A status without a reason (an older shell) reads as before.
+  const plain = rows.nth(1).locator('.agent-update-state');
+  await expect(plain).toHaveText('in Benutzung – übersprungen');
+  await expect(plain).not.toHaveAttribute('title');
+});
+
 const REFUSALS = [
   'Agenten werden bereits aktualisiert.',
   'Die Agenten werden noch gesucht. Bitte gleich noch einmal versuchen.',

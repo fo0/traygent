@@ -75,6 +75,12 @@ fn clock() -> DateTime<Utc> {
 fn used(stdout: &str) -> [bool; 3] {
     let runner = FakeRunner::default().processes(stdout);
     let used = in_use(&windows_host(), &runner);
+    AgentId::ALL.map(|agent| used.get(agent).is_some())
+}
+
+fn reasons(stdout: &str) -> [Option<AgentInUseReason>; 3] {
+    let runner = FakeRunner::default().processes(stdout);
+    let used = in_use(&windows_host(), &runner);
     AgentId::ALL.map(|agent| *used.get(agent))
 }
 
@@ -167,7 +173,14 @@ fn an_unreadable_process_list_counts_every_agent_as_in_use() {
     // A line the script never prints.
     assert_eq!(used("Get-CimInstance : Access denied\ntraygent-end\n"), all);
     let host = windows_host();
+    let list = Some(AgentInUseReason::ProcessList);
     let flags = |runner: &FakeRunner| AgentId::ALL.map(|agent| *in_use(&host, runner).get(agent));
+    let all = [list; 3];
+    assert_eq!(reasons(""), all);
+    assert_eq!(
+        reasons("Get-CimInstance : Access denied\ntraygent-end\n"),
+        all
+    );
     assert_eq!(flags(&FakeRunner::default()), all);
     for error in [RunError::Missing, RunError::Timeout, RunError::Failed] {
         let runner = FakeRunner::default().result(&list_call(), Err(error));
@@ -201,6 +214,43 @@ fn a_node_process_with_an_unreadable_command_line_counts_for_every_agent() {
 }
 
 #[test]
+fn every_agent_in_use_says_why() {
+    use AgentInUseReason::{Process, UnreadableProcess};
+    assert_eq!(UNREADABLE_LINE, "pkg unknown");
+    assert_eq!(reasons("traygent-end\n"), [None, None, None]);
+    assert_eq!(
+        reasons("exe claude.exe\npkg codex.js\ntraygent-end\n"),
+        [Some(Process), None, Some(Process)]
+    );
+    // An unreadable command line counts for every agent, but its own process is named.
+    assert_eq!(
+        reasons("pkg unknown\ntraygent-end\n"),
+        [Some(UnreadableProcess); 3]
+    );
+    assert_eq!(
+        reasons("exe claude.exe\npkg unknown\ntraygent-end\n"),
+        [
+            Some(Process),
+            Some(UnreadableProcess),
+            Some(UnreadableProcess)
+        ]
+    );
+    assert_eq!(
+        reasons("pkg unknown\nexe codex.exe\ntraygent-end\n"),
+        [
+            Some(UnreadableProcess),
+            Some(UnreadableProcess),
+            Some(Process)
+        ]
+    );
+    // A line the script never prints still fails closed for all, whatever came before.
+    assert_eq!(
+        reasons("exe claude.exe\npkg unknown\npkg other\ntraygent-end\n"),
+        [Some(AgentInUseReason::ProcessList); 3]
+    );
+}
+
+#[test]
 fn an_agent_in_use_is_skipped_without_running_its_update() {
     let runner = FakeRunner::default()
         .processes("exe claude.exe\ntraygent-end\n")
@@ -209,9 +259,17 @@ fn an_agent_in_use_is_skipped_without_running_its_update() {
     let status = run(AgentId::Claude, CLAUDE, &runner);
     assert_eq!(
         status,
-        super::status(AgentId::Claude, AgentUpdateState::InUse, clock())
+        AgentUpdateStatus {
+            reason: Some(AgentInUseReason::Process),
+            ..super::status(AgentId::Claude, AgentUpdateState::InUse, clock())
+        }
     );
     assert_eq!(runner.calls(), [list_call()]);
+    // An unreadable list skips with its own reason.
+    let runner = FakeRunner::default();
+    let status = run(AgentId::Claude, CLAUDE, &runner);
+    assert_eq!(status.state, AgentUpdateState::InUse);
+    assert_eq!(status.reason, Some(AgentInUseReason::ProcessList));
 }
 
 #[test]

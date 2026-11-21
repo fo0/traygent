@@ -24,6 +24,28 @@ describe('agentUpdateText', () => {
     });
   });
 
+  it('names why an agent was in use, in the tooltip and to assistive tech (#48)', () => {
+    const reasons = {
+      process: 'Die CLI läuft gerade',
+      unreadableProcess:
+        'Ein node- oder bun-Prozess ist nicht lesbar (anderer Benutzer oder Administrator)',
+      processList: 'Prozessliste nicht lesbar',
+    } as const;
+    for (const [reason, words] of Object.entries(reasons))
+      expect(
+        agentUpdateText(
+          status({
+            state: 'inUse',
+            reason: reason as keyof typeof reasons,
+          }),
+        ),
+      ).toEqual({
+        text: 'in Benutzung – übersprungen',
+        title: words,
+        detail: words,
+      });
+  });
+
   it('shows the new version of an update, the old one in the tooltip and to assistive tech', () => {
     expect(
       agentUpdateText(
