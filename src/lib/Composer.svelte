@@ -117,10 +117,23 @@
       : blocked || 'Starten (Enter)',
   );
 
+  /**
+   * A press while blocked: the reason shows under the composer, not only in
+   * the tooltip, and goes away as soon as nothing blocks any more.
+   */
+  let refused = $state(false);
+  $effect(() => {
+    if (!blocked) refused = false;
+  });
+
   /** Enter anywhere in the composer, the button itself, or a menu-less click. */
   function start() {
     if (target.kind === 'install') return onInstall(composer.agent);
-    if (blocked || launching) return;
+    if (launching) return;
+    if (blocked) {
+      refused = true;
+      return;
+    }
     void onLaunch(composer.request()).then((ok) => ok && composer.launched());
   }
   async function browse() {
@@ -190,4 +203,7 @@
         />{launching ? 'Startet …' : 'Starten'}{/if}</button
     >
   </div>
+  {#if refused && blocked}<p class="field-error composer-error" role="alert">
+      {blocked}
+    </p>{/if}
 </form>

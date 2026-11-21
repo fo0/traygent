@@ -235,15 +235,19 @@ test('„Starten“ waits for a folder and explains why in its tooltip', async (
   await form.getByRole('combobox', { name: 'Ordner oder Repo' }).fill('');
   await expect(start(page)).toHaveAttribute('aria-disabled', 'true');
   await expect(start(page)).toHaveAttribute('title', 'Ordner wählen');
-  // aria-disabled keeps it focusable; a forced click starts nothing.
+  await expect(form.getByRole('alert')).toHaveCount(0);
+  // aria-disabled keeps it focusable; a forced click starts nothing, but
+  // says why under the composer.
   await start(page).click({ force: true });
   await expect(rows(page)).toHaveCount(6);
+  await expect(form.getByRole('alert')).toHaveText('Ordner wählen');
   await form.getByRole('button', { name: 'Zuletzt verwendete Ordner' }).click();
   await page.getByRole('menuitem', { name: /^Notizen/ }).click();
   await expect(
     form.getByRole('combobox', { name: 'Ordner oder Repo' }),
   ).toHaveValue('C:\\Users\\demo\\Notizen');
   await expect(start(page)).not.toHaveAttribute('aria-disabled');
+  await expect(form.getByRole('alert')).toHaveCount(0);
 });
 
 test('natively a start sends the exact request and shows the German error', async ({
