@@ -139,7 +139,7 @@
       recent.folder,
       repo,
       env.label,
-      profile && (profileRemoved ? profile : `Profil: ${profile}`),
+      profile && `Profil: ${profile}`,
       optionTitle,
       `Freigabe: ${permission.label}`,
       ports.length && portsTitle,
