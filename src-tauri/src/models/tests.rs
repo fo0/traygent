@@ -325,11 +325,20 @@ fn agent_update_statuses_are_camel_case_and_skip_unknown_versions() {
         state: AgentUpdateState::InUse,
         version: None,
         from: None,
+        by: None,
         at: "2026-11-10T08:00:00Z".into(),
     };
     assert_eq!(
         serde_json::to_value(&skipped).unwrap(),
         json!({ "agent": "codex", "state": "inUse", "at": "2026-11-10T08:00:00Z" })
+    );
+    let held = AgentUpdateStatus {
+        by: Some("codex.exe".into()),
+        ..skipped.clone()
+    };
+    assert_eq!(
+        serde_json::to_value(&held).unwrap()["by"],
+        json!("codex.exe")
     );
     let updated = AgentUpdateStatus {
         state: AgentUpdateState::Updated,

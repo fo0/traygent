@@ -73,9 +73,13 @@ fn clock() -> DateTime<Utc> {
 }
 
 fn used(stdout: &str) -> [bool; 3] {
+    AgentId::ALL.map(|agent| held(stdout, agent).is_some())
+}
+
+/// What holds the agent's CLI with this process list.
+fn held(stdout: &str, agent: AgentId) -> Option<String> {
     let runner = FakeRunner::default().processes(stdout);
-    let used = in_use(&windows_host(), &runner);
-    AgentId::ALL.map(|agent| *used.get(agent))
+    in_use(&windows_host(), &runner, CODEX).get(agent).clone()
 }
 
 /// `update_agent` / `run_agent` with one runner in every role.
@@ -167,7 +171,11 @@ fn an_unreadable_process_list_counts_every_agent_as_in_use() {
     // A line the script never prints.
     assert_eq!(used("Get-CimInstance : Access denied\ntraygent-end\n"), all);
     let host = windows_host();
-    let flags = |runner: &FakeRunner| AgentId::ALL.map(|agent| *in_use(&host, runner).get(agent));
+    let flags = |runner: &FakeRunner| {
+        AgentId::ALL.map(|agent| {
+            in_use(&host, runner, CODEX).get(agent).as_deref() == Some(LIST_UNREADABLE)
+        })
+    };
     assert_eq!(flags(&FakeRunner::default()), all);
     for error in [RunError::Missing, RunError::Timeout, RunError::Failed] {
         let runner = FakeRunner::default().result(&list_call(), Err(error));
@@ -183,7 +191,7 @@ fn an_unreadable_process_list_counts_every_agent_as_in_use() {
     let runner = FakeRunner::default().processes("traygent-end\n");
     let other = Host::default();
     assert_eq!(
-        AgentId::ALL.map(|agent| *in_use(&other, &runner).get(agent)),
+        AgentId::ALL.map(|agent| in_use(&other, &runner, CODEX).get(agent).is_some()),
         all
     );
     assert!(runner.calls().is_empty());
@@ -192,10 +200,78 @@ fn an_unreadable_process_list_counts_every_agent_as_in_use() {
 #[test]
 fn a_node_process_with_an_unreadable_command_line_counts_for_every_agent() {
     assert!(LIST_SCRIPT.contains("IsNullOrWhiteSpace($line)) { 'pkg unknown' }"));
-    assert_eq!(line_agent("pkg unknown"), None);
+    assert_eq!(read_line("pkg unknown", CODEX), Some(Line::Unknown));
     assert_eq!(used("pkg unknown\ntraygent-end\n"), [true, true, true]);
     assert_eq!(
         used("exe claude.exe\npkg unknown\ntraygent-end\n"),
+        [true, true, true]
+    );
+    // A process that is known keeps its name; the others get the reason.
+    let list = "exe claude.exe\npkg unknown\ntraygent-end\n";
+    assert_eq!(held(list, AgentId::Claude).as_deref(), Some("claude.exe"));
+    assert_eq!(
+        held(list, AgentId::Codex).as_deref(),
+        Some(PROCESS_UNREADABLE)
+    );
+}
+
+#[test]
+fn a_binary_another_program_bundles_does_not_hold_the_cli() {
+    let bundles = [
+        r"exe claude.exe C:\Users\max\AppData\Local\AnthropicClaude\app-1.2.3\claude.exe",
+        r"exe claude.exe C:\Program Files\WindowsApps\Claude_1.2.3.0_x64__pzs8sxrjxfjjc\app\Claude.exe",
+        r"exe claude.exe c:\users\max\.vscode\extensions\anthropic.claude-code-2.1.330-win32-x64\resources\native-binary\claude.exe",
+        r"exe codex.exe C:\Program Files\WindowsApps\OpenAI.Codex_26.1118.0.0_x64__2p2nqsd0c76g0\app\resources\codex.exe",
+        r"exe codex.exe C:\Users\max\.vscode\extensions\openai.chatgpt-0.5.44-win32-x64\bin\windows-x86_64\codex.exe",
+        r"exe codex.exe C:\Users\Max Muster\.cursor\extensions\OpenAI.ChatGPT-0.5.44\bin\codex.exe",
+    ];
+    for line in bundles {
+        assert_eq!(read_line(line, CODEX), Some(Line::Bundled), "{line}");
+    }
+    let list = format!("{}\ntraygent-end\n", bundles.join("\n"));
+    assert_eq!(used(&list), [false, false, false]);
+    // The CLI next to a bundled copy still counts, named by its path.
+    let cli = r"C:\Users\Max Muster\AppData\Local\Programs\OpenAI\Codex\bin\codex.exe";
+    let list = format!("{}\nexe codex.exe {cli}\ntraygent-end\n", bundles[4]);
+    assert_eq!(used(&list), [false, false, true]);
+    assert_eq!(held(&list, AgentId::Codex).as_deref(), Some(cli));
+    // Without a readable path nothing says it is a bundle: it counts, named by its image.
+    assert_eq!(
+        held("exe codex.exe\ntraygent-end\n", AgentId::Codex).as_deref(),
+        Some("codex.exe")
+    );
+    assert_eq!(
+        held("pkg codex.js\ntraygent-end\n", AgentId::Codex).as_deref(),
+        Some("pkg codex.js")
+    );
+    // A CR before the line break is no part of the path.
+    assert_eq!(
+        held(
+            "exe codex.exe C:\\x\\codex.exe\r\ntraygent-end\r\n",
+            AgentId::Codex
+        )
+        .as_deref(),
+        Some(r"C:\x\codex.exe")
+    );
+    assert!(LIST_SCRIPT.contains("('exe ' + $name + ' ' + [string]$process.ExecutablePath).Trim()"));
+    // The CLI the run updates is never a bundle, and a Store-installed CLI trusts no
+    // Store package.
+    let package = r"C:\Program Files\WindowsApps\OpenAI.Codex_1.0.0.0_x64__x\codex.exe";
+    let line = format!("exe codex.exe {package}");
+    assert_eq!(read_line(&line, CODEX), Some(Line::Bundled));
+    assert_eq!(
+        read_line(&line, &package.to_uppercase()),
+        Some(Line::Holds(AgentId::Codex, package))
+    );
+    let alias = r"C:\Users\max\AppData\Local\Microsoft\WindowsApps\codex.exe";
+    assert_eq!(
+        read_line(&line, alias),
+        Some(Line::Holds(AgentId::Codex, package))
+    );
+    assert_eq!(read_line(bundles[4], alias), Some(Line::Bundled));
+    // An image the script never prints fails closed, whatever its path.
+    assert_eq!(
+        used("exe other.exe C:\\x\\other.exe\ntraygent-end\n"),
         [true, true, true]
     );
 }
@@ -207,10 +283,11 @@ fn an_agent_in_use_is_skipped_without_running_its_update() {
         .reply(&format!("{CLAUDE} --version"), "2.1.317 (Claude Code)")
         .reply(&format!("{CLAUDE} update"), "");
     let status = run(AgentId::Claude, CLAUDE, &runner);
-    assert_eq!(
-        status,
-        super::status(AgentId::Claude, AgentUpdateState::InUse, clock())
-    );
+    let skipped = AgentUpdateStatus {
+        by: Some("claude.exe".into()),
+        ..super::status(AgentId::Claude, AgentUpdateState::InUse, clock())
+    };
+    assert_eq!(status, skipped);
     assert_eq!(runner.calls(), [list_call()]);
 }
 
