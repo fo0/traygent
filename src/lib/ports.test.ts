@@ -5,6 +5,7 @@ import {
   MAX_PORTS,
   TOO_MANY,
   addPort,
+  addPorts,
   exposedIp,
   normalizePort,
   normalizePorts,
@@ -173,6 +174,40 @@ describe('port lists', () => {
       presetPort(10000 + i),
     );
     expect(addPort(full, '3000')).toEqual({ problem: TOO_MANY });
+  });
+  it('adds several entries separated by blanks, commas or semicolons', () => {
+    expect(
+      addPorts([presetPort(3000)], ' 5173, 8080:80;9000-9001/udp\n'),
+    ).toEqual({
+      list: [
+        presetPort(3000),
+        presetPort(5173),
+        '127.0.0.1:8080:80',
+        '127.0.0.1:9000-9001:9000-9001/udp',
+      ],
+      problem: '',
+    });
+    // An entry already listed, or typed twice, is no change.
+    expect(addPorts([presetPort(3000)], '3000 3000,5173')).toEqual({
+      list: [presetPort(3000), presetPort(5173)],
+      problem: '',
+    });
+  });
+  it('adds none of several entries when one cannot be added', () => {
+    expect(addPorts([], '5173 abc 8080')).toEqual({
+      problem: 'Port „abc“ ist ungültig.',
+    });
+    expect(addPorts([], '3000, 3000:80')).toEqual({
+      problem: 'Host-Port 3000 ist doppelt belegt.',
+    });
+    const almost = Array.from({ length: MAX_PORTS - 1 }, (_, i) =>
+      presetPort(10000 + i),
+    );
+    expect(addPorts(almost, '3000 3001')).toEqual({ problem: TOO_MANY });
+  });
+  it('treats a single entry exactly as addPort', () => {
+    for (const text of ['  5173 ', '', '  ', '\uFEFF3000', 'abc'])
+      expect(addPorts([], text)).toEqual(addPort([], text));
   });
 });
 

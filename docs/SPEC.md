@@ -628,6 +628,9 @@ An exec-form Node hook in the selected Claude user settings can reference a moun
   is never exposed to the LAN by accident. Both sides validate; Rust normalizes and is the
   authority. Duplicate host ports (same protocol, overlapping ranges) are refused; at most 20
   entries.
+- The custom field takes several entries at once, separated by blanks, commas or semicolons
+  (`3000, 5173 8080:80`): all are added, or — when one is refused — none, and the field keeps
+  the text with the first entry's reason.
 - The service inside the container must listen on `0.0.0.0` (tooltip hint, no prose).
 
 ## Docker socket (Docker sessions, #46)

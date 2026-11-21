@@ -164,6 +164,29 @@ test('the keyboard opens, toggles and closes the picker', async ({ page }) => {
   await expect(chip).toHaveAccessibleName('Ports 1');
 });
 
+test('the custom field takes several entries at once, or none', async ({
+  page,
+}) => {
+  await page.goto('/');
+  await composer(page).getByRole('radio', { name: 'Docker' }).check();
+  await portsChip(page).click();
+  const field = popover(page).getByRole('textbox', { name: 'Eigener Port' });
+  // One refused entry adds none; the text stays for the fix.
+  await field.fill('9000, abc 9100:80');
+  await field.press('Enter');
+  await expect(field).toHaveAccessibleDescription('Port „abc“ ist ungültig.');
+  await expect(field).toHaveValue('9000, abc 9100:80');
+  await expect(popover(page).locator('.port-chip')).toHaveCount(0);
+  await field.fill('9000, 9100:80 9200-9201/udp');
+  await field.press('Enter');
+  await expect(field).toHaveValue('');
+  await expect(popover(page).locator('.port-chip')).toHaveText([
+    '127.0.0.1:9000:9000',
+    '127.0.0.1:9100:80',
+    '127.0.0.1:9200-9201:9200-9201/udp',
+  ]);
+});
+
 test('Einstellungen → Umgebung saves the default ports', async ({ page }) => {
   await page.goto('/');
   await page

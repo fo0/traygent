@@ -26,7 +26,7 @@ One composer, no prose:
   - **Freigabe** — the permission mode: a symbol that cycles **Nachfragen** (ask) → **Auto** → bypass, its label in the tooltip, the bypass in a warning colour. The bypass label follows each CLI — **Bypass** for Claude Code, **YOLO** for Codex and OpenCode.
   - **Session** — **Neu** (new) / **Fortsetzen** (continue) / **Auswahl** (pick from the agent's session list), where the agent supports them.
   - **Profil** — Lokal and Docker, once the agent has a second profile ([below](#several-accounts--profile)): a round mark — a person for **Standard**, else the profile's initial — that picks which sign-in the next start uses; in a warning colour while that profile is not signed in.
-  - **Ports** — Docker only: checkboxes for common dev-server ports (3000 Next.js · Node, 5173 Vite, 4200 Angular, 8000 Django · FastAPI, 8080 Spring, 5000 Flask · ASP.NET, 4321 Astro, 6006 Storybook) plus custom Docker specs such as `8080:80` or `3000-3002/udp`. Ports bind to `127.0.0.1` unless an IP is typed explicitly.
+  - **Ports** — Docker only: checkboxes for common dev-server ports (3000 Next.js · Node, 5173 Vite, 4200 Angular, 8000 Django · FastAPI, 8080 Spring, 5000 Flask · ASP.NET, 4321 Astro, 6006 Storybook) plus custom Docker specs such as `8080:80` or `3000-3002/udp` (several at once, separated by spaces or commas). Ports bind to `127.0.0.1` unless an IP is typed explicitly.
 - **Starten** (start) or **Enter** opens the session. When the agent's CLI is missing locally, the button reads **Installieren …** and opens **Einstellungen → Agenten** for it — never a dead start. While something blocks the start (no folder yet, an invalid option), a press names the reason below the button until it is fixed.
 
 ## Workspaces

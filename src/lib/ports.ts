@@ -220,3 +220,30 @@ export function addPort(
   const listProblem = portListProblem(next);
   return listProblem ? { problem: listProblem } : { list: next, problem: '' };
 }
+
+/**
+ * What separates several entries typed or pasted into one field: ASCII
+ * blanks, commas and semicolons, none of which the grammar allows.
+ */
+const SEPARATORS = /[\t\n\r ,;]+/;
+
+/**
+ * Adds every entry of a typed or pasted text, separated by spaces, commas or
+ * semicolons (`3000, 5173 8080:80`): all of them, normalized, or none and the
+ * German reason of the first one that cannot be added. One entry behaves as
+ * `addPort`.
+ */
+export function addPorts(
+  list: readonly string[],
+  text: string,
+): { list: string[]; problem: '' } | { list?: undefined; problem: string } {
+  const entries = text.split(SEPARATORS).filter(Boolean);
+  if (entries.length < 2) return addPort(list, text);
+  let next: string[] = [...list];
+  for (const entry of entries) {
+    const result = addPort(next, entry);
+    if (!result.list) return { problem: result.problem };
+    next = result.list;
+  }
+  return { list: next, problem: '' };
+}
