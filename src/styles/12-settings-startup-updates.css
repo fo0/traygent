@@ -146,6 +146,11 @@
 .update-notes li + li {
   margin-top: 2px;
 }
+/* Takes the focus while „Installieren“ is replaced by the progress. */
+.update-phase:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 3px;
+}
 .update-progress {
   margin-top: 10px;
 }

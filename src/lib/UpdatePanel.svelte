@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { tick, untrack } from 'svelte';
   import Icon from './Icon.svelte';
   import type { DownloadProgress, UpdateInfo } from './types';
   import { changelogSummary, releaseDate, type UpdatePhase } from './updates';
@@ -35,6 +36,36 @@
   );
   const published = $derived(info ? releaseDate(info.date) : '');
   const bullets = $derived(info ? changelogSummary(info.notes) : []);
+
+  // „Installieren“ gives way to the progress bar: the focus moves to the
+  // phase box around it instead of dropping to <body>, and back to the
+  // button when it returns as „Erneut versuchen“.
+  let phaseBox: HTMLDivElement | undefined = $state();
+  let installButton: HTMLButtonElement | undefined = $state();
+  /** Where the focus goes once the phase has changed. */
+  let refocus: 'box' | 'button' | null = null;
+  $effect.pre(() => {
+    void phase;
+    refocus = untrack(() => {
+      const focused = document.activeElement;
+      if (focused && focused === installButton) return 'box';
+      if (focused && focused === phaseBox) return 'button';
+      return null;
+    });
+  });
+  $effect(() => {
+    void phase;
+    const target = refocus;
+    refocus = null;
+    if (!target) return;
+    void tick().then(() => {
+      const focused = document.activeElement;
+      if (target === 'box' && (!focused || focused === document.body))
+        phaseBox?.focus();
+      else if (target === 'button' && focused === phaseBox)
+        installButton?.focus();
+    });
+  });
 </script>
 
 <section class="update-panel" aria-label="App-Update">
@@ -67,32 +98,38 @@
       {#if bullets.length}<ul class="update-notes" aria-label="Änderungen">
           {#each bullets as bullet, index (index)}<li>{bullet}</li>{/each}
         </ul>{/if}
-      {#if phase === 'downloading'}
-        <div class="update-progress" role="status">
-          <label for="update-download"
-            >Lädt …{percent === undefined ? '' : ` ${percent} %`}</label
+      <div class="update-phase" tabindex="-1" bind:this={phaseBox}>
+        {#if phase === 'downloading'}
+          <div class="update-progress" role="status">
+            <label for="update-download"
+              >Lädt …{percent === undefined ? '' : ` ${percent} %`}</label
+            >
+            {#if percent === undefined}<progress id="update-download"
+              ></progress>{:else}<progress
+                id="update-download"
+                max="100"
+                value={percent}
+              ></progress>{/if}
+          </div>
+        {:else if phase === 'verifying'}
+          <p class="update-line" role="status">Wird geprüft …</p>
+        {:else if phase === 'installing'}
+          <p class="update-line" role="status">
+            Wird installiert – Traygent startet neu …
+          </p>
+        {:else}
+          {#if error}<div class="alert danger" role="alert">
+              <Icon name="warning" size={14} /><span>{error}</span>
+            </div>{/if}
+          <button
+            class="primary-button"
+            disabled={busy}
+            onclick={onInstall}
+            bind:this={installButton}
+            >{error ? 'Erneut versuchen' : 'Installieren'}</button
           >
-          {#if percent === undefined}<progress id="update-download"
-            ></progress>{:else}<progress
-              id="update-download"
-              max="100"
-              value={percent}
-            ></progress>{/if}
-        </div>
-      {:else if phase === 'verifying'}
-        <p class="update-line" role="status">Wird geprüft …</p>
-      {:else if phase === 'installing'}
-        <p class="update-line" role="status">
-          Wird installiert – Traygent startet neu …
-        </p>
-      {:else}
-        {#if error}<div class="alert danger" role="alert">
-            <Icon name="warning" size={14} /><span>{error}</span>
-          </div>{/if}
-        <button class="primary-button" disabled={busy} onclick={onInstall}
-          >{error ? 'Erneut versuchen' : 'Installieren'}</button
-        >
-      {/if}
+        {/if}
+      </div>
     </div>
   {/if}
   {#if error && !info}<div class="alert danger" role="alert">
