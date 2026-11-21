@@ -108,8 +108,8 @@ Brand top left: icon + „Traygent“. Window ~480×760, frameless, tray popup l
    A row's profile: ▶ restarts with it. One removed since never falls back to another (#61):
    the tile's mark turns into a warning „?“ named „Profil entfernt“, ▶ and its Ctrl+digit are
    blocked („Profil entfernt · in „Bearbeiten …“ ein anderes wählen“), and a start that slips
-   through is refused natively („Profil nicht gefunden.“); „In Composer übernehmen“ takes it over, or the saved „Standard-Profil“ when it
-   is gone. A start of the same folder with another profile updates the row's profile.
+   through is refused natively („Profil nicht gefunden.“); „In Composer übernehmen“ takes it
+   over, or the saved „Standard-Profil“ when it is gone. A start of the same folder with another profile updates the row's profile.
    „Modell & Denken“ (#43, a `Segmented` at the top of „Bearbeiten …“, explanation in the
    tooltips): „Traygent“ (default) — every ▶ sends the stored model and thinking level as
    today; „Agent“ — ▶ sends `keepAgentModel: true` and the launch builder passes no model or
