@@ -15,17 +15,16 @@ pub async fn get_agent_quota(
     tauri::async_runtime::spawn_blocking(move || {
         let state = app.state::<NativeState>();
         let settings = state.lock().settings().clone();
-        let path = quota_paths::credentials_path(
-            agent,
-            profile.as_deref(),
-            env,
-            &settings,
-            &Host::current(),
-        );
-        match path {
-            Ok(path) => quota::fetch(agent, &path),
-            Err(detail) => AgentQuota::unavailable(detail),
-        }
+        // Off (`quotaReads`, ADR-0014): returns before the path is resolved.
+        quota::read(agent, &settings, || {
+            quota_paths::credentials_path(
+                agent,
+                profile.as_deref(),
+                env,
+                &settings,
+                &Host::current(),
+            )
+        })
     })
     .await
     .map_err(|_| FAILED.to_string())

@@ -34,7 +34,7 @@
     <Icon name={AGENT_ICONS[agent]} size={18} />
     {#if active}<strong class="segment-label">{label}</strong>{/if}
     {#if dot}<span class="status-dot" data-state={dot}></span>{/if}
-    {#if active}
+    {#if active && !view.off}
       <span class="weekly-summary">
         {#if view.week.countdown}
           <Icon name="refresh" size={12} />

@@ -197,11 +197,25 @@ mod tests {
         );
     }
 
+    // Bytes 120..128 of a WAL index are SQLite's lock slots and hold no data. Windows locks
+    // are mandatory: a read across a slot an open connection holds fails with error 33.
+    const SHM_LOCKS: std::ops::Range<u64> = 120..128;
+
     fn files(dir: &TempDir) -> Vec<(String, Vec<u8>)> {
+        use std::io::{Read, Seek, SeekFrom};
         dir.entries()
             .into_iter()
             .map(|name| {
-                let bytes = fs::read(dir.0.join(&name)).unwrap();
+                let mut file = fs::File::open(dir.0.join(&name)).unwrap();
+                let mut bytes = Vec::new();
+                if name.ends_with("-shm") {
+                    (&file)
+                        .take(SHM_LOCKS.start)
+                        .read_to_end(&mut bytes)
+                        .unwrap();
+                    file.seek(SeekFrom::Start(SHM_LOCKS.end)).unwrap();
+                }
+                file.read_to_end(&mut bytes).unwrap();
                 (name, bytes)
             })
             .collect()
@@ -306,5 +320,76 @@ mod tests {
             files(&dir) == before,
             "the database and its sidecars must remain byte-identical"
         );
+    }
+
+    /// The -shm as `files` reads it, with its lock slots restored as zeros.
+    fn shm_with_zeroed_locks(files: &[(String, Vec<u8>)]) -> Vec<u8> {
+        let (_, bytes) = files
+            .iter()
+            .find(|(name, _)| name.ends_with("-shm"))
+            .unwrap();
+        let (at, len) = (SHM_LOCKS.start as usize, SHM_LOCKS.end - SHM_LOCKS.start);
+        let mut bytes = bytes.clone();
+        bytes.splice(at..at, vec![0; len as usize]);
+        bytes
+    }
+
+    // In one process SQLite shares one wal-index node per database (by file name on Windows,
+    // by inode on Unix), so the test above reuses the writer's read-write mapping. A copy under
+    // another name is what OpenCode stopped or crashed leaves behind: nobody holds its DMS lock,
+    // so readonly_shm=1 gets SQLITE_READONLY_CANTINIT, ignores the -shm content and rebuilds a
+    // private wal-index from the -wal up to its last commit frame (os_win.c winLockSharedMemory,
+    // wal.c walIndexReadHdr and walBeginShmUnreliable).
+    #[test]
+    fn rebuilds_the_wal_index_from_the_wal_when_no_writer_holds_the_shm() {
+        let dir = TempDir::new("opencode-writer");
+        let path = dir.0.join("opencode.db");
+        let db = fixture(&path);
+        sql(
+            &db,
+            r#"PRAGMA journal_mode=WAL; PRAGMA wal_autocheckpoint=0; PRAGMA cache_size=10;
+            CREATE TABLE filler (data BLOB);
+            INSERT INTO credential VALUES ('a','opencode-go','{"type":"key","key":"synthetic-stale"}',1,1)"#,
+        );
+        // A valid wal-index that predates the last commit: trusting it would yield the stale key.
+        let stale = shm_with_zeroed_locks(&files(&dir));
+        sql(
+            &db,
+            r#"UPDATE credential SET value='{"type":"key","key":"synthetic-committed"}'"#,
+        );
+        // The small cache spills the uncommitted change into the -wal as frames without a commit.
+        sql(
+            &db,
+            r#"BEGIN; UPDATE credential SET value='{"type":"key","key":"synthetic-uncommitted"}';
+            WITH RECURSIVE n(i) AS (SELECT 1 UNION ALL SELECT i + 1 FROM n WHERE i < 64)
+            INSERT INTO filler SELECT zeroblob(4000) FROM n"#,
+        );
+        let live = files(&dir);
+        let (_, wal) = live
+            .iter()
+            .find(|(name, _)| name.ends_with("-wal"))
+            .unwrap();
+        let pending = b"synthetic-uncommitted";
+        assert!(wal.windows(pending.len()).any(|w| w == pending));
+        assert!(shm_with_zeroed_locks(&live) != stale);
+        for shm in [vec![0; 32768], stale] {
+            let copy = TempDir::new("opencode-copy");
+            let path = copy.0.join("kopie.db");
+            for (name, bytes) in &live {
+                let suffix = name.strip_prefix("opencode.db").unwrap();
+                let bytes = if suffix == "-shm" { &shm } else { bytes };
+                fs::write(sidecar(&path, suffix), bytes).unwrap();
+            }
+            let before = files(&copy);
+            assert_eq!(before.len(), 3);
+            go_key(&path)
+                .unwrap()
+                .with_secret(|s| assert_eq!(s, "synthetic-committed"));
+            assert!(
+                files(&copy) == before,
+                "the database and its sidecars must remain byte-identical"
+            );
+        }
+        sql(&db, "ROLLBACK");
     }
 }

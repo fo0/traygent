@@ -6,6 +6,8 @@
     configuredQuotaBars,
     QUOTA_LABELS,
     QUOTA_METRICS,
+    quotaReadOn,
+    quotaReadTip,
     type QuotaMetric,
   } from './quotaTypes';
   import type { SettingsDraft } from './settingsDraft.svelte';
@@ -30,7 +32,10 @@
       enabled.includes(metric) ? (ordered.shift() ?? metric) : metric,
     );
   });
-  const view = $derived(quotaView(quotas.read(agent), enabled, quotas.now));
+  const reading = $derived(quotaReadOn(draft.value, agent));
+  const view = $derived(
+    quotaView(quotas.read(agent), enabled, quotas.now, reading),
+  );
 
   function toggle(metric: QuotaMetric, show: boolean) {
     if (metric === 'week') return;
@@ -56,23 +61,32 @@
   class="settings-group quota-settings"
   aria-labelledby="quota-settings-heading"
 >
-  <h3 id="quota-settings-heading">Kontingentbalken</h3>
-  <p class="field-help">
-    Die Woche bleibt bei allen CLIs sichtbar. Weitere Balken erscheinen bei der
-    Auswahl.
-  </p>
+  <h3 id="quota-settings-heading">Kontingent</h3>
+  <!-- Opt-in per agent (ADR-0014); the tooltip says which sign-in it uses. -->
+  <label class="switch-row" title={quotaReadTip(agent)}>
+    <input
+      type="checkbox"
+      class="switch-input"
+      title={quotaReadTip(agent)}
+      checked={reading}
+      onchange={(event) =>
+        draft.setQuotaRead(agent, event.currentTarget.checked)}
+    />
+    <span class="switch" aria-hidden="true"></span>
+    <span>Kontingent abfragen</span>
+  </label>
   {#each rows as metric (metric)}
     {@const index = enabled.indexOf(metric)}
     {@const label = QUOTA_LABELS[metric]}
-    <div class="quota-settings-row">
+    <div class="quota-settings-row" class:off={!reading}>
       <label
         class="env-toggle"
-        title={metric === 'week' ? 'Immer sichtbar' : undefined}
+        title={metric === 'week' ? 'Bei allen CLIs immer sichtbar' : undefined}
       >
         <input
           type="checkbox"
           checked={index >= 0}
-          disabled={metric === 'week'}
+          disabled={metric === 'week' || !reading}
           onchange={(event) => toggle(metric, event.currentTarget.checked)}
         />{label}
       </label>
@@ -80,7 +94,7 @@
         <button
           type="button"
           class="icon-button small"
-          disabled={index === 0}
+          disabled={!reading || index === 0}
           title={label + ' nach oben'}
           aria-label={label + ' nach oben'}
           onclick={() => move(metric, -1)}>↑</button
@@ -88,7 +102,7 @@
         <button
           type="button"
           class="icon-button small"
-          disabled={index === enabled.length - 1}
+          disabled={!reading || index === enabled.length - 1}
           title={label + ' nach unten'}
           aria-label={label + ' nach unten'}
           onclick={() => move(metric, 1)}>↓</button

@@ -36,6 +36,11 @@ Stable project knowledge. **Read at session start.**
 - **Date:** 2026-11-13
 - **Decision:** One config dir per sign-in (`CLAUDE_CONFIG_DIR=%USERPROFILE%\.claude-<id>`, „Standard“ = `.claude`); shared dirs (+ user extras) are junctions into the default home; `settings.json` and the `.claude.json` subset merge three-way against a value base, sign-in keys per profile; other files whole (newest wins). Claude Code in local and Docker sessions ([ADR-0012](docs/adr/0012-select-accounts-in-docker-sessions.md)). Detail: [ADR-0009](docs/adr/0009-agent-profiles-with-linked-config-directories.md), [ADR-0010](docs/adr/0010-three-way-merge-of-the-profiles-settings-and-state-file.md), `docs/SPEC.md → Profiles`.
 
+### Subscription quota reads are opt-in per agent
+
+- **Date:** 2026-11-22
+- **Decision:** `settings.quotaReads` (owner, #83): off by default for Claude and Codex (undocumented endpoints, CLI sign-in), on for OpenCode Go; `quota::read` returns before any path, file or request when off; Traygent's own User-Agent only, ≥ 30 s between scheduled reads. Detail: [ADR-0014](docs/adr/0014-opt-in-subscription-quota-reads.md).
+
 ## Gotchas & Pitfalls
 
 - **Releases are manual only** — _Actions → Desktop Release → Run workflow_ on `main` runs `ci.yml` for that commit, then builds and publishes; merges never release. Never start one unprompted. (2026-11-03)

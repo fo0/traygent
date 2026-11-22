@@ -170,8 +170,12 @@
 .field-cell {
   min-width: 0;
 }
-.quota-settings .field-help {
-  margin-bottom: 6px;
+.quota-settings .switch-row {
+  margin: 0 0 6px;
+}
+/* Read switched off: the bar choices stay in place, unavailable. */
+.quota-settings-row.off {
+  color: var(--text-3);
 }
 .quota-settings-row {
   display: flex;

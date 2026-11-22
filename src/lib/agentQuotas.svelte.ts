@@ -1,10 +1,15 @@
 import type { Bridge } from './bridgeTypes';
 import { MINUTE, minuteClock } from './clock';
-import type { AgentQuota } from './quotaTypes';
+import { quotaReadOn, type AgentQuota } from './quotaTypes';
 import { defaultProfile, DEFAULT_PROFILE } from './profiles';
 import type { AgentId, EnvId, Snapshot } from './types';
 
 const REFRESH_INTERVAL = 5 * 60_000;
+// A provider that keeps reporting a reset moments away must not turn into a request loop.
+const MIN_INTERVAL = 30_000;
+// A failed read keeps the last good windows this long: enough for a network blip,
+// short enough that a signed-out account does not keep its old figures.
+const STALE_LIMIT = 15 * 60_000;
 const unavailable: AgentQuota = {
   windows: {},
   detail: 'Kontingent konnte nicht geladen werden.',
@@ -24,7 +29,9 @@ export function quotaContexts(
   env: EnvId,
 ): QuotaContext[] {
   const { settings, profiles, catalog } = snapshot;
-  return catalog.map(({ id: agent }) => {
+  // An agent whose read is off gets no context, so the provider is never asked.
+  const reading = catalog.filter(({ id }) => quotaReadOn(settings, id));
+  return reading.map(({ id: agent }) => {
     const profile =
       agent === active ? selectedProfile : defaultProfile(settings, agent);
     const status = profiles?.find((p) => p.agent === agent && p.id === profile);
@@ -45,11 +52,20 @@ export function quotaContexts(
   });
 }
 
+const hasWindows = (quota?: AgentQuota) =>
+  Object.keys(quota?.windows ?? {}).length > 0;
+
+const resets = (quota?: AgentQuota) =>
+  Object.values(quota?.windows ?? {})
+    .map((window) => Date.parse(window.resetAt ?? ''))
+    .filter((reset) => !Number.isNaN(reset));
+
 interface Entry {
   context: QuotaContext;
   result?: AgentQuota;
   busy: boolean;
   nextRead: number;
+  goodAt?: number;
 }
 
 /** Cache by launch account. A late reply can only update its own entry. */
@@ -88,6 +104,9 @@ export class AgentQuotas {
       next.set(context.agent, entry);
     }
     this.#selected = next;
+    // A switched-off agent keeps nothing cached: switching it back on reads afresh.
+    for (const [key, entry] of this.#cache)
+      if (!next.has(entry.context.agent)) this.#cache.delete(key);
     this.#publish();
     this.refresh();
   }
@@ -121,13 +140,14 @@ export class AgentQuotas {
   }
 
   // The shared clock drives countdowns. A reported window ending between ticks
-  // gets its own wake-up so a spent allowance disappears at its actual reset.
+  // gets its own wake-up so a spent allowance disappears at its actual reset,
+  // even when the next provider read is held back by the minimum interval.
   #scheduleExpiry(now: number) {
     clearTimeout(this.#expiry);
     if (!this.#observing) return;
     const next = Math.min(
       ...[...this.#selected.values()]
-        .map((e) => e.nextRead)
+        .flatMap((e) => [e.nextRead, ...resets(e.result)])
         .filter((t) => t > now),
     );
     if (next - now < MINUTE)
@@ -137,22 +157,37 @@ export class AgentQuotas {
   async #load(entry: Entry) {
     entry.busy = true;
     const { agent, env, profile } = entry.context;
+    let result: AgentQuota;
     try {
-      entry.result = (await this.#read(agent, profile, env)) ?? unavailable;
+      result = (await this.#read(agent, profile, env)) ?? unavailable;
     } catch {
-      entry.result = unavailable;
-    } finally {
-      entry.busy = false;
-      const now = Date.now();
-      const resets = Object.values(entry.result?.windows ?? {})
-        .map((window) => Date.parse(window.resetAt ?? ''))
-        .filter((reset) => reset > now);
-      entry.nextRead = Math.min(now + REFRESH_INTERVAL, ...resets);
-      if (this.#selected.get(agent) === entry) {
-        this.now = now;
-        this.#publish();
-        this.#scheduleExpiry(now);
-      }
+      result = unavailable;
+    }
+    // A failed read (no windows, only a detail; a switched-off read has neither) keeps the last good
+    // windows with the new detail for a while; their own resets still expire them.
+    const now = Date.now();
+    const previous = entry.result;
+    if (hasWindows(result)) entry.goodAt = now;
+    entry.result =
+      previous &&
+      hasWindows(previous) &&
+      now - (entry.goodAt ?? 0) < STALE_LIMIT
+        ? hasWindows(result) || !result.detail
+          ? result
+          : { windows: previous.windows, detail: result.detail }
+        : result;
+    entry.busy = false;
+    entry.nextRead = Math.max(
+      now + MIN_INTERVAL,
+      Math.min(
+        now + REFRESH_INTERVAL,
+        ...resets(entry.result).filter((reset) => reset > now),
+      ),
+    );
+    if (this.#selected.get(agent) === entry) {
+      this.now = now;
+      this.#publish();
+      this.#scheduleExpiry(now);
     }
   }
 

@@ -15,12 +15,18 @@ const segment = (page: Page, agent: AgentId) =>
 async function serveQuotas(
   page: Page,
   quotas: Partial<Record<AgentId, AgentQuota>>,
+  reads: Record<AgentId, boolean> = {
+    claude: true,
+    opencode: true,
+    codex: true,
+  },
 ) {
   const snapshot = nativeSnapshot();
   snapshot.settings.quotaBars = {
     claude: ['session', 'week', 'fable'],
     codex: ['week', 'spark'],
   };
+  snapshot.settings.quotaReads = reads;
   await installTauriMock(
     page,
     ({ snapshot, quotas }) =>
@@ -118,6 +124,34 @@ test('the selected CLI shows its ordered bars, while the other radios expose wee
     'Woche',
     'Spark 100 % frei',
   ]);
+});
+
+test('an agent whose read is off is never asked and shows no figure or bar', async ({
+  page,
+}) => {
+  const reading: AgentQuota = {
+    windows: { week: { used: 32, resetAt } },
+    detail: null,
+  };
+  await serveQuotas(
+    page,
+    { claude: reading, opencode: reading, codex: reading },
+    { claude: false, opencode: true, codex: false },
+  );
+  const claude = segment(page, 'claude');
+  await expect(segment(page, 'opencode').locator('.quota-fill')).toHaveCount(1);
+  await expect(claude.locator('.quota-meter, .weekly-summary')).toHaveCount(0);
+  await expect(claude.locator('.segment-label')).toHaveText('Claude Code');
+  await expect(
+    claude.getByRole('radio', { name: 'Claude Code', exact: true }),
+  ).toHaveAccessibleDescription(/Kontingentabfrage ausgeschaltet/);
+  await expect(segment(page, 'codex').locator('.quota-meter')).toHaveCount(0);
+  const asked = await page.evaluate(() =>
+    window
+      .__traygentIpcMock!.calls.filter((c) => c.cmd === 'get_agent_quota')
+      .map((c) => c.args?.agent),
+  );
+  expect([...new Set(asked)]).toEqual(['opencode']);
 });
 
 test('expired readings disappear while a still-current window stays visible', async ({

@@ -2,7 +2,7 @@ import { toggleEnv } from './environments';
 import { errorMessage } from './format';
 import { emptyShare, type ShareKind } from './profileShare';
 import { DEFAULT_PROFILE, newProfileProblem, profileId } from './profiles';
-import type { QuotaMetric } from './quotaTypes';
+import { quotaReadOn, type QuotaMetric } from './quotaTypes';
 import type { AgentId, AgentProfile, AppSettings, EnvId } from './types';
 import { settingsProblems, type SettingsField } from './validation';
 
@@ -211,6 +211,27 @@ export class SettingsDraft {
       return;
     }
     (this.value.quotaBars ??= {})[agent] = bars;
+  }
+
+  /**
+   * Stages the agent's quota read switch. The record is always written whole,
+   * so the save never leaves another agent to a type default.
+   */
+  setQuotaRead(agent: AgentId, on: boolean) {
+    const reads = { claude: false, opencode: false, codex: false };
+    for (const id of Object.keys(reads) as AgentId[])
+      reads[id] = id === agent ? on : quotaReadOn(this.value, id);
+    // Back at an older snapshot's implicit defaults: nothing staged.
+    if (
+      !this.saved.quotaReads &&
+      (Object.keys(reads) as AgentId[]).every(
+        (id) => reads[id] === quotaReadOn(this.saved, id),
+      )
+    ) {
+      delete this.value.quotaReads;
+      return;
+    }
+    this.value.quotaReads = reads;
   }
 
   /** Stages the extra shared folders or files of `agent`. */
