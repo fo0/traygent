@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { demoSettings } from './demoData';
 import { envsProblem, lastEnv, shownEnv, toggleEnv } from './environments';
+import { configuredQuotaBars } from './quotaTypes';
 import { SettingsDraft } from './settingsDraft.svelte';
 import {
   argsProblem,
@@ -62,6 +63,24 @@ describe('SettingsDraft', () => {
     draft.commit(draft.current());
     expect(draft.dirty).toBe(false);
     expect(draft.saved.agentUpdates).toBe(true);
+  });
+
+  it('stages quota order per agent and restores the implicit weekly default', () => {
+    const old = demoSettings();
+    delete old.quotaBars;
+    const draft = new SettingsDraft(old);
+    expect(configuredQuotaBars(draft.value, 'claude')).toEqual(['week']);
+    draft.setQuotaBars('claude', ['fable', 'week']);
+    expect(draft.dirty).toBe(true);
+    expect(old.quotaBars).toBeUndefined();
+    expect(configuredQuotaBars(draft.value, 'codex')).toEqual(['week']);
+    draft.setQuotaBars('claude', ['week']);
+    expect(draft.dirty).toBe(false);
+    draft.setQuotaBars('codex', ['sparkWeek', 'week', 'session']);
+    draft.commit(draft.current());
+    expect(draft.saved.quotaBars).toEqual({
+      codex: ['sparkWeek', 'week', 'session'],
+    });
   });
 
   it('stages the Docker Node switch: on by default, off only once saved', () => {

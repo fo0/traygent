@@ -68,6 +68,7 @@ function handlerParams(command: string): string[] {
  * is a type error here, a renamed Rust parameter fails the test.
  */
 const ARGS: { [K in Command]?: Exclude<Commands[K]['args'], undefined> } = {
+  get_agent_quota: { agent: 'claude', profile: 'team', env: 'local' },
   set_autostart: { enabled: true },
   install_update: {
     onProgress: {} as Commands['install_update']['args']['onProgress'],

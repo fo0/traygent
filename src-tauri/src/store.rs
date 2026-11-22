@@ -6,7 +6,7 @@
 //! by defaults. Unknown fields are ignored; missing, unreadable or invalid ones take their
 //! default ([`settings::sanitize`]).
 use crate::models::{
-    AgentId, AgentProfile, AppSettings, EnvId, GithubAccount, LaunchOptions, RecentSession,
+    AgentId, AgentProfile, AppSettings, GithubAccount, LaunchOptions, RecentSession,
     DEFAULT_PROFILE,
 };
 use crate::{github, recents, settings};
@@ -137,6 +137,7 @@ fn parse_account(value: &Value) -> Option<GithubAccount> {
 fn parse_settings(object: &Map<String, Value>) -> AppSettings {
     let defaults = AppSettings::default();
     let agents = object.get("agents").and_then(Value::as_object);
+    let quota_bars = object.get("quotaBars").and_then(Value::as_object);
     let docker = object.get("docker").and_then(Value::as_object);
     let images = docker.and_then(|docker| docker.get("images")?.as_object().cloned());
     let profiles = object.get("profiles").and_then(Value::as_object);
@@ -145,7 +146,8 @@ fn parse_settings(object: &Map<String, Value>) -> AppSettings {
     let mut settings = AppSettings {
         default_agent: field(object, "defaultAgent", defaults.default_agent),
         default_env: field(object, "defaultEnv", defaults.default_env),
-        environments: environments(object).unwrap_or_else(|| defaults.environments.clone()),
+        environments: known_items(object.get("environments"))
+            .unwrap_or_else(|| defaults.environments.clone()),
         terminal: field(object, "terminal", defaults.terminal),
         shared_window: field(object, "sharedWindow", defaults.shared_window),
         agent_updates: field(object, "agentUpdates", defaults.agent_updates),
@@ -155,6 +157,9 @@ fn parse_settings(object: &Map<String, Value>) -> AppSettings {
     for agent in AgentId::ALL {
         if let Some(agents) = agents {
             *settings.agents.get_mut(agent) = field(agents, agent.id(), LaunchOptions::default());
+        }
+        if let Some(list) = known_items(quota_bars.and_then(|bars| bars.get(agent.id()))) {
+            *settings.quota_bars.get_mut(agent) = list;
         }
         if let Some(images) = &images {
             let fallback = defaults.docker.images.get(agent).clone();
@@ -200,13 +205,12 @@ fn parse_profile(value: &Value) -> Option<AgentProfile> {
     serde_json::from_value(value.clone()).ok()
 }
 
-/// The composer's environments; an id a newer version added is dropped, the rest kept.
-/// Absent (a file from before the setting) means all of them.
-fn environments(object: &Map<String, Value>) -> Option<Vec<EnvId>> {
-    let list = object.get("environments")?.as_array()?;
+/// Drop unknown list entries individually. Missing or non-list fields use their default.
+fn known_items<T: DeserializeOwned>(value: Option<&Value>) -> Option<Vec<T>> {
+    let list = value?.as_array()?;
     let known = list
         .iter()
-        .filter_map(|item| serde_json::from_value::<EnvId>(item.clone()).ok());
+        .filter_map(|item| serde_json::from_value(item.clone()).ok());
     Some(known.collect())
 }
 

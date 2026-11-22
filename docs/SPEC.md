@@ -36,11 +36,11 @@ Brand top left: icon + „Traygent“. Window ~480×760, frameless, tray popup l
 2. **Neue Session** composer (one card, no prose), directly under the AppBar like RepoWatch's
    search field — no visible section heading; the section is named for assistive tech only and
    the checked agent is the page's focus landing:
-   - Agent segmented control (Claude · OpenCode · Codex), each with a small status dot for the
-     selected environment (ready / missing). Only the chosen agent shows its name and takes the
-     row's room; the others shrink to mark and dot at full contrast (never greyed out — they
-     are choices, not disabled ones), the name lives in their tooltip and accessible name
-     (owner request, #5).
+   - The selected agent shows its name and environment status on the left. The weekly reset
+     countdown and remaining percentage share that line on the right. Each agent button has a
+     bottom bar showing weekly consumption. Inactive buttons keep their mark and status dot.
+     In Settings → Agenten, users can enable and order additional windows for the active button.
+     The week stays enabled. Missing or expired values never count as an unused allowance.
    - Folder: one field („Ordner oder Repo“) for a folder **or** a GitHub repository + quick list
      of recent folders + a GitHub button (menu of the account's 8 newest-pushed repositories;
      „GitHub verbinden …“ without an account) + browse button (native folder dialog); see
@@ -245,6 +245,7 @@ Commands (Rust `#[tauri::command]`, German `Err` strings; panel calls only via `
 | command                            | args                                                                                             | result                                                        |
 | ---------------------------------- | ------------------------------------------------------------------------------------------------ | ------------------------------------------------------------- |
 | `snapshot`                         | –                                                                                                | `Snapshot` (cached detection)                                 |
+| `get_agent_quota`                  | `{ agent, profile, env }`                                                                        | `AgentQuota` (reported windows with usage and reset time)     |
 | `refresh_detection`                | –                                                                                                | `Snapshot` (re-probes CLIs + Docker)                          |
 | `save_settings`                    | `{ settings }`                                                                                   | `Snapshot` (validated; invalid → Err)                         |
 | `launch_session`                   | `{ request }`                                                                                    | `LaunchOutcome` (validates, opens terminal, records recent)   |

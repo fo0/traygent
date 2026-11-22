@@ -2,6 +2,7 @@ import { toggleEnv } from './environments';
 import { errorMessage } from './format';
 import { emptyShare, type ShareKind } from './profileShare';
 import { DEFAULT_PROFILE, newProfileProblem, profileId } from './profiles';
+import type { QuotaMetric } from './quotaTypes';
 import type { AgentId, AgentProfile, AppSettings, EnvId } from './types';
 import { settingsProblems, type SettingsField } from './validation';
 
@@ -191,6 +192,25 @@ export class SettingsDraft {
         this.setShare(agent, kind, [
           ...(this.saved.profileShare?.[agent]?.[kind] ?? []),
         ]);
+  }
+
+  /** Stages the enabled quota bars in their display order. */
+  setQuotaBars(agent: AgentId, bars: QuotaMetric[]) {
+    // Restoring the implicit weekly default of an older snapshot also clears its dirty flag.
+    if (
+      !this.saved.quotaBars?.[agent] &&
+      bars.length === 1 &&
+      bars[0] === 'week'
+    ) {
+      if (this.value.quotaBars) delete this.value.quotaBars[agent];
+      if (
+        !this.saved.quotaBars &&
+        !Object.keys(this.value.quotaBars ?? {}).length
+      )
+        delete this.value.quotaBars;
+      return;
+    }
+    (this.value.quotaBars ??= {})[agent] = bars;
   }
 
   /** Stages the extra shared folders or files of `agent`. */

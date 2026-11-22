@@ -1,10 +1,11 @@
 <script lang="ts">
-  import { untrack } from 'svelte';
+  import { onMount, untrack } from 'svelte';
   import Composer from './Composer.svelte';
   import EmptyState from './EmptyState.svelte';
   import RecentList from './RecentList.svelte';
   import SectionHeader from './SectionHeader.svelte';
   import { Composer as ComposerState } from './composerState.svelte';
+  import { quotaContexts } from './agentQuotas.svelte';
   import { catalogEntry, sentOptions } from './agents';
   import { RestartGate } from './rowStart';
   import type { Panel } from './panel.svelte';
@@ -36,6 +37,18 @@
   $effect(() => {
     const value = snapshot;
     if (value) untrack(() => composer.sync(value));
+  });
+
+  onMount(() => panel.quotas.observe());
+  $effect(() => {
+    if (!snapshot || !composer.ready) return;
+    const contexts = quotaContexts(
+      snapshot,
+      composer.agent,
+      composer.profile,
+      composer.env,
+    );
+    untrack(() => panel.quotas.follow(contexts));
   });
 
   /** „In Composer übernehmen“: the form at the top, ready for Enter. */
@@ -84,6 +97,7 @@
       <Composer
         {snapshot}
         {composer}
+        quotas={panel.quotas}
         launching={panel.launching}
         onLaunch={(request) => panel.launch(request)}
         {onInstall}

@@ -4,6 +4,8 @@
   import CopyField from './CopyField.svelte';
   import Icon from './Icon.svelte';
   import ProfileSettings from './ProfileSettings.svelte';
+  import QuotaSettings from './QuotaSettings.svelte';
+  import type { AgentQuotas } from './agentQuotas.svelte';
   import Segmented, { type Segment } from './Segmented.svelte';
   import {
     AGENT_ICONS,
@@ -23,6 +25,7 @@
   // and its staged defaults.
   let {
     snapshot,
+    quotas,
     draft,
     agent = $bindable(),
     demo,
@@ -30,6 +33,7 @@
     onInstall,
   }: {
     snapshot: Snapshot;
+    quotas: AgentQuotas;
     draft: SettingsDraft;
     agent: AgentId;
     demo: boolean;
@@ -119,6 +123,7 @@
   }}
 />
 {#if entry}
+  <QuotaSettings {entry} {draft} {quotas} />
   <section class="settings-group" aria-label={entry.label}>
     <dl class="status-lines">
       <div>

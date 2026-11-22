@@ -98,6 +98,8 @@ pub struct Host {
     pub codex_install_dir: Option<String>,
     pub codex_home: Option<String>,
     pub claude_config_dir: Option<String>,
+    pub opencode_db: Option<String>,
+    pub xdg_data_home: Option<String>,
     pub traygent_exe: Option<String>,
 }
 
@@ -118,6 +120,8 @@ impl Host {
             codex_install_dir: var("CODEX_INSTALL_DIR"),
             codex_home: var("CODEX_HOME"),
             claude_config_dir: var("CLAUDE_CONFIG_DIR"),
+            opencode_db: std::env::var("OPENCODE_DB").ok(),
+            xdg_data_home: var("XDG_DATA_HOME"),
             traygent_exe: std::env::current_exe()
                 .ok()
                 .and_then(|path| path.into_os_string().into_string().ok()),

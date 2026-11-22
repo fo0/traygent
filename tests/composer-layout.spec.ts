@@ -1,5 +1,5 @@
 import { expect, test, type Page } from './support/test';
-import { LAYOUT_FONTS, pinFont, type LayoutFont } from './support/fonts';
+import { LAYOUT_FONTS, pinFont } from './support/fonts';
 
 // The composer's sizes: the leading agent row, „Starten“ and the chip row.
 
@@ -14,48 +14,63 @@ const segmentHeight = (group: ReturnType<typeof agents>) =>
     .first()
     .evaluate((node) => node.getBoundingClientRect().height);
 
-/** Widths at which every agent name fits; DejaVu cuts at the 360 px minimum. */
-const UNCUT: Record<LayoutFont, number[]> = {
-  'Liberation Sans': [480, 440, 360],
-  'DejaVu Sans': [480, 440],
-};
-
-test('the agent row leads the composer: 36 px, 14.5 px names, 18 px marks at 480 px', async ({
+test('the weekly meter sits below the prominent agent choice at 480 px', async ({
   page,
 }) => {
   await page.setViewportSize({ width: 480, height: 760 });
   await page.goto('/');
   const segment = agents(page).locator('.segment').first();
-  expect(await segmentHeight(agents(page))).toBe(36);
+  expect(await segmentHeight(agents(page))).toBeGreaterThanOrEqual(40);
+  expect(await segmentHeight(agents(page))).toBeLessThanOrEqual(44);
   await expect(segment).toHaveCSS('font-size', '14.5px');
-  await expect(segment.locator('svg')).toHaveCSS('width', '18px');
+  await expect(segment.locator('svg.mark')).toHaveCSS('width', '18px');
   expect(await segmentHeight(envs(page))).toBe(28);
-  // Below the default window the row keeps the regular size.
   for (const width of [479, 360]) {
     await page.setViewportSize({ width, height: 760 });
-    expect(await segmentHeight(agents(page))).toBe(
-      await segmentHeight(envs(page)),
-    );
+    await expect(segment.locator('svg.mark')).toHaveCSS('width', '14px');
+    expect(await segmentHeight(agents(page))).toBeLessThanOrEqual(44);
   }
 });
 
 for (const font of LAYOUT_FONTS) {
-  test(`no agent name is cut in ${font}`, async ({ page }) => {
+  test(`the CLI name, reset and free quota fit on one line in ${font}`, async ({
+    page,
+  }) => {
+    await page.emulateMedia({ reducedMotion: 'reduce' });
     await page.goto('/');
     await pinFont(page, font);
     // Only the checked agent shows its name (the row collapses the others).
-    for (const width of UNCUT[font]) {
+    for (const width of [480, 440, 375, 360, 320]) {
       await page.setViewportSize({ width, height: 760 });
       for (const agent of ['Claude Code', 'OpenCode', 'Codex']) {
         await agents(page).getByRole('radio', { name: agent }).check();
-        const label = agents(page).locator(
-          '.segment:has(input:checked) .segment-label',
-        );
+        const selected = agents(page).locator('.segment:has(input:checked)');
+        const label = selected.locator('.segment-label');
         await expect(label).toHaveText(agent);
-        const cut = await label.evaluate(
-          (node) => node.scrollWidth > node.clientWidth,
+        await expect(selected.locator('.weekly-summary')).toContainText(
+          '% frei',
         );
-        expect(cut, `${agent} at ${width}px`).toBe(false);
+        const layout = await selected.evaluate((node) => {
+          const name = node.querySelector('.segment-label')!;
+          const bounds = (selector: string) =>
+            node.querySelector(selector)!.getBoundingClientRect();
+          const dot = bounds('.status-dot');
+          const summary = bounds('.weekly-summary');
+          const track = bounds('.quota-track');
+          return {
+            cut: name.scrollWidth > name.clientWidth,
+            gap: summary.left - dot.right,
+            alignment: Math.abs(summary.right - track.right),
+            center: Math.abs(
+              summary.top + summary.height / 2 - dot.top - dot.height / 2,
+            ),
+          };
+        });
+        const where = `${agent} at ${width}px`;
+        expect(layout.cut, where).toBe(false);
+        expect(layout.gap, where).toBeGreaterThan(0);
+        expect(layout.alignment, where).toBeLessThan(1);
+        expect(layout.center, where).toBeLessThan(1);
       }
     }
   });
