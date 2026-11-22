@@ -1,6 +1,6 @@
 import type { AgentId, AppSettings } from './types';
 
-export const DEFAULT_QUOTA_REFRESH_MINUTES = 5;
+export const DEFAULT_QUOTA_REFRESH_MINUTES = 15;
 
 export function validQuotaRefresh(minutes: number) {
   return Number.isInteger(minutes) && minutes >= 1 && minutes <= 60;
