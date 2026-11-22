@@ -66,7 +66,7 @@ export class SettingsDraft {
   }
 
   /** Whether a field of this group is invalid, e.g. `docker`, or the field itself. */
-  invalidIn(group: 'agents' | 'docker' | 'environments' | 'github') {
+  invalidIn(group: 'app' | 'agents' | 'docker' | 'environments' | 'github') {
     return Object.keys(this.problems).some(
       (field) => field === group || field.startsWith(`${group}.`),
     );

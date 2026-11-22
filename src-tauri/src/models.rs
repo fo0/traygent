@@ -409,6 +409,8 @@ pub struct AppSettings {
     /// Claude and Codex (undocumented endpoints, CLI sign-in), on for OpenCode Go.
     #[serde(deserialize_with = "quota_reads")]
     pub quota_reads: PerAgent<bool>,
+    /// Minutes between scheduled quota reads for enabled agents.
+    pub quota_refresh_minutes: u32,
     pub docker: DockerSettings,
     pub github: GithubSettings,
     /// Update the local agent CLIs in the background while no session uses them.

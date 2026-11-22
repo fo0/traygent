@@ -36,8 +36,9 @@ Brand top left: icon + „Traygent“. Window ~480×760, frameless, tray popup l
 2. **Neue Session** composer (one card, no prose), directly under the AppBar like RepoWatch's
    search field — no visible section heading; the section is named for assistive tech only and
    the checked agent is the page's focus landing:
-   - The selected agent shows its name and environment status on the left. The weekly reset
-     countdown and remaining percentage share that line on the right. Each agent button has a
+   - The selected agent shows its name and environment status on the left. The last successful quota read appears
+     on the right. Hovering over its timestamp shows the refresh interval. The weekly reset
+     countdown and remaining percentage appear on the week’s meter row. Each agent button has a
      bottom bar showing weekly consumption. Inactive buttons keep their mark and status dot.
      In Settings → Agenten, users can enable and order additional windows for the active button.
      The week stays enabled. Missing or expired values never count as an unused allowance.
@@ -211,7 +212,7 @@ Brand top left: icon + „Traygent“. Window ~480×760, frameless, tray popup l
   Anmeldung prüfen“ (lists gh sign-ins, one consent line, „Übernehmen“) and a masked token field
   with „Verbinden“. Account actions apply at once; the clone root („Klon-Ordner“, placeholder
   the default) is staged like every setting.
-- **App**: theme (System/Hell/Dunkel), Mit Windows starten, „Fehlersuche“ with the staged switch
+- **App**: theme (System/Hell/Dunkel), quota refresh interval (1–60 minutes, default 5), Mit Windows starten, „Fehlersuche“ with the staged switch
   „Debug“ (`settings.debug`, default off, tooltip „Anmeldung im sichtbaren Terminal, Fehler mit
   Ausgabe“): a profile sign-in opens the visible terminal instead of running hidden (#41). The
   panel shortens no error or `syncError` text, so „Debug“ changes the sign-in only.

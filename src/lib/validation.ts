@@ -7,6 +7,7 @@
 import { envsProblem } from './environments';
 import { DOCKER_ONLY, portListProblem } from './ports';
 import { agentShare, shareProblems } from './profileShare';
+import { validQuotaRefresh } from './quotaTypes';
 import { DEFAULT_PROFILE, profilesProblem } from './profiles';
 import type { AgentId, AppSettings, LaunchRequest } from './types';
 
@@ -127,6 +128,7 @@ export type SettingsField =
   | `agents.${AgentId}.share.files`
   | `docker.images.${AgentId}`
   | 'docker.ports'
+  | 'app.quotaRefreshMinutes'
   | 'environments'
   | 'github.cloneRoot';
 
@@ -139,6 +141,12 @@ export function settingsProblems(
   labels: Partial<Record<AgentId, string>> = {},
 ): Partial<Record<SettingsField, string>> {
   const problems: Partial<Record<SettingsField, string>> = {};
+  if (
+    settings.quotaRefreshMinutes !== undefined &&
+    !validQuotaRefresh(settings.quotaRefreshMinutes)
+  )
+    problems['app.quotaRefreshMinutes'] =
+      'Eine ganze Zahl von 1 bis 60 eingeben.';
   const environments = envsProblem(settings);
   if (environments) problems.environments = environments;
   for (const agent of Object.keys(settings.agents) as AgentId[]) {

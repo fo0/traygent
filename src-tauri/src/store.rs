@@ -152,6 +152,11 @@ fn parse_settings(object: &Map<String, Value>) -> AppSettings {
         terminal: field(object, "terminal", defaults.terminal),
         shared_window: field(object, "sharedWindow", defaults.shared_window),
         agent_updates: field(object, "agentUpdates", defaults.agent_updates),
+        quota_refresh_minutes: field(
+            object,
+            "quotaRefreshMinutes",
+            defaults.quota_refresh_minutes,
+        ),
         debug: field(object, "debug", defaults.debug),
         ..defaults.clone()
     };
