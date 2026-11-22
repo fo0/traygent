@@ -20,6 +20,7 @@ fn sample() -> Persisted {
     let mut settings = AppSettings {
         terminal: TerminalId::Console,
         shared_window: true,
+        quota_refresh_minutes: 15,
         agent_updates: true,
         debug: true,
         ..AppSettings::default()
@@ -135,6 +136,24 @@ fn save_then_load_round_trips_with_a_version() {
     let loaded = load(&dir.0);
     assert_eq!(loaded.state, state);
     assert!(loaded.read_only.is_none());
+}
+
+#[test]
+fn an_unknown_or_missing_quota_interval_keeps_the_other_settings() {
+    let dir = TempDir::new("quota-interval");
+    for value in [json!("15"), json!(0), json!(61), Value::Null] {
+        dir.write(
+            &json!({"version": 1, "settings": {
+                "debug": true, "quotaRefreshMinutes": value
+            }})
+            .to_string(),
+        );
+        let loaded = load(&dir.0).state.settings;
+        assert_eq!(loaded.quota_refresh_minutes, 5);
+        assert!(loaded.debug);
+    }
+    dir.write(r#"{"version":1,"settings":{}}"#);
+    assert_eq!(load(&dir.0).state.settings.quota_refresh_minutes, 5);
 }
 
 #[test]

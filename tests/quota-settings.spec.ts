@@ -94,9 +94,7 @@ test('the quota read switch is staged until saved and locks the bar choices whil
   await expect(fable).toBeDisabled();
   await expect(fable).toBeChecked();
   await expect(up).toBeDisabled();
-  await expect(preview.locator('[data-metric], .weekly-summary')).toHaveCount(
-    0,
-  );
+  await expect(preview.locator('[data-metric], .quota-updated')).toHaveCount(0);
   await expect(save).not.toHaveAttribute('aria-disabled', 'true');
   await dialog.getByRole('button', { name: 'Abbrechen' }).click();
 
@@ -105,7 +103,7 @@ test('the quota read switch is staged until saved and locks the bar choices whil
   await flip();
   await save.click();
   await expect(dialog).toHaveCount(0);
-  await expect(claude.locator('.quota-meter, .weekly-summary')).toHaveCount(0);
+  await expect(claude.locator('.quota-meter, .quota-updated')).toHaveCount(0);
   await settings.click();
   await expect(read).not.toBeChecked();
   await expect(fable).toBeDisabled();

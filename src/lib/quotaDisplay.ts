@@ -1,5 +1,5 @@
 import { MINUTE } from './clock';
-import { dateTime, plural } from './format';
+import { clockTime, dateTime, plural } from './format';
 import {
   QUOTA_LABELS,
   QUOTA_OFF_HINT,
@@ -68,16 +68,30 @@ export function quotaView(
   metrics: readonly QuotaMetric[],
   now: number,
   read = true,
+  updatedAt?: number,
+  refreshMinutes?: number,
 ) {
   const week = quotaRow(quota, 'week', now);
   if (!read) return { week, rows: [], hint: QUOTA_OFF_HINT, off: true };
   const rows = metrics.map((metric) =>
     metric === 'week' ? week : quotaRow(quota, metric, now),
   );
-  const hint = [...rows.map((row) => row.hint), quota?.detail]
+  const updated =
+    updatedAt === undefined ? 'Stand –' : `Stand ${clockTime(updatedAt)}`;
+  const refreshHint = [
+    updatedAt === undefined
+      ? 'Noch keine Kontingentdaten geladen'
+      : `Zuletzt aktualisiert am ${dateTime(updatedAt)}`,
+    refreshMinutes === undefined
+      ? ''
+      : `Bei geöffnetem Panel alle ${refreshMinutes} Min.`,
+  ]
+    .filter(Boolean)
+    .join(' · ');
+  const hint = [...rows.map((row) => row.hint), quota?.detail, refreshHint]
     .filter(Boolean)
     .join('\n');
-  return { week, rows, hint, off: false };
+  return { week, rows, hint, updated, refreshHint, off: false };
 }
 
 export type QuotaView = ReturnType<typeof quotaView>;

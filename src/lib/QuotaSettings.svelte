@@ -8,6 +8,7 @@
     QUOTA_METRICS,
     quotaReadOn,
     quotaReadTip,
+    quotaRefreshMinutes,
     type QuotaMetric,
   } from './quotaTypes';
   import type { SettingsDraft } from './settingsDraft.svelte';
@@ -34,7 +35,14 @@
   });
   const reading = $derived(quotaReadOn(draft.value, agent));
   const view = $derived(
-    quotaView(quotas.read(agent), enabled, quotas.now, reading),
+    quotaView(
+      quotas.read(agent),
+      enabled,
+      quotas.now,
+      reading,
+      quotas.updatedAt(agent),
+      quotaRefreshMinutes(draft.value),
+    ),
   );
 
   function toggle(metric: QuotaMetric, show: boolean) {
