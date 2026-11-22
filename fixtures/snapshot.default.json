@@ -26,6 +26,11 @@
         "extraArgs": ""
       }
     },
+    "quotaBars": {
+      "claude": ["week"],
+      "opencode": ["week"],
+      "codex": ["week"]
+    },
     "docker": {
       "images": {
         "claude": "node:22-trixie",

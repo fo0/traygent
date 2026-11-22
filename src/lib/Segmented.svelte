@@ -16,7 +16,8 @@
   }
 </script>
 
-<script lang="ts" generics="T extends string">
+<script lang="ts" generics="T extends string, Item extends Segment<T>">
+  import type { Snippet } from 'svelte';
   import Icon from './Icon.svelte';
 
   // Native radios: arrow keys, focus and disabled items come from the browser.
@@ -29,12 +30,13 @@
     landing = false,
     prominent = false,
     collapse = false,
+    children,
   }: {
     /** The radio group's name; unique per page. */
     name: string;
     /** Accessible name of the group; never shown. */
     label: string;
-    items: readonly Segment<T>[];
+    items: readonly Item[];
     value: T;
     onChange: (value: T) => void;
     /** The checked radio is the page's focus landing (`focus.ts → landing`). */
@@ -50,6 +52,8 @@
      * the tooltips.
      */
     collapse?: boolean;
+    /** Custom visuals use the same native radio, name and description. */
+    children?: Snippet<[Item]>;
   } = $props();
   const hintId = (item: Segment<T>) => `${name}-${item.id}-hint`;
 </script>
@@ -71,13 +75,19 @@
         value={item.id}
         checked={value === item.id}
         disabled={item.disabled}
+        aria-label={children ? item.label : undefined}
         aria-describedby={item.hint ? hintId(item) : undefined}
         data-focus-landing={landing && value === item.id ? true : undefined}
         onchange={() => onChange(item.id)}
       />
-      {#if item.icon}<Icon name={item.icon} size={prominent ? 18 : 14} />{/if}
-      <span class="segment-label">{item.label}</span>
-      {#if item.dot}<span class="status-dot" data-state={item.dot}></span>{/if}
+      {#if children}
+        {@render children(item)}
+      {:else}
+        {#if item.icon}<Icon name={item.icon} size={prominent ? 18 : 14} />{/if}
+        <span class="segment-label">{item.label}</span>
+        {#if item.dot}<span class="status-dot" data-state={item.dot}
+          ></span>{/if}
+      {/if}
     </label>
     {#if item.hint}<span id={hintId(item)} hidden>{item.hint}</span>{/if}
   {/each}

@@ -23,6 +23,28 @@ impl AgentHome {
         settings: &AppSettings,
         profile: Option<&str>,
     ) -> Result<Option<Self>, String> {
+        let Some(mut home) = Self::from_host(agent, host, settings, profile)? else {
+            return Ok(None);
+        };
+        home.directory = normalize_folder(&home.directory)
+            .map_err(|e| format!("{}-Konfigurationsordner: {e}", agent.label()))?;
+        if is_network_path(&home.directory) {
+            return Err(format!(
+                "Der {}-Konfigurationsordner muss auf einem lokalen Laufwerk liegen.",
+                agent.label()
+            ));
+        }
+        Ok(Some(home))
+    }
+
+    /// The host configuration used by local sessions and mounted by Docker. Consumers
+    /// validate the path for their own operation before accessing it.
+    pub(crate) fn from_host(
+        agent: AgentId,
+        host: &Host,
+        settings: &AppSettings,
+        profile: Option<&str>,
+    ) -> Result<Option<Self>, String> {
         let override_dir = match agent {
             AgentId::Opencode => return Ok(None),
             AgentId::Codex => host.codex_home.as_deref(),
@@ -34,7 +56,7 @@ impl AgentHome {
         };
         let mut claude_state = None;
         let mut shared_from = None;
-        let path = if let Some(dir) = override_dir {
+        let directory = if let Some(dir) = override_dir {
             dir.to_string()
         } else {
             let user_dir = host
@@ -54,14 +76,6 @@ impl AgentHome {
                 host.join(user_dir, &[".codex"])
             }
         };
-        let directory = normalize_folder(&path)
-            .map_err(|e| format!("{}-Konfigurationsordner: {e}", agent.label()))?;
-        if is_network_path(&directory) {
-            return Err(format!(
-                "Der {}-Konfigurationsordner muss auf einem lokalen Laufwerk liegen.",
-                agent.label()
-            ));
-        }
         Ok(Some(Self {
             directory,
             claude_state,

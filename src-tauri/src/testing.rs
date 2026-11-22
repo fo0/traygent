@@ -85,6 +85,8 @@ pub(crate) fn windows_host() -> Host {
         codex_install_dir: None,
         codex_home: None,
         claude_config_dir: None,
+        opencode_db: None,
+        xdg_data_home: None,
         traygent_exe: Some(r"C:\Program Files\Traygent\traygent.exe".into()),
     }
 }

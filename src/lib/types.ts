@@ -9,10 +9,12 @@
 import type { AgentUpdateStatus } from './agentUpdateTypes';
 import type { GithubState } from './githubTypes';
 import type { AgentProfile, ProfileShare, ProfileStatus } from './profileTypes';
+import type { QuotaMetric } from './quotaTypes';
 
 export type * from './agentUpdateTypes';
 export type * from './githubTypes';
 export type * from './profileTypes';
+export type * from './quotaTypes';
 export type * from './shellTypes';
 
 /** The coding agents Traygent starts. */
@@ -225,6 +227,8 @@ export interface AppSettings {
   sharedWindow: boolean;
   /** Defaults per agent. */
   agents: Record<AgentId, LaunchOptions>;
+  /** Enabled quota bars of the selected agent, in display order. Defaults to the week. */
+  quotaBars?: Partial<Record<AgentId, QuotaMetric[]>>;
   docker: DockerSettings;
   github: GithubSettings;
   /** Update the local agent CLIs every 4 hours while no session uses them. */

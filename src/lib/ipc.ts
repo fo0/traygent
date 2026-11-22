@@ -1,6 +1,8 @@
 import { Channel, invoke } from '@tauri-apps/api/core';
+import type { AgentQuota } from './quotaTypes';
 import type {
   AgentId,
+  EnvId,
   AppSettings,
   DownloadProgress,
   LaunchOptions,
@@ -23,6 +25,10 @@ import type {
  */
 export interface Commands {
   snapshot: { args: undefined; result: Snapshot };
+  get_agent_quota: {
+    args: { agent: AgentId; profile: string; env: EnvId };
+    result: AgentQuota;
+  };
   /**
    * Starts a new detection and resolves at once with `detecting: true`; the
    * finished snapshot follows as the `traygent:snapshot` event.
@@ -129,6 +135,7 @@ type Args<K extends Command> = Commands[K]['args'];
 /** Runtime list of the map's keys; the record type keeps it exhaustive and exact. */
 const REGISTERED: Record<Command, true> = {
   snapshot: true,
+  get_agent_quota: true,
   refresh_detection: true,
   save_settings: true,
   launch_session: true,

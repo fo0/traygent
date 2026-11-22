@@ -2,10 +2,10 @@
   import FolderField from './FolderField.svelte';
   import Icon from './Icon.svelte';
   import OptionChips from './OptionChips.svelte';
+  import QuotaTile from './QuotaTile.svelte';
   import Segmented, { type Segment } from './Segmented.svelte';
   import {
     ENVIRONMENTS,
-    AGENT_ICONS,
     SOON,
     STATE_LABELS,
     agentStatus,
@@ -16,6 +16,9 @@
     startState,
   } from './agents';
   import type { Composer } from './composerState.svelte';
+  import type { AgentQuotas } from './agentQuotas.svelte';
+  import { quotaView } from './quotaDisplay';
+  import { configuredQuotaBars } from './quotaTypes';
   import { recentFolders } from './recents';
   import { targetProblem } from './target';
   import type {
@@ -35,6 +38,7 @@
   let {
     snapshot,
     composer,
+    quotas,
     launching,
     onLaunch,
     onInstall,
@@ -44,6 +48,7 @@
   }: {
     snapshot: Snapshot;
     composer: Composer;
+    quotas: AgentQuotas;
     launching: boolean;
     /** Resolves true when the terminal opened. */
     onLaunch: (request: LaunchRequest) => Promise<boolean>;
@@ -80,15 +85,22 @@
     const detail = status?.detail ? ` · ${status.detail}` : '';
     return `${label}${version} · ${state}${detail}`;
   }
-  const agents = $derived<Segment<AgentId>[]>(
+  const agents = $derived(
     snapshot.catalog.map((item) => {
       const status = agentStatus(snapshot, item.id, composer.env);
+      const active = item.id === composer.agent;
+      const view = quotaView(
+        quotas.read(item.id),
+        active ? configuredQuotaBars(snapshot.settings, item.id) : ['week'],
+        quotas.now,
+      );
       return {
         id: item.id,
         label: item.label,
-        icon: AGENT_ICONS[item.id],
-        dot: status?.state ?? 'unknown',
-        hint: agentHint(item.label, status),
+        dot: status?.state ?? ('unknown' as const),
+        active,
+        view,
+        hint: [agentHint(item.label, status), view.hint].join('\n'),
       };
     }),
   );
@@ -163,7 +175,18 @@
     landing
     prominent
     collapse
-  />
+  >
+    {#snippet children(item)}
+      <QuotaTile
+        agent={item.id}
+        label={item.label}
+        dot={item.dot}
+        active={item.active}
+        view={item.view}
+        hint={item.hint}
+      />
+    {/snippet}
+  </Segmented>
   <FolderField
     bind:value={composer.folder}
     recents={recentFolders(snapshot.recents)}

@@ -189,8 +189,7 @@ no newline) · `leaf` = part after the last `\` or `/` · `n` = every byte of `l
 - **Session:** new = nothing · continue = `--continue` · resume = **unsupported** (no picker flag; `--session <id>`
   only) → `sessions: ['new','continue']`.
 - **Extra args:** after the built flags. Order: `--standalone` · `--auto` · `--continue` · extra.
-- **Auth:** `opencode auth login` (interactive) — storage path not documented; it lives under the data/config dirs
-  (`opencode debug paths`: data `~/.local/share/opencode`, config `~/.config/opencode`, state `~/.local/state/opencode`).
+- **Auth:** `opencode auth login` selects a connection. V2 stores credentials in the `credential` table of `opencode.db` under the data directory. The quota reader follows the active `opencode-go` credential and the `OPENCODE_DB` override. [Database path](https://github.com/anomalyco/opencode/blob/v2.2.5/packages/cli/src/database-path.ts) · [Credential selection](https://github.com/anomalyco/opencode/blob/v2.2.5/packages/core/src/credential.ts).
 - **Profiles:** not implemented (no recipe, `catalog.profiles: false`). Sign-in, config and sessions are spread over
   three XDG-style dirs, so one variable per account is not known — UNVERIFIED (BACKLOG #53).
 

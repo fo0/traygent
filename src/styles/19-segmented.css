@@ -84,7 +84,8 @@
   }
 }
 @media (max-width: 479px) {
-  .segmented.prominent .segment svg {
+  .segmented.prominent .segment > svg,
+  .segmented.prominent .segment .mark {
     width: 14px;
     height: 14px;
   }

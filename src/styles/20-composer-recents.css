@@ -9,6 +9,56 @@
   padding: 10px;
 }
 
+/* The selected CLI holds its weekly summary. The other two keep their mark,
+   probe status and weekly meter even when the selection shows extra rows. */
+.composer .segmented.collapse {
+  container-type: inline-size;
+  padding: 3px;
+  gap: 3px;
+}
+.composer .segmented.collapse .segment {
+  flex-basis: clamp(36px, 13%, 60px);
+  min-height: 40px;
+  padding: 8px 10px 6px;
+}
+.composer .segmented.collapse .segment:has(input:checked) {
+  flex: 1 1 0;
+}
+@container (max-width: 365px) {
+  .composer .segmented.collapse .segment {
+    flex-basis: 34px;
+    padding-inline: 4px;
+  }
+  .composer .segmented.collapse .segment:has(input:checked) {
+    padding-inline: 6px;
+  }
+}
+@container (max-width: 325px) {
+  .composer .segmented.collapse .segment {
+    flex-basis: 29px;
+    padding-inline: 3px;
+  }
+  .composer .segmented.collapse .segment:has(input:checked) {
+    padding-inline: 4px;
+  }
+}
+@media (max-width: 350px) {
+  .composer .segmented.collapse {
+    margin-inline: -6px;
+    padding-inline: 1px;
+    gap: 1px;
+  }
+}
+@container (max-width: 290px) {
+  .composer .segmented.collapse .segment {
+    flex-basis: 25px;
+    padding-inline: 1px;
+  }
+  .composer .segmented.collapse .segment:has(input:checked) {
+    padding-inline: 3px;
+  }
+}
+
 /* Folder: path field, recent-folder menu and the browse button in one box. */
 .folder-field {
   position: relative;

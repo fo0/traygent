@@ -20,8 +20,8 @@ required-features = ["desktop"]
 default = []
 # The Windows tray shell; pulls the update client in.
 desktop = ["dep:tauri", "dep:tauri-build", "dep:tauri-plugin-dialog", "dep:tauri-plugin-opener", "dep:tauri-plugin-single-instance", "dep:tauri-plugin-updater", "dep:dirs", "dep:windows-sys", "dep:winreg", "updates", "vault"]
-# In-app updates: release check, installer download and verification.
-updates = ["dep:reqwest", "dep:semver"]
+# Network clients for updates and subscription quotas.
+updates = ["dep:reqwest", "dep:semver", "dep:toml"]
 # The GitHub token in the OS credential vault (Windows Credential Manager); never a
 # plaintext or in-memory fallback.
 vault = ["dep:keyring"]
@@ -44,6 +44,8 @@ tauri-plugin-updater = { version = "2.14.1", optional = true }
 
 reqwest = { version = "0.12", default-features = false, features = ["blocking", "json", "rustls-tls"], optional = true }
 semver = { version = "1", optional = true }
+# Read the credential-store setting from the CLI's Codex config.
+toml = { version = "1.1", default-features = false, features = ["parse", "serde"], optional = true }
 
 [build-dependencies]
 tauri-build = { version = "2", features = [], optional = true }

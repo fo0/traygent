@@ -10,6 +10,7 @@
   import StartupSettings from './StartupSettings.svelte';
   import ThemeSetting from './ThemeSetting.svelte';
   import UpdatePanel from './UpdatePanel.svelte';
+  import type { AgentQuotas } from './agentQuotas.svelte';
   import { Autostart } from './autostart.svelte';
   import { errorMessage } from './format';
   import type { GithubActions } from './githubActions.svelte';
@@ -26,6 +27,7 @@
     updater,
     appVersion,
     snapshot,
+    quotas,
     initialTab = 'agents',
     initialAgent = null,
     closeAfterInstall = false,
@@ -44,6 +46,7 @@
     appVersion: string;
     /** Catalog and probes; its settings are the staged baseline. */
     snapshot: Snapshot;
+    quotas: AgentQuotas;
     initialTab?: SettingsTab;
     /** The agent „Agenten“ opens at; the default agent otherwise. */
     initialAgent?: AgentId | null;
@@ -246,6 +249,7 @@
     {#if tab === 'agents'}
       <AgentSettings
         {snapshot}
+        {quotas}
         {draft}
         bind:agent
         {demo}
