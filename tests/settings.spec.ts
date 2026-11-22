@@ -24,7 +24,7 @@ test('App validates and saves the quota refresh interval', async ({ page }) => {
   const minutes = dialog.getByRole('spinbutton', {
     name: 'Abfrageintervall (Minuten)',
   });
-  await expect(minutes).toHaveValue('5');
+  await expect(minutes).toHaveValue('15');
   for (const value of ['', '0', '1.5', '61']) {
     await minutes.fill(value);
     await expect(minutes).toHaveAttribute('aria-invalid', 'true');
@@ -34,7 +34,7 @@ test('App validates and saves the quota refresh interval', async ({ page }) => {
   await dialog.getByRole('button', { name: 'Abbrechen' }).click();
   await openSettings(page);
   await openApp();
-  await expect(minutes).toHaveValue('5');
+  await expect(minutes).toHaveValue('15');
   await minutes.fill('12');
   await saveButton(page).click();
   await expect(dialog).toHaveCount(0);

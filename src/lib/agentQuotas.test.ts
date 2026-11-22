@@ -119,7 +119,7 @@ describe('agent quotas', () => {
       .mockRejectedValueOnce(new Error())
       .mockResolvedValueOnce(usage(55));
     const quotas = new AgentQuotas(get);
-    quotas.follow([standard]);
+    quotas.follow([standard], 5);
     await Promise.resolve();
     vi.setSystemTime(now + 300_000);
     quotas.refresh();
@@ -153,7 +153,7 @@ describe('agent quotas', () => {
       .mockResolvedValueOnce(good)
       .mockRejectedValue(new Error());
     const quotas = new AgentQuotas(get);
-    quotas.follow([standard]);
+    quotas.follow([standard], 5);
     await Promise.resolve();
     for (const minutes of [5, 10]) {
       vi.setSystemTime(now + minutes * 60_000);
