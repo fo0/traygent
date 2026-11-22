@@ -1,6 +1,7 @@
 //! App settings: defaults, normalization and validation (German errors reach the panel).
 use crate::models::{
     AgentId, AppSettings, DockerSettings, EnvId, GithubSettings, LaunchOptions, PerAgent,
+    QuotaMetric,
 };
 use crate::{catalog, launch, ports};
 
@@ -45,6 +46,7 @@ impl Default for AppSettings {
             terminal: Default::default(),
             shared_window: false,
             agents: PerAgent::from_fn(|_| LaunchOptions::default()),
+            quota_bars: PerAgent::from_fn(|_| vec![QuotaMetric::Week]),
             docker: DockerSettings::default(),
             github: GithubSettings::default(),
             agent_updates: false,
@@ -59,6 +61,8 @@ impl Default for AppSettings {
 /// Trims user-typed text and fills blank values with their defaults.
 pub fn normalize(mut settings: AppSettings) -> AppSettings {
     for agent in AgentId::ALL {
+        let bars = settings.quota_bars.get_mut(agent);
+        *bars = normalize_quota_bars(agent, bars);
         let options = settings.agents.get_mut(agent);
         *options = normalize_options(options.clone());
         let image = settings.docker.images.get_mut(agent);
@@ -78,6 +82,25 @@ pub fn normalize(mut settings: AppSettings) -> AppSettings {
     profiles::normalize(&mut settings);
     share::normalize(&mut settings);
     settings
+}
+
+fn normalize_quota_bars(agent: AgentId, bars: &[QuotaMetric]) -> Vec<QuotaMetric> {
+    use QuotaMetric::*;
+    let supported: &[QuotaMetric] = match agent {
+        AgentId::Claude => &[Week, Session, Fable, Sonnet],
+        AgentId::Opencode => &[Week, Session, Month],
+        AgentId::Codex => &[Week, Session, Spark, SparkWeek],
+    };
+    let mut ordered = Vec::new();
+    for &metric in bars {
+        if supported.contains(&metric) && !ordered.contains(&metric) {
+            ordered.push(metric);
+        }
+    }
+    if !ordered.contains(&Week) {
+        ordered.insert(0, Week);
+    }
+    ordered
 }
 
 /// Each environment once, in [`EnvId::ALL`] order; an empty list stays for `validate`.

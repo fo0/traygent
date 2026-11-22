@@ -186,6 +186,7 @@ export function demoSettings(): AppSettings {
       socket: false,
       manageNode: true,
     },
+    quotaBars: { claude: ['week'], opencode: ['week'], codex: ['week'] },
     github: { cloneRoot: '' },
     agentUpdates: false,
     debug: false,

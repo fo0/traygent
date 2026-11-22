@@ -1,3 +1,4 @@
+import { AgentQuotas } from './agentQuotas.svelte';
 import type { NoticeTone } from './StatusBanners.svelte';
 import type { Bridge, ObserveSnapshots, RecentEdit } from './bridgeTypes';
 import { errorMessage } from './format';
@@ -45,6 +46,7 @@ export class Panel {
   launching = $state(false);
 
   readonly native: boolean;
+  readonly quotas: AgentQuotas;
   readonly notices = new Notices();
   /** Settings → GitHub and the listing refresh. */
   readonly github: GithubActions;
@@ -62,6 +64,7 @@ export class Panel {
 
   constructor({ bridge, native, observe }: PanelDeps) {
     this.#bridge = bridge;
+    this.quotas = new AgentQuotas(bridge.getAgentQuota);
     this.native = native;
     this.#observe = observe;
     this.github = new GithubActions({
@@ -157,6 +160,7 @@ export class Panel {
     if (this.refreshing) return null;
     const ticket = ++this.#epoch;
     this.refreshing = true;
+    this.quotas.refresh(true);
     this.error = '';
     this.notices.clear(PANEL_NOTICE);
     this.#announceAfter = null;

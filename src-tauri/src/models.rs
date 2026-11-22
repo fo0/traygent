@@ -45,6 +45,19 @@ impl AgentId {
     }
 }
 
+/// Subscription limits that can appear on the agent selector.
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, PartialOrd, Ord, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub enum QuotaMetric {
+    Week,
+    Session,
+    Fable,
+    Sonnet,
+    Spark,
+    SparkWeek,
+    Month,
+}
+
 /// Where a session runs; `wsl` is reserved and never ready yet.
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Hash, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -379,6 +392,8 @@ pub struct AppSettings {
     pub shared_window: bool,
     /// Defaults per agent.
     pub agents: PerAgent<LaunchOptions>,
+    /// Enabled quota bars per agent in display order. Every list includes the week.
+    pub quota_bars: PerAgent<Vec<QuotaMetric>>,
     pub docker: DockerSettings,
     pub github: GithubSettings,
     /// Update the local agent CLIs in the background while no session uses them.
