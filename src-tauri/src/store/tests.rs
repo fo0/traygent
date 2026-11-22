@@ -20,7 +20,7 @@ fn sample() -> Persisted {
     let mut settings = AppSettings {
         terminal: TerminalId::Console,
         shared_window: true,
-        quota_refresh_minutes: 15,
+        quota_refresh_minutes: 5,
         agent_updates: true,
         debug: true,
         ..AppSettings::default()
@@ -149,11 +149,11 @@ fn an_unknown_or_missing_quota_interval_keeps_the_other_settings() {
             .to_string(),
         );
         let loaded = load(&dir.0).state.settings;
-        assert_eq!(loaded.quota_refresh_minutes, 5);
+        assert_eq!(loaded.quota_refresh_minutes, 15);
         assert!(loaded.debug);
     }
     dir.write(r#"{"version":1,"settings":{}}"#);
-    assert_eq!(load(&dir.0).state.settings.quota_refresh_minutes, 5);
+    assert_eq!(load(&dir.0).state.settings.quota_refresh_minutes, 15);
 }
 
 #[test]

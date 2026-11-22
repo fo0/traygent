@@ -212,7 +212,7 @@ Brand top left: icon + „Traygent“. Window ~480×760, frameless, tray popup l
   Anmeldung prüfen“ (lists gh sign-ins, one consent line, „Übernehmen“) and a masked token field
   with „Verbinden“. Account actions apply at once; the clone root („Klon-Ordner“, placeholder
   the default) is staged like every setting.
-- **App**: theme (System/Hell/Dunkel), quota refresh interval (1–60 minutes, default 5), Mit Windows starten, „Fehlersuche“ with the staged switch
+- **App**: theme (System/Hell/Dunkel), quota refresh interval (1–60 minutes, default 15), Mit Windows starten, „Fehlersuche“ with the staged switch
   „Debug“ (`settings.debug`, default off, tooltip „Anmeldung im sichtbaren Terminal, Fehler mit
   Ausgabe“): a profile sign-in opens the visible terminal instead of running hidden (#41). The
   panel shortens no error or `syncError` text, so „Debug“ changes the sign-in only.
