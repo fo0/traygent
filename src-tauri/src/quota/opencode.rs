@@ -197,11 +197,25 @@ mod tests {
         );
     }
 
+    // Bytes 120..128 of a WAL index are SQLite's lock slots and hold no data. Windows locks
+    // are mandatory: a read across a slot an open connection holds fails with error 33.
+    const SHM_LOCKS: std::ops::Range<u64> = 120..128;
+
     fn files(dir: &TempDir) -> Vec<(String, Vec<u8>)> {
+        use std::io::{Read, Seek, SeekFrom};
         dir.entries()
             .into_iter()
             .map(|name| {
-                let bytes = fs::read(dir.0.join(&name)).unwrap();
+                let mut file = fs::File::open(dir.0.join(&name)).unwrap();
+                let mut bytes = Vec::new();
+                if name.ends_with("-shm") {
+                    (&file)
+                        .take(SHM_LOCKS.start)
+                        .read_to_end(&mut bytes)
+                        .unwrap();
+                    file.seek(SeekFrom::Start(SHM_LOCKS.end)).unwrap();
+                }
+                file.read_to_end(&mut bytes).unwrap();
                 (name, bytes)
             })
             .collect()
