@@ -5,6 +5,8 @@ import { defaultProfile, DEFAULT_PROFILE } from './profiles';
 import type { AgentId, EnvId, Snapshot } from './types';
 
 const REFRESH_INTERVAL = 5 * 60_000;
+// A provider that keeps reporting a reset moments away must not turn into a request loop.
+const MIN_INTERVAL = 30_000;
 const unavailable: AgentQuota = {
   windows: {},
   detail: 'Kontingent konnte nicht geladen werden.',
@@ -147,7 +149,10 @@ export class AgentQuotas {
       const resets = Object.values(entry.result?.windows ?? {})
         .map((window) => Date.parse(window.resetAt ?? ''))
         .filter((reset) => reset > now);
-      entry.nextRead = Math.min(now + REFRESH_INTERVAL, ...resets);
+      entry.nextRead = Math.max(
+        now + MIN_INTERVAL,
+        Math.min(now + REFRESH_INTERVAL, ...resets),
+      );
       if (this.#selected.get(agent) === entry) {
         this.now = now;
         this.#publish();

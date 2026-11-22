@@ -73,7 +73,7 @@ Components: `AppBar` (brand, refresh, settings), `Dashboard` with `Composer` (`S
 
 The composer requests `get_agent_quota` for the account each button would launch. The Rust worker copies the settings under the service lock and releases it before file or network I/O. It reads the launch profile’s file-backed Claude or Codex sign-in, or the selected OpenCode Go credential from the V2 database, then queries the provider’s usage endpoint. Only window identifiers, consumed percentages, reset timestamps and a display message cross IPC. Tokens and provider responses stay in the worker.
 
-`AgentQuotas` caches results in memory per agent, environment and account. A late reply stays with its original account. The panel refreshes visible quotas every five minutes, at a reported reset and on manual refresh. The settings store keeps only the selected bar order in `quotaBars`. The browser demo supplies synthetic windows through the same bridge.
+`AgentQuotas` caches results in memory per agent, environment and account. A late reply stays with its original account. The panel refreshes visible quotas every five minutes, at a reported reset (never sooner than 30 seconds after the last read) and on manual refresh. Provider requests carry Traygent’s own `User-Agent`. The settings store keeps only the selected bar order in `quotaBars`. The browser demo supplies synthetic windows through the same bridge.
 
 ## Detection
 
