@@ -12,6 +12,7 @@ import type {
   PortPreset,
   Snapshot,
 } from './types';
+import { DEFAULT_QUOTA_REFRESH_MINUTES } from './quotaTypes';
 import { demoGithub } from './demoGithub';
 import {
   demoProfileSettings,
@@ -188,7 +189,7 @@ export function demoSettings(): AppSettings {
     },
     quotaBars: { claude: ['week'], opencode: ['week'], codex: ['week'] },
     // Both states on show: Codex keeps the shipped default (off).
-    quotaRefreshMinutes: 5,
+    quotaRefreshMinutes: DEFAULT_QUOTA_REFRESH_MINUTES,
     quotaReads: { claude: true, opencode: true, codex: false },
     github: { cloneRoot: '' },
     agentUpdates: false,

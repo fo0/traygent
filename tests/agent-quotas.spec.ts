@@ -27,7 +27,7 @@ async function serveQuotas(
     codex: ['week', 'spark'],
   };
   snapshot.settings.quotaReads = reads;
-  snapshot.settings.quotaRefreshMinutes = 15;
+  snapshot.settings.quotaRefreshMinutes = 12;
   await installTauriMock(
     page,
     ({ snapshot, quotas }) =>
@@ -79,7 +79,7 @@ test('the selected CLI shows its ordered bars, while the other radios expose wee
   await updated.hover();
   await expect(updated).toHaveAttribute(
     'title',
-    /Zuletzt aktualisiert am .*alle 15 Min/,
+    /Zuletzt aktualisiert am .*alle 12 Min/,
   );
   await expect(claude.locator('.quota-caption')).toHaveText([
     'Session 30 % frei',

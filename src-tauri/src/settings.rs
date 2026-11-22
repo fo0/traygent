@@ -49,7 +49,7 @@ impl Default for AppSettings {
             agents: PerAgent::from_fn(|_| LaunchOptions::default()),
             quota_bars: PerAgent::from_fn(|_| vec![QuotaMetric::Week]),
             quota_reads: PerAgent::from_fn(default_quota_read),
-            quota_refresh_minutes: 5,
+            quota_refresh_minutes: 15,
             docker: DockerSettings::default(),
             github: GithubSettings::default(),
             agent_updates: false,
