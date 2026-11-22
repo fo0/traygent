@@ -17,6 +17,7 @@ use std::time::Duration;
 
 const MAX_AUTH_BYTES: u64 = 1024 * 1024;
 const MAX_USAGE_BYTES: u64 = 256 * 1024;
+const MAX_TOKEN_BYTES: usize = 8 * 1024;
 const UNREADABLE: &str = "Die Anmeldedatei konnte nicht gelesen werden.";
 const UNREACHABLE: &str = "Der Anbieter ist nicht erreichbar.";
 const INVALID_RESPONSE: &str = "Die Kontingentdaten des Anbieters sind ungültig.";
@@ -173,8 +174,7 @@ fn parse_cli_login(agent: AgentId, auth: &[u8]) -> Result<Login, &'static str> {
             .filter(|s| !s.trim().is_empty())
     };
     let token = SecretToken::new(field_text(token_field).ok_or_else(|| login_required(agent))?);
-    // The same shape rule as the OpenCode key: anything else could not become a header.
-    if !token.with_secret(|s| SecretToken::new(s.trim().to_owned()).is_well_formed()) {
+    if !token.with_secret(header_safe) {
         return Err(login_required(agent));
     }
     let account_id = if agent == AgentId::Codex {
@@ -183,6 +183,13 @@ fn parse_cli_login(agent: AgentId, auth: &[u8]) -> Result<Login, &'static str> {
         None
     };
     Ok(Login { token, account_id })
+}
+
+/// A provider token as it is sent, trimmed. Codex access tokens are JWTs of a few KiB, so
+/// the limit is the usual header size and not the one for GitHub tokens.
+fn header_safe(token: &str) -> bool {
+    let token = token.trim();
+    (1..=MAX_TOKEN_BYTES).contains(&token.len()) && token.bytes().all(|b| b.is_ascii_graphic())
 }
 
 fn usage_request(
@@ -362,15 +369,39 @@ mod tests {
 
     #[test]
     fn a_token_that_cannot_be_a_header_reads_as_signed_out() {
-        for bad in ["a b", "a\nb", "a\u{7f}b"] {
-            let auth = json!({"claudeAiOauth": {"accessToken": bad}}).to_string();
+        let claude = |token: &str| json!({"claudeAiOauth": {"accessToken": token}}).to_string();
+        let codex = |token: &str| json!({"tokens": {"access_token": token}}).to_string();
+        let jwt = |len: usize| "x".repeat(len);
+        for (agent, auth) in [
+            (AgentId::Claude, claude("a b")),
+            (AgentId::Claude, claude("a\nb")),
+            (AgentId::Claude, claude("a\u{7f}b")),
+            (AgentId::Claude, claude("synthetic-\u{e9}")),
+            (AgentId::Codex, codex("a\tb")),
+            (AgentId::Codex, codex(&jwt(MAX_TOKEN_BYTES + 1))),
+        ] {
             assert_eq!(
-                parse_cli_login(AgentId::Claude, auth.as_bytes()).err(),
-                Some(login_required(AgentId::Claude))
+                parse_cli_login(agent, auth.as_bytes()).err(),
+                Some(login_required(agent))
             );
         }
-        let auth = json!({"claudeAiOauth": {"accessToken": " demo-padded\n"}}).to_string();
-        assert!(parse_cli_login(AgentId::Claude, auth.as_bytes()).is_ok());
+        for (agent, auth) in [
+            (AgentId::Claude, claude(" demo-padded\n")),
+            (AgentId::Codex, codex(&jwt(4096))),
+            (AgentId::Codex, codex(&jwt(MAX_TOKEN_BYTES))),
+        ] {
+            assert!(parse_cli_login(agent, auth.as_bytes()).is_ok());
+        }
+    }
+
+    #[test]
+    fn a_sized_buffer_does_not_grow_while_reading() {
+        let data = [b'x'; 4096];
+        let bytes = read_bounded(&data[..], MAX_AUTH_BYTES, data.len() + 1).unwrap();
+        assert_eq!(
+            (bytes.len(), bytes.capacity()),
+            (data.len(), data.len() + 1)
+        );
     }
 
     #[cfg(unix)]

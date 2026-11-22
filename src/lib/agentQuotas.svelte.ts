@@ -47,6 +47,11 @@ export function quotaContexts(
   });
 }
 
+const resets = (quota?: AgentQuota) =>
+  Object.values(quota?.windows ?? {})
+    .map((window) => Date.parse(window.resetAt ?? ''))
+    .filter((reset) => !Number.isNaN(reset));
+
 interface Entry {
   context: QuotaContext;
   result?: AgentQuota;
@@ -123,13 +128,14 @@ export class AgentQuotas {
   }
 
   // The shared clock drives countdowns. A reported window ending between ticks
-  // gets its own wake-up so a spent allowance disappears at its actual reset.
+  // gets its own wake-up so a spent allowance disappears at its actual reset,
+  // even when the next provider read is held back by the minimum interval.
   #scheduleExpiry(now: number) {
     clearTimeout(this.#expiry);
     if (!this.#observing) return;
     const next = Math.min(
       ...[...this.#selected.values()]
-        .map((e) => e.nextRead)
+        .flatMap((e) => [e.nextRead, ...resets(e.result)])
         .filter((t) => t > now),
     );
     if (next - now < MINUTE)
@@ -146,12 +152,12 @@ export class AgentQuotas {
     } finally {
       entry.busy = false;
       const now = Date.now();
-      const resets = Object.values(entry.result?.windows ?? {})
-        .map((window) => Date.parse(window.resetAt ?? ''))
-        .filter((reset) => reset > now);
       entry.nextRead = Math.max(
         now + MIN_INTERVAL,
-        Math.min(now + REFRESH_INTERVAL, ...resets),
+        Math.min(
+          now + REFRESH_INTERVAL,
+          ...resets(entry.result).filter((reset) => reset > now),
+        ),
       );
       if (this.#selected.get(agent) === entry) {
         this.now = now;
