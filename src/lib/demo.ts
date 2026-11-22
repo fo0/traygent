@@ -6,6 +6,7 @@ import {
   launchUpdateProblem,
   scheduleSteps,
 } from './demoAgentUpdates';
+import { demoQuota } from './demoQuota';
 import { DEMO_PICKED_FOLDER, demoSnapshot } from './demoData';
 import {
   DEMO_ACCOUNT,
@@ -58,6 +59,7 @@ const DEMO_TOKEN = /^(?:gh[pousr]_|github_pat_)\w{4,}$/;
  */
 export function createDemoBridge(latency = 150, detection = 600): DemoBridge {
   let data = demoSnapshot();
+  const quotaEpoch = Date.now();
   const listeners = new Set<(snapshot: Snapshot) => void>();
   let detectionTimer: ReturnType<typeof setTimeout> | undefined;
   let listingTimer: ReturnType<typeof setTimeout> | undefined;
@@ -104,6 +106,9 @@ export function createDemoBridge(latency = 150, detection = 600): DemoBridge {
     async snapshot() {
       await delay();
       return copy();
+    },
+    async getAgentQuota(agent, profile, env) {
+      return demoQuota(agent, profile, env, data.profiles, quotaEpoch);
     },
     async refreshDetection() {
       await delay();

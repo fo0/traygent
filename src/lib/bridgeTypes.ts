@@ -1,6 +1,8 @@
 // The bridge contract: what the native shell and the browser demo both serve.
+import type { AgentQuota } from './quotaTypes';
 import type {
   AgentId,
+  EnvId,
   AppSettings,
   LaunchOptions,
   LaunchOutcome,
@@ -23,6 +25,11 @@ export type RecentEdit = [
 export interface Bridge {
   /** The current snapshot (cached detection natively). */
   snapshot(): Promise<Snapshot>;
+  getAgentQuota(
+    agent: AgentId,
+    profile: string,
+    env: EnvId,
+  ): Promise<AgentQuota>;
   /**
    * Starts a detection; resolves at once with `detecting: true`. The finished
    * snapshot arrives through `observe`.

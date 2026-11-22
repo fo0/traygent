@@ -146,6 +146,7 @@
     initialAgent={modals.settingsAgent}
     closeAfterInstall={modals.installFlow}
     returnFocus={modals.returnFocus}
+    quotas={panel.quotas}
     github={panel.github}
     profiles={panel.profiles}
     onSaveSettings={(settings) => panel.saveSettings(settings)}

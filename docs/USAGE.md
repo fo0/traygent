@@ -17,7 +17,8 @@ Everything the panel does, control by control. The UI labels are German; each on
 
 One composer, no prose:
 
-- **Agent** — **Claude Code · OpenCode · Codex**; each carries a status dot for the selected environment (ready or missing).
+- **Agent** — **Claude Code · OpenCode · Codex**; each carries a status dot for the selected environment. In the selected button, **3 Tage · 68 % frei** means the weekly quota resets in three days and 68% remains. The bars along the bottom show the share already used. They turn amber at 70% and red at 90%. Hover over a button for details. An unavailable quota has no percentage.
+- **Kontingentbalken** under **Einstellungen → Agenten** controls the selected agent’s bars and their order. The weekly bar is always enabled. Other available windows depend on the subscription, such as Claude’s session or Fable limit. Compact buttons always show just the week.
 - **Folder or repository** („Ordner oder Repo“) — the field starts empty, its placeholder names both forms. Type a folder, browse with the native folder dialog or pick one of the recent folders — or name a GitHub repository: paste its URL, type `owner/name`, or type a few letters to get suggestions from your connected account ([below](#start-from-a-github-repository)). **Ctrl+L** jumps to the field and selects its text. **Escape** clears it (an open suggestion list closes first).
 - **Environment** — **Lokal** (local) or **Docker**; **WSL** is shown disabled („Bald verfügbar“, coming soon). Environments you hide under **Einstellungen → Umgebung → Umgebungen** leave the composer; with just one, the row disappears.
 - **Option chips** — start from the saved defaults and change the next start only:
@@ -43,7 +44,8 @@ One composer, no prose:
 ## Status and refresh
 
 - The footer shows the Docker state (**Docker 27.5 · bereit** = ready, or why it is not; only while Docker is shown) and when detection last ran (**Stand hh:mm** = as of hh:mm).
-- Detection runs at startup and on the refresh button, **F5** or **Ctrl+R**, off the UI thread.
+- Detection runs at startup and on the refresh button, **F5** or **Ctrl+R**, off the UI thread. Refresh also checks the quotas. While the panel is visible, it checks them about every five minutes and after a reported reset.
+- Quotas follow the selected launch account. Claude Code and Codex can use their shared host sign-in in Docker. OpenCode V2 uses its selected Go account for local sessions. Its Docker sign-in lives in a separate volume and the Docker quota is unavailable. File-backed Claude and Codex sign-ins need a valid CLI access token. A tooltip explains when a quota cannot be read.
 
 ## Settings — „Einstellungen“
 

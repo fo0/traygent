@@ -10,6 +10,8 @@ export const native = isTauri();
 /** Native commands; the browser preview serves the labelled demo instead. */
 const nativeBridge: Bridge = {
   snapshot: () => call('snapshot'),
+  getAgentQuota: (agent, profile, env) =>
+    call('get_agent_quota', { agent, profile, env }),
   refreshDetection: () => call('refresh_detection'),
   saveSettings: (settings) => call('save_settings', { settings }),
   launchSession: (request) => call('launch_session', { request }),

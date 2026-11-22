@@ -125,6 +125,7 @@ test('a profile row opens its details in place, one at a time', async ({
   await expect(team).toHaveAttribute('aria-expanded', 'false');
   // The row stays one line: no detail before it is opened.
   await expect(list.locator('.profile-detail')).toHaveCount(0);
+  await team.scrollIntoViewIfNeeded();
   const before = await team.boundingBox();
   await team.click();
   await expect(team).toHaveAttribute('aria-expanded', 'true');

@@ -20,6 +20,7 @@ const idle = async () => () => {};
 function bridgeWith(overrides: Partial<Bridge> = {}): Bridge {
   return {
     snapshot: async () => snapshot(),
+    getAgentQuota: async () => ({ windows: {}, detail: null }),
     refreshDetection: async () => snapshot(),
     saveSettings: async (settings) => snapshot({ settings }),
     launchSession: async () => ({

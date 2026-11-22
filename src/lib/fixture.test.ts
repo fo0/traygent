@@ -90,6 +90,7 @@ describe('golden snapshot fixture', () => {
           'sharedWindow',
           'agents',
           'docker',
+          'quotaBars',
           'github',
           'agentUpdates',
           'profiles',
@@ -103,6 +104,7 @@ describe('golden snapshot fixture', () => {
     // A fresh install has no extra profile and starts every agent with its own.
     for (const agent of AGENTS) {
       const id = agent as keyof typeof settings.profiles;
+      expect(settings.quotaBars?.[id]).toEqual(['week']);
       expect(settings.profiles[id], `settings.profiles.${agent}`).toEqual([]);
       expect(settings.agentProfile[id], `agentProfile.${agent}`).toBe(
         'default',

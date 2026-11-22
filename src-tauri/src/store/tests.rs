@@ -1,7 +1,7 @@
 use super::*;
 use crate::models::{
-    AgentProfile, EnvId, GithubSource, LaunchRequest, PermissionId, RepoRef, SessionMode,
-    TerminalId,
+    AgentProfile, EnvId, GithubSource, LaunchRequest, PermissionId, QuotaMetric, RepoRef,
+    SessionMode, TerminalId,
 };
 use crate::testing::TempDir;
 use serde_json::json;
@@ -25,6 +25,7 @@ fn sample() -> Persisted {
         ..AppSettings::default()
     };
     settings.docker.gh_token = true;
+    settings.quota_bars.codex = vec![QuotaMetric::SparkWeek, QuotaMetric::Week];
     settings.docker.ports = vec!["127.0.0.1:5173:5173".into()];
     settings.docker.socket = true;
     settings.docker.manage_node = false;
@@ -98,6 +99,10 @@ fn save_then_load_round_trips_with_a_version() {
     assert_eq!(value["settings"]["terminal"], "console");
     assert_eq!(value["settings"]["sharedWindow"], true);
     assert_eq!(value["settings"]["agentUpdates"], true);
+    assert_eq!(
+        value["settings"]["quotaBars"]["codex"],
+        json!(["sparkWeek", "week"])
+    );
     assert_eq!(value["settings"]["debug"], true);
     assert_eq!(value["settings"]["docker"]["socket"], true);
     assert_eq!(value["settings"]["docker"]["manageNode"], false);
@@ -124,6 +129,30 @@ fn save_then_load_round_trips_with_a_version() {
     let loaded = load(&dir.0);
     assert_eq!(loaded.state, state);
     assert!(loaded.read_only.is_none());
+}
+
+#[test]
+fn quota_bars_recover_individually_and_keep_the_selected_order() {
+    use QuotaMetric::*;
+    let dir = TempDir::new("quota-bars");
+    dir.write(
+        &json!({ "version": 1, "settings": { "quotaBars": {
+            "claude": ["fable", 42, "new", "fable", "week", "sonnet", "spark"],
+            "opencode": ["session", "month", "spark"],
+            "codex": false
+        }}})
+        .to_string(),
+    );
+    let bars = load(&dir.0).state.settings.quota_bars;
+    assert_eq!(bars.claude, [Fable, Week, Sonnet]);
+    assert_eq!(bars.opencode, [Week, Session, Month]);
+    assert_eq!(bars.codex, [Week]);
+
+    dir.write(r#"{"version":1,"settings":{}}"#);
+    let old = load(&dir.0).state.settings;
+    for agent in AgentId::ALL {
+        assert_eq!(old.quota_bars.get(agent).as_slice(), [Week]);
+    }
 }
 
 #[test]

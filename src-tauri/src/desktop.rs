@@ -137,6 +137,7 @@ pub fn run() {
             crate::desktop_agents::install_agent,
             crate::desktop_agents::open_folder,
             crate::desktop_agent_updates::update_agents,
+            crate::desktop_quota::get_agent_quota,
             crate::desktop_profiles::sync_profiles,
             crate::desktop_profiles::profile_login,
             crate::desktop_profiles::cancel_profile_login,
