@@ -26,6 +26,8 @@ fn sample() -> Persisted {
     };
     settings.docker.gh_token = true;
     settings.quota_bars.codex = vec![QuotaMetric::SparkWeek, QuotaMetric::Week];
+    settings.quota_reads.claude = true;
+    settings.quota_reads.opencode = false;
     settings.docker.ports = vec!["127.0.0.1:5173:5173".into()];
     settings.docker.socket = true;
     settings.docker.manage_node = false;
@@ -103,6 +105,10 @@ fn save_then_load_round_trips_with_a_version() {
         value["settings"]["quotaBars"]["codex"],
         json!(["sparkWeek", "week"])
     );
+    assert_eq!(
+        value["settings"]["quotaReads"],
+        json!({ "claude": true, "opencode": false, "codex": false })
+    );
     assert_eq!(value["settings"]["debug"], true);
     assert_eq!(value["settings"]["docker"]["socket"], true);
     assert_eq!(value["settings"]["docker"]["manageNode"], false);
@@ -153,6 +159,45 @@ fn quota_bars_recover_individually_and_keep_the_selected_order() {
     for agent in AgentId::ALL {
         assert_eq!(old.quota_bars.get(agent).as_slice(), [Week]);
     }
+}
+
+/// A file from before the setting reads only OpenCode Go; an unreadable value falls back
+/// to that agent's default alone (ADR-0014).
+#[test]
+fn quota_reads_load_their_defaults_and_recover_per_agent() {
+    let dir = TempDir::new("quota-reads");
+    dir.write(r#"{"version":1,"settings":{}}"#);
+    let reads = load(&dir.0).state.settings.quota_reads;
+    assert_eq!(
+        (reads.claude, reads.opencode, reads.codex),
+        (false, true, false)
+    );
+
+    dir.write(
+        &json!({ "version": 1, "settings": { "quotaReads": {
+            "claude": true, "opencode": "yes", "codex": 1
+        }}})
+        .to_string(),
+    );
+    let reads = load(&dir.0).state.settings.quota_reads;
+    assert_eq!(
+        (reads.claude, reads.opencode, reads.codex),
+        (true, true, false)
+    );
+
+    dir.write(r#"{"version":1,"settings":{"quotaReads":{"opencode":false}}}"#);
+    let reads = load(&dir.0).state.settings.quota_reads;
+    assert_eq!(
+        (reads.claude, reads.opencode, reads.codex),
+        (false, false, false)
+    );
+
+    dir.write(r#"{"version":1,"settings":{"quotaReads":true}}"#);
+    let reads = load(&dir.0).state.settings.quota_reads;
+    assert_eq!(
+        (reads.claude, reads.opencode, reads.codex),
+        (false, true, false)
+    );
 }
 
 #[test]

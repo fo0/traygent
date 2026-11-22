@@ -1,5 +1,5 @@
-import type { AgentQuota, QuotaMetric } from './quotaTypes';
-import type { AgentId, EnvId, ProfileStatus } from './types';
+import { quotaReadOn, type AgentQuota, type QuotaMetric } from './quotaTypes';
+import type { AgentId, EnvId, Snapshot } from './types';
 
 const HOURS = 3_600_000;
 const samples: Record<
@@ -21,14 +21,18 @@ const samples: Record<
   },
 };
 
-/** Invented usage for the browser demo. Reset times stay fixed across refreshes. */
+/**
+ * Invented usage for the browser demo. Reset times stay fixed across
+ * refreshes. A switched-off read answers like Rust's gate: nothing.
+ */
 export function demoQuota(
   agent: AgentId,
   profile: string,
   env: EnvId,
-  profiles: ProfileStatus[],
+  { settings, profiles }: Pick<Snapshot, 'settings' | 'profiles'>,
   epoch: number,
 ): AgentQuota {
+  if (!quotaReadOn(settings, agent)) return { windows: {}, detail: null };
   if (env === 'wsl' || (agent === 'opencode' && env === 'docker'))
     return {
       windows: {},

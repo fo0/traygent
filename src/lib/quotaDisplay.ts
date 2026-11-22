@@ -1,6 +1,11 @@
 import { MINUTE } from './clock';
 import { dateTime, plural } from './format';
-import { QUOTA_LABELS, type AgentQuota, type QuotaMetric } from './quotaTypes';
+import {
+  QUOTA_LABELS,
+  QUOTA_OFF_HINT,
+  type AgentQuota,
+  type QuotaMetric,
+} from './quotaTypes';
 
 const HOUR = 60 * MINUTE;
 const DAY = 24 * HOUR;
@@ -53,20 +58,26 @@ function quotaRow(
   };
 }
 
-/** Weekly summary and configured rows, with one description for hover and speech. */
+/**
+ * Weekly summary and configured rows, with one description for hover and
+ * speech. With the read off (`read: false`) the tile shows no figure and no
+ * bar: a chosen state, not missing data.
+ */
 export function quotaView(
   quota: AgentQuota | undefined,
   metrics: readonly QuotaMetric[],
   now: number,
+  read = true,
 ) {
   const week = quotaRow(quota, 'week', now);
+  if (!read) return { week, rows: [], hint: QUOTA_OFF_HINT, off: true };
   const rows = metrics.map((metric) =>
     metric === 'week' ? week : quotaRow(quota, metric, now),
   );
   const hint = [...rows.map((row) => row.hint), quota?.detail]
     .filter(Boolean)
     .join('\n');
-  return { week, rows, hint };
+  return { week, rows, hint, off: false };
 }
 
 export type QuotaView = ReturnType<typeof quotaView>;

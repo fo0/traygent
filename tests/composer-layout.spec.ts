@@ -32,12 +32,25 @@ test('the weekly meter sits below the prominent agent choice at 480 px', async (
   }
 });
 
+/** The demo leaves Codex at its shipped default (no quota read); turn it on. */
+async function readCodexQuota(page: Page) {
+  await page
+    .getByRole('button', { name: 'Einstellungen', exact: true })
+    .click();
+  const dialog = page.getByRole('dialog', { name: 'Einstellungen' });
+  await dialog.getByRole('radio', { name: 'Codex' }).check();
+  await dialog.getByText('Kontingent abfragen', { exact: true }).click();
+  await dialog.getByRole('button', { name: 'Speichern', exact: true }).click();
+  await expect(dialog).toHaveCount(0);
+}
+
 for (const font of LAYOUT_FONTS) {
   test(`the CLI name, reset and free quota fit on one line in ${font}`, async ({
     page,
   }) => {
     await page.emulateMedia({ reducedMotion: 'reduce' });
     await page.goto('/');
+    await readCodexQuota(page);
     await pinFont(page, font);
     // Only the checked agent shows its name (the row collapses the others).
     for (const width of [480, 440, 375, 360, 320]) {

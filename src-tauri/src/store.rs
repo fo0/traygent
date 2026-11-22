@@ -138,6 +138,7 @@ fn parse_settings(object: &Map<String, Value>) -> AppSettings {
     let defaults = AppSettings::default();
     let agents = object.get("agents").and_then(Value::as_object);
     let quota_bars = object.get("quotaBars").and_then(Value::as_object);
+    let quota_reads = object.get("quotaReads").and_then(Value::as_object);
     let docker = object.get("docker").and_then(Value::as_object);
     let images = docker.and_then(|docker| docker.get("images")?.as_object().cloned());
     let profiles = object.get("profiles").and_then(Value::as_object);
@@ -160,6 +161,11 @@ fn parse_settings(object: &Map<String, Value>) -> AppSettings {
         }
         if let Some(list) = known_items(quota_bars.and_then(|bars| bars.get(agent.id()))) {
             *settings.quota_bars.get_mut(agent) = list;
+        }
+        // Absent (a file from before the setting) or unreadable: the agent's default.
+        if let Some(reads) = quota_reads {
+            let fallback = *defaults.quota_reads.get(agent);
+            *settings.quota_reads.get_mut(agent) = field(reads, agent.id(), fallback);
         }
         if let Some(images) = &images {
             let fallback = defaults.docker.images.get(agent).clone();

@@ -17,6 +17,7 @@ use std::time::Duration;
 
 const MAX_AUTH_BYTES: u64 = 1024 * 1024;
 const MAX_USAGE_BYTES: u64 = 256 * 1024;
+const MAX_TOKEN_BYTES: usize = 8 * 1024;
 const UNREADABLE: &str = "Die Anmeldedatei konnte nicht gelesen werden.";
 const UNREACHABLE: &str = "Der Anbieter ist nicht erreichbar.";
 const INVALID_RESPONSE: &str = "Die Kontingentdaten des Anbieters sind ungültig.";
@@ -57,7 +58,7 @@ pub(super) fn fetch(agent: AgentId, path: &Path) -> Result<AgentQuota, &'static 
         header_percent("x-codex-primary-used-percent"),
         header_percent("x-codex-secondary-used-percent"),
     ];
-    let bytes = read_bounded(response, MAX_USAGE_BYTES).ok_or(INVALID_RESPONSE)?;
+    let bytes = read_bounded(response, MAX_USAGE_BYTES, 0).ok_or(INVALID_RESPONSE)?;
     let body = serde_json::from_slice(without_bom(&bytes)).map_err(|_| INVALID_RESPONSE)?;
     Ok(windows::parse(agent, &body, codex_used, Utc::now()))
 }
@@ -136,11 +137,14 @@ fn read_local_file(path: &Path) -> Result<Option<Vec<u8>>, ()> {
             return Err(());
         }
     }
-    read_bounded(file, MAX_AUTH_BYTES).map(Some).ok_or(())
+    read_bounded(file, MAX_AUTH_BYTES, opened.len() as usize + 1)
+        .map(Some)
+        .ok_or(())
 }
 
-fn read_bounded(source: impl Read, limit: u64) -> Option<Vec<u8>> {
-    let mut bytes = Vec::new();
+/// `expected` sizes the buffer up front: a buffer that grows leaves unwiped copies behind.
+fn read_bounded(source: impl Read, limit: u64, expected: usize) -> Option<Vec<u8>> {
+    let mut bytes = Vec::with_capacity(expected);
     if source.take(limit + 1).read_to_end(&mut bytes).is_err() || bytes.len() as u64 > limit {
         wipe(&mut bytes);
         return None;
@@ -170,12 +174,22 @@ fn parse_cli_login(agent: AgentId, auth: &[u8]) -> Result<Login, &'static str> {
             .filter(|s| !s.trim().is_empty())
     };
     let token = SecretToken::new(field_text(token_field).ok_or_else(|| login_required(agent))?);
+    if !token.with_secret(header_safe) {
+        return Err(login_required(agent));
+    }
     let account_id = if agent == AgentId::Codex {
         field_text("account_id")
     } else {
         None
     };
     Ok(Login { token, account_id })
+}
+
+/// A provider token as it is sent, trimmed. Codex access tokens are JWTs of a few KiB, so
+/// the limit is the usual header size and not the one for GitHub tokens.
+fn header_safe(token: &str) -> bool {
+    let token = token.trim();
+    (1..=MAX_TOKEN_BYTES).contains(&token.len()) && token.bytes().all(|b| b.is_ascii_graphic())
 }
 
 fn usage_request(
@@ -196,9 +210,8 @@ fn usage_request(
     });
     match agent {
         AgentId::Claude => {
-            request = request
-                .header("anthropic-beta", "oauth-2025-04-20")
-                .header("User-Agent", "claude-code/2.1.69");
+            // No User-Agent override: Traygent never presents itself as the provider's CLI.
+            request = request.header("anthropic-beta", "oauth-2025-04-20");
         }
         AgentId::Codex => {
             if let Some(id) = login.account_id {
@@ -279,6 +292,8 @@ mod tests {
             assert_eq!(req.headers()["accept"], "application/json");
             assert_eq!(req.headers()["authorization"], bearer);
             assert!(req.headers()["authorization"].is_sensitive());
+            // The client's own `Traygent/<version>` stays the only User-Agent.
+            assert!(!req.headers().contains_key("user-agent"));
             if agent == AgentId::Codex {
                 assert_eq!(req.headers()["chatgpt-account-id"], "demo-account");
                 assert!(req.headers()["chatgpt-account-id"].is_sensitive());
@@ -287,7 +302,6 @@ mod tests {
             }
             if agent == AgentId::Claude {
                 assert_eq!(req.headers()["anthropic-beta"], "oauth-2025-04-20");
-                assert_eq!(req.headers()["user-agent"], "claude-code/2.1.69");
             } else {
                 assert!(!req.headers().contains_key("anthropic-beta"));
             }
@@ -309,7 +323,7 @@ mod tests {
             .set_len(MAX_AUTH_BYTES + 1)
             .unwrap();
         assert_eq!(login(AgentId::Codex, &file).err(), Some(UNREADABLE));
-        assert_eq!(read_bounded(&b"{}   "[..], 4), None);
+        assert_eq!(read_bounded(&b"{}   "[..], 4, 0), None);
     }
 
     #[test]
@@ -351,6 +365,43 @@ mod tests {
         let entry =
             json!({"auth_mode":"chatgpt", "OPENAI_API_KEY":null, "tokens":{"access_token":"demo"}});
         assert!(parse_cli_login(AgentId::Codex, entry.to_string().as_bytes()).is_ok());
+    }
+
+    #[test]
+    fn a_token_that_cannot_be_a_header_reads_as_signed_out() {
+        let claude = |token: &str| json!({"claudeAiOauth": {"accessToken": token}}).to_string();
+        let codex = |token: &str| json!({"tokens": {"access_token": token}}).to_string();
+        let jwt = |len: usize| "x".repeat(len);
+        for (agent, auth) in [
+            (AgentId::Claude, claude("a b")),
+            (AgentId::Claude, claude("a\nb")),
+            (AgentId::Claude, claude("a\u{7f}b")),
+            (AgentId::Claude, claude("synthetic-\u{e9}")),
+            (AgentId::Codex, codex("a\tb")),
+            (AgentId::Codex, codex(&jwt(MAX_TOKEN_BYTES + 1))),
+        ] {
+            assert_eq!(
+                parse_cli_login(agent, auth.as_bytes()).err(),
+                Some(login_required(agent))
+            );
+        }
+        for (agent, auth) in [
+            (AgentId::Claude, claude(" demo-padded\n")),
+            (AgentId::Codex, codex(&jwt(4096))),
+            (AgentId::Codex, codex(&jwt(MAX_TOKEN_BYTES))),
+        ] {
+            assert!(parse_cli_login(agent, auth.as_bytes()).is_ok());
+        }
+    }
+
+    #[test]
+    fn a_sized_buffer_does_not_grow_while_reading() {
+        let data = [b'x'; 4096];
+        let bytes = read_bounded(&data[..], MAX_AUTH_BYTES, data.len() + 1).unwrap();
+        assert_eq!(
+            (bytes.len(), bytes.capacity()),
+            (data.len(), data.len() + 1)
+        );
     }
 
     #[cfg(unix)]

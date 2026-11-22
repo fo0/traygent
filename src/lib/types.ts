@@ -229,6 +229,11 @@ export interface AppSettings {
   agents: Record<AgentId, LaunchOptions>;
   /** Enabled quota bars of the selected agent, in display order. Defaults to the week. */
   quotaBars?: Partial<Record<AgentId, QuotaMetric[]>>;
+  /**
+   * Whether the agent's subscription quota is read at all (ADR-0014). Defaults
+   * to `QUOTA_READ_DEFAULTS`: off for Claude and Codex, on for OpenCode Go.
+   */
+  quotaReads?: Partial<Record<AgentId, boolean>>;
   docker: DockerSettings;
   github: GithubSettings;
   /** Update the local agent CLIs every 4 hours while no session uses them. */

@@ -18,7 +18,7 @@
   import type { Composer } from './composerState.svelte';
   import type { AgentQuotas } from './agentQuotas.svelte';
   import { quotaView } from './quotaDisplay';
-  import { configuredQuotaBars } from './quotaTypes';
+  import { configuredQuotaBars, quotaReadOn } from './quotaTypes';
   import { recentFolders } from './recents';
   import { targetProblem } from './target';
   import type {
@@ -93,6 +93,7 @@
         quotas.read(item.id),
         active ? configuredQuotaBars(snapshot.settings, item.id) : ['week'],
         quotas.now,
+        quotaReadOn(snapshot.settings, item.id),
       );
       return {
         id: item.id,
