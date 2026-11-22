@@ -98,6 +98,25 @@ describe('agent quotas', () => {
     expect(quotas.read('claude')?.windows).toEqual({});
   });
 
+  it('waits half a minute before the next read when the reported reset is moments away', async () => {
+    vi.useFakeTimers();
+    const now = Date.now();
+    const get = vi
+      .fn()
+      .mockImplementation(async () =>
+        usage(99, new Date(Date.now() + 1_000).toISOString()),
+      );
+    const quotas = new AgentQuotas(get);
+    quotas.follow([standard]);
+    await Promise.resolve();
+    vi.setSystemTime(now + 29_999);
+    quotas.refresh();
+    expect(get).toHaveBeenCalledTimes(1);
+    vi.setSystemTime(now + 30_000);
+    quotas.refresh();
+    expect(get).toHaveBeenCalledTimes(2);
+  });
+
   it('discards the previous account display while a replacement sign-in or environment is loading', async () => {
     const get = vi.fn().mockResolvedValue(usage(15));
     const quotas = new AgentQuotas(get);
