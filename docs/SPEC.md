@@ -129,7 +129,15 @@ Brand top left: icon + „Traygent“. Window ~480×760, frameless, tray popup l
 
 ## Settings dialog (staged: „Speichern“ + „Abbrechen“; tabs)
 
-- **Agenten**: per agent a section: local status (version or „Nicht installiert“), Docker
+- **Agenten**: per agent a section, opening with „Kontingent“: the staged switch „Kontingent
+  abfragen“ (`settings.quotaReads`, default off for Claude Code and Codex, on for OpenCode;
+  tooltip „Nutzt die CLI-Anmeldung gegen eine nicht offiziell dokumentierte Schnittstelle des
+  Anbieters“, for OpenCode „Nutzt den eigenen OpenCode-Go-Schlüssel aus der OpenCode-Anmeldung“;
+  [ADR-0014](adr/0014-opt-in-subscription-quota-reads.md)), then the bar choices
+  (`settings.quotaBars`, the week always on, tooltip „Bei allen CLIs immer sichtbar“; disabled
+  while the read is off) and a „Vorschau“ tile. With the read off the panel never calls
+  `get_agent_quota` for that agent, drops its cached reading, and its composer button shows no
+  figure and no bar, only the description „Kontingentabfrage ausgeschaltet“. Then local status (version or „Nicht installiert“), Docker
   readiness (only while Docker is shown), best-practice Windows install command (copy button + „Installieren“ = opens a
   terminal running it, then re-detects on demand), update command; defaults: model, effort,
   permission, extra CLI args (free text, validated). For an agent with `profiles` a „Profile“
@@ -242,29 +250,29 @@ German: the session started, the profile sync before it was incomplete).
 
 Commands (Rust `#[tauri::command]`, German `Err` strings; panel calls only via `src/lib/ipc.ts`):
 
-| command                            | args                                                                                             | result                                                        |
-| ---------------------------------- | ------------------------------------------------------------------------------------------------ | ------------------------------------------------------------- |
-| `snapshot`                         | –                                                                                                | `Snapshot` (cached detection)                                 |
-| `get_agent_quota`                  | `{ agent, profile, env }`                                                                        | `AgentQuota` (reported windows with usage and reset time)     |
-| `refresh_detection`                | –                                                                                                | `Snapshot` (re-probes CLIs + Docker)                          |
-| `save_settings`                    | `{ settings }`                                                                                   | `Snapshot` (validated; invalid → Err)                         |
-| `launch_session`                   | `{ request }`                                                                                    | `LaunchOutcome` (validates, opens terminal, records recent)   |
-| `remove_recent`                    | `{ id }`                                                                                         | `Snapshot`                                                    |
-| `restore_recent`                   | `{ recent }`                                                                                     | `Snapshot` (undo of remove)                                   |
-| `update_recent`                    | `{ id, options, ports, profile: string \| null, keepAgentModel, dockerSocket }`                  | `Snapshot` (edit, no start)                                   |
-| `pick_folder`                      | `{ initial?: string }`                                                                           | `string \| null` (native folder dialog)                       |
-| `install_agent`                    | `{ agent }`                                                                                      | `void` (opens a terminal running the catalog install command) |
-| `open_folder`                      | `{ path }`                                                                                       | `void` (Explorer)                                             |
-| `update_agents`                    | –                                                                                                | `Snapshot` (starts an agent-CLI update run, events follow)    |
-| `github_connect_token`             | `{ token }`                                                                                      | `Snapshot` (verifies `/user`, vaults the token, lists repos)  |
-| `github_local_accounts`            | –                                                                                                | `LocalAccounts` (gh sign-ins; reads no token)                 |
-| `github_import_local`              | `{ login }`                                                                                      | `Snapshot` (explicit consent: reads that gh token, as above)  |
-| `github_disconnect`                | –                                                                                                | `Snapshot` (deletes the vault copy; gh stays signed in)       |
-| `github_refresh_repos`             | –                                                                                                | `Snapshot` (returns with `github.loading`, event follows)     |
-| `sync_profiles`                    | –                                                                                                | `Snapshot` (syncs every profile now, statuses in `profiles`)  |
-| `profile_login`                    | `{ agent, profile }`                                                                             | `Snapshot` (hidden: after the sign-in; „Debug“: once opened)  |
-| `cancel_profile_login`             | `{ agent, profile }`                                                                             | `boolean` (ends that profile's sign-in; false: none running)  |
-| shell commands kept from RepoWatch | autostart_status, set_autostart, open_startup_settings, check_update, install_update, hide_panel | unchanged                                                     |
+| command                            | args                                                                                             | result                                                                                      |
+| ---------------------------------- | ------------------------------------------------------------------------------------------------ | ------------------------------------------------------------------------------------------- |
+| `snapshot`                         | –                                                                                                | `Snapshot` (cached detection)                                                               |
+| `get_agent_quota`                  | `{ agent, profile, env }`                                                                        | `AgentQuota` (reported windows with usage and reset time; read off → no windows, no detail) |
+| `refresh_detection`                | –                                                                                                | `Snapshot` (re-probes CLIs + Docker)                                                        |
+| `save_settings`                    | `{ settings }`                                                                                   | `Snapshot` (validated; invalid → Err)                                                       |
+| `launch_session`                   | `{ request }`                                                                                    | `LaunchOutcome` (validates, opens terminal, records recent)                                 |
+| `remove_recent`                    | `{ id }`                                                                                         | `Snapshot`                                                                                  |
+| `restore_recent`                   | `{ recent }`                                                                                     | `Snapshot` (undo of remove)                                                                 |
+| `update_recent`                    | `{ id, options, ports, profile: string \| null, keepAgentModel, dockerSocket }`                  | `Snapshot` (edit, no start)                                                                 |
+| `pick_folder`                      | `{ initial?: string }`                                                                           | `string \| null` (native folder dialog)                                                     |
+| `install_agent`                    | `{ agent }`                                                                                      | `void` (opens a terminal running the catalog install command)                               |
+| `open_folder`                      | `{ path }`                                                                                       | `void` (Explorer)                                                                           |
+| `update_agents`                    | –                                                                                                | `Snapshot` (starts an agent-CLI update run, events follow)                                  |
+| `github_connect_token`             | `{ token }`                                                                                      | `Snapshot` (verifies `/user`, vaults the token, lists repos)                                |
+| `github_local_accounts`            | –                                                                                                | `LocalAccounts` (gh sign-ins; reads no token)                                               |
+| `github_import_local`              | `{ login }`                                                                                      | `Snapshot` (explicit consent: reads that gh token, as above)                                |
+| `github_disconnect`                | –                                                                                                | `Snapshot` (deletes the vault copy; gh stays signed in)                                     |
+| `github_refresh_repos`             | –                                                                                                | `Snapshot` (returns with `github.loading`, event follows)                                   |
+| `sync_profiles`                    | –                                                                                                | `Snapshot` (syncs every profile now, statuses in `profiles`)                                |
+| `profile_login`                    | `{ agent, profile }`                                                                             | `Snapshot` (hidden: after the sign-in; „Debug“: once opened)                                |
+| `cancel_profile_login`             | `{ agent, profile }`                                                                             | `boolean` (ends that profile's sign-in; false: none running)                                |
+| shell commands kept from RepoWatch | autostart_status, set_autostart, open_startup_settings, check_update, install_update, hide_panel | unchanged                                                                                   |
 
 ## Repositories (GitHub, [ADR-0005](adr/0005-start-from-a-github-repository.md))
 

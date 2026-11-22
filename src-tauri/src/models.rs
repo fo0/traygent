@@ -394,6 +394,9 @@ pub struct AppSettings {
     pub agents: PerAgent<LaunchOptions>,
     /// Enabled quota bars per agent in display order. Every list includes the week.
     pub quota_bars: PerAgent<Vec<QuotaMetric>>,
+    /// Whether the panel reads the agent's subscription quota at all (ADR-0014): off for
+    /// Claude and Codex (undocumented endpoints, CLI sign-in), on for OpenCode Go.
+    pub quota_reads: PerAgent<bool>,
     pub docker: DockerSettings,
     pub github: GithubSettings,
     /// Update the local agent CLIs in the background while no session uses them.

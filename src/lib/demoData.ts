@@ -187,6 +187,8 @@ export function demoSettings(): AppSettings {
       manageNode: true,
     },
     quotaBars: { claude: ['week'], opencode: ['week'], codex: ['week'] },
+    // Both states on show: Codex keeps the shipped default (off).
+    quotaReads: { claude: true, opencode: true, codex: false },
     github: { cloneRoot: '' },
     agentUpdates: false,
     debug: false,
