@@ -163,7 +163,7 @@ export class AgentQuotas {
     } catch {
       result = unavailable;
     }
-    // A failed read (Rust sends no windows, only a detail) keeps the last good
+    // A failed read (no windows, only a detail; a switched-off read has neither) keeps the last good
     // windows with the new detail for a while; their own resets still expire them.
     const now = Date.now();
     const previous = entry.result;
@@ -172,7 +172,7 @@ export class AgentQuotas {
       previous &&
       hasWindows(previous) &&
       now - (entry.goodAt ?? 0) < STALE_LIMIT
-        ? hasWindows(result)
+        ? hasWindows(result) || !result.detail
           ? result
           : { windows: previous.windows, detail: result.detail }
         : result;

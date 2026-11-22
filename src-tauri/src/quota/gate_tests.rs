@@ -29,6 +29,14 @@ fn the_defaults_read_only_opencode_go() {
 }
 
 #[test]
+fn a_partial_object_over_ipc_keeps_the_other_agents_defaults() {
+    let settings: AppSettings = serde_json::from_str(r#"{"quotaReads":{"claude":true}}"#).unwrap();
+    assert!(settings.quota_reads.claude);
+    assert!(!settings.quota_reads.codex);
+    assert!(settings.quota_reads.opencode);
+}
+
+#[test]
 fn a_switched_off_read_resolves_no_path_reads_no_file_and_builds_no_request() {
     // Claude and Codex by default; OpenCode Go once its switch is turned off.
     let mut settings = AppSettings::default();
@@ -45,9 +53,8 @@ fn a_switched_off_read_resolves_no_path_reads_no_file_and_builds_no_request() {
                 resolved.set(resolved.get() + 1);
                 Ok(path.clone())
             },
-            |_, path| {
+            |_, _| {
                 fetched.set(fetched.get() + 1);
-                let _ = std::fs::read(path);
                 AgentQuota::unavailable("read")
             },
         );

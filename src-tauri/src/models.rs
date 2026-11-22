@@ -340,6 +340,17 @@ impl<T: Default> PerAgent<T> {
     }
 }
 
+/// A missing agent takes its own default, not `false`: a partial object must not switch
+/// OpenCode Go off.
+fn quota_reads<'de, D: serde::Deserializer<'de>>(source: D) -> Result<PerAgent<bool>, D::Error> {
+    let given = PerAgent::<Option<bool>>::deserialize(source)?;
+    Ok(PerAgent::from_fn(|agent| {
+        given
+            .get(agent)
+            .unwrap_or_else(|| crate::settings::default_quota_read(agent))
+    }))
+}
+
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase", default)]
 pub struct DockerSettings {
@@ -396,6 +407,7 @@ pub struct AppSettings {
     pub quota_bars: PerAgent<Vec<QuotaMetric>>,
     /// Whether the panel reads the agent's subscription quota at all (ADR-0014): off for
     /// Claude and Codex (undocumented endpoints, CLI sign-in), on for OpenCode Go.
+    #[serde(deserialize_with = "quota_reads")]
     pub quota_reads: PerAgent<bool>,
     pub docker: DockerSettings,
     pub github: GithubSettings,

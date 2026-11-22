@@ -67,6 +67,7 @@
     <input
       type="checkbox"
       class="switch-input"
+      title={quotaReadTip(agent)}
       checked={reading}
       onchange={(event) =>
         draft.setQuotaRead(agent, event.currentTarget.checked)}

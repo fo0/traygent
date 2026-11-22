@@ -45,7 +45,7 @@ One composer, no prose:
 
 - The footer shows the Docker state (**Docker 27.5 · bereit** = ready, or why it is not; only while Docker is shown) and when detection last ran (**Stand hh:mm** = as of hh:mm).
 - Detection runs at startup and on the refresh button, **F5** or **Ctrl+R**, off the UI thread. Refresh also checks the quotas. While the panel is visible, it checks them about every five minutes and after a reported reset.
-- Only agents with **Kontingent abfragen** on are checked. Quotas follow the selected launch account. Claude Code and Codex can use their shared host sign-in in Docker. OpenCode V2 uses its selected Go account for local sessions. Its Docker sign-in lives in a separate volume and the Docker quota is unavailable. File-backed Claude and Codex sign-ins need a valid CLI access token. A tooltip explains when a quota cannot be read. A failed check keeps the last reading until its own reset time passes.
+- Only agents with **Kontingent abfragen** on are checked. Quotas follow the selected launch account. Claude Code and Codex can use their shared host sign-in in Docker. OpenCode V2 uses its selected Go account for local sessions. Its Docker sign-in lives in a separate volume and the Docker quota is unavailable. File-backed Claude and Codex sign-ins need a valid CLI access token. A tooltip explains when a quota cannot be read. A failed check keeps the last reading for up to 15 minutes, and never past its own reset time.
 
 ## Settings — „Einstellungen“
 
