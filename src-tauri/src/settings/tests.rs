@@ -26,6 +26,17 @@ fn defaults_match_the_spec() {
 }
 
 #[test]
+fn quota_refresh_accepts_whole_minutes_from_one_to_sixty() {
+    for (minutes, valid) in [(0, false), (1, true), (7, true), (60, true), (61, false)] {
+        let settings = AppSettings {
+            quota_refresh_minutes: minutes,
+            ..AppSettings::default()
+        };
+        assert_eq!(validate(&settings).is_ok(), valid, "{minutes} minutes");
+    }
+}
+
+#[test]
 fn wsl_cannot_be_the_default_environment() {
     let settings = AppSettings {
         default_env: EnvId::Wsl,

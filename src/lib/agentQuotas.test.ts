@@ -167,6 +167,55 @@ describe('agent quotas', () => {
     expect(quotas.read('claude')?.windows).toEqual({});
   });
 
+  it('expires a failed manual refresh before a long polling interval elapses', async () => {
+    vi.useFakeTimers();
+    const now = Date.now();
+    const get = vi
+      .fn()
+      .mockResolvedValueOnce(usage(25))
+      .mockRejectedValue(new Error());
+    const quotas = new AgentQuotas(get);
+    vi.stubGlobal('window', new EventTarget());
+    const stop = quotas.observe();
+    quotas.follow([standard], 60);
+    await Promise.resolve();
+    await vi.advanceTimersByTimeAsync(3 * 60_000);
+    quotas.refresh(true);
+    await Promise.resolve();
+    expect(quotas.read('claude')?.windows).toEqual(usage(25).windows);
+    await vi.advanceTimersByTimeAsync(12 * 60_000);
+    expect(quotas.read('claude')?.windows).toEqual({});
+    expect(quotas.updatedAt('claude')).toBe(now);
+    expect(get).toHaveBeenCalledTimes(2);
+    stop();
+  });
+
+  it('reschedules cached readings from the last attempt when the saved interval changes', async () => {
+    vi.useFakeTimers();
+    const now = Date.now();
+    const get = vi.fn().mockResolvedValue(usage(40));
+    const quotas = new AgentQuotas(get);
+    quotas.follow([standard], 5);
+    await Promise.resolve();
+    expect(quotas.updatedAt('claude')).toBe(now);
+
+    vi.setSystemTime(now + 5 * 60_000);
+    quotas.follow([standard], 15);
+    expect(get).toHaveBeenCalledTimes(1);
+    get.mockRejectedValueOnce(new Error());
+    quotas.follow([standard], 2);
+    await Promise.resolve();
+    expect(get).toHaveBeenCalledTimes(2);
+    expect(quotas.updatedAt('claude')).toBe(now);
+
+    vi.setSystemTime(now + 7 * 60_000);
+    quotas.refresh();
+    await Promise.resolve();
+    expect(quotas.updatedAt('claude')).toBe(Date.now());
+    quotas.follow([]);
+    expect(quotas.updatedAt('claude')).toBeUndefined();
+  });
+
   it('shows a first read that fails as unavailable', async () => {
     const get = vi.fn().mockRejectedValue(new Error());
     const quotas = new AgentQuotas(get);

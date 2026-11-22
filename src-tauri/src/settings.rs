@@ -10,6 +10,7 @@ pub mod share;
 
 /// Base image for every agent's container (docs/AGENT_RECIPES.md §4).
 pub const DEFAULT_IMAGE: &str = "node:22-trixie";
+const QUOTA_REFRESH_MINUTES: std::ops::RangeInclusive<u32> = 1..=60;
 const MAX_MODEL_CHARS: usize = 128;
 const MAX_EXTRA_ARGS_CHARS: usize = 1000;
 const MAX_IMAGE_CHARS: usize = 255;
@@ -48,6 +49,7 @@ impl Default for AppSettings {
             agents: PerAgent::from_fn(|_| LaunchOptions::default()),
             quota_bars: PerAgent::from_fn(|_| vec![QuotaMetric::Week]),
             quota_reads: PerAgent::from_fn(default_quota_read),
+            quota_refresh_minutes: 5,
             docker: DockerSettings::default(),
             github: GithubSettings::default(),
             agent_updates: false,
@@ -143,6 +145,9 @@ pub fn normalize_options(mut options: LaunchOptions) -> LaunchOptions {
 pub fn sanitize(settings: AppSettings) -> AppSettings {
     let mut settings = normalize(settings);
     let defaults = AppSettings::default();
+    if !QUOTA_REFRESH_MINUTES.contains(&settings.quota_refresh_minutes) {
+        settings.quota_refresh_minutes = defaults.quota_refresh_minutes;
+    }
     if !settings.environments.iter().copied().any(can_start) {
         settings.environments = defaults.environments.clone();
     }
@@ -187,6 +192,12 @@ pub fn validate(settings: &AppSettings) -> Result<(), String> {
         return Err(WSL_SOON.into());
     }
     validate_environments(&settings.environments, settings.default_env)?;
+    if !QUOTA_REFRESH_MINUTES.contains(&settings.quota_refresh_minutes) {
+        return Err(
+            "Das Aktualisierungsintervall für Kontingente muss zwischen 1 und 60 Minuten liegen."
+                .into(),
+        );
+    }
     for agent in AgentId::ALL {
         validate_options(agent, settings.agents.get(agent))?;
         validate_image(agent, settings.docker.images.get(agent))?;

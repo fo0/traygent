@@ -92,6 +92,7 @@ describe('golden snapshot fixture', () => {
           'docker',
           'quotaBars',
           'quotaReads',
+          'quotaRefreshMinutes',
           'github',
           'agentUpdates',
           'profiles',
@@ -102,6 +103,7 @@ describe('golden snapshot fixture', () => {
       },
       'settings',
     );
+    expect(settings.quotaRefreshMinutes).toBe(5);
     // A fresh install has no extra profile and starts every agent with its own.
     for (const agent of AGENTS) {
       const id = agent as keyof typeof settings.profiles;

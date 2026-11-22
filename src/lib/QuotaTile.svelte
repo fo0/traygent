@@ -35,22 +35,20 @@
     {#if active}<strong class="segment-label">{label}</strong>{/if}
     {#if dot}<span class="status-dot" data-state={dot}></span>{/if}
     {#if active && !view.off}
-      <span class="weekly-summary">
-        {#if view.week.countdown}
-          <Icon name="refresh" size={12} />
-          <span>{view.week.countdown}</span>
-          <span>·</span>
-        {/if}
-        <b>{view.week.free}</b>
-      </span>
+      <span class="quota-updated" title={view.refreshHint}>{view.updated}</span>
     {/if}
   </span>
   {#each view.rows as row (row.metric)}
     <span class="quota-meter" data-metric={row.metric}>
-      {#if active && view.rows.length > 1}
+      {#if active}
         <span class="quota-caption">
           <span>{row.label}</span>
-          {#if row.metric !== 'week'}<b>{row.free}</b>{/if}
+          <span class="quota-value">
+            {#if row.metric === 'week' && row.countdown}
+              {row.countdown} ·
+            {/if}
+            <b>{row.free}</b>
+          </span>
         </span>
       {/if}
       <span class="quota-track" class:unknown={row.used === null}>
@@ -77,7 +75,7 @@
     min-width: 0;
   }
   .quota-heading,
-  .weekly-summary,
+  .quota-updated,
   .quota-caption {
     display: flex;
     align-items: center;
@@ -98,7 +96,7 @@
     width: 6px;
     height: 6px;
   }
-  .weekly-summary,
+  .quota-updated,
   .quota-caption {
     gap: 4px;
     color: var(--text-2);
@@ -107,12 +105,10 @@
     line-height: 1.2;
     font-variant-numeric: tabular-nums;
   }
-  .weekly-summary {
+  .quota-updated {
+    /* Keep the refresh tooltip above the radio's transparent hit area. */
+    position: relative;
     margin-inline-start: auto;
-  }
-  .weekly-summary b {
-    color: var(--text);
-    font-weight: 600;
   }
   .quota-meter {
     display: grid;
@@ -151,16 +147,15 @@
   }
   @container (max-width: 365px) {
     .quota-heading,
-    .weekly-summary {
+    .quota-updated {
       gap: 3px;
     }
-    /* A longer countdown or fractional percentage gets room from the mark. */
     .quota-tile:not(.compact) .quota-heading > :global(.mark) {
       flex-shrink: 1;
       min-width: 0;
     }
     .segment-label,
-    .weekly-summary {
+    .quota-updated {
       flex-shrink: 0;
     }
   }
@@ -168,7 +163,7 @@
     .quota-heading {
       gap: 2px;
     }
-    .weekly-summary {
+    .quota-updated {
       font-size: 10.5px;
       gap: 2px;
     }
@@ -192,8 +187,7 @@
       background: transparent;
       border-color: GrayText;
     }
-    .weekly-summary,
-    .weekly-summary b,
+    .quota-updated,
     .quota-caption,
     .quota-caption b {
       color: inherit;

@@ -234,6 +234,8 @@ export interface AppSettings {
    * to `QUOTA_READ_DEFAULTS`: off for Claude and Codex, on for OpenCode Go.
    */
   quotaReads?: Partial<Record<AgentId, boolean>>;
+  /** Minutes between visible-panel subscription quota reads; defaults to five. */
+  quotaRefreshMinutes?: number;
   docker: DockerSettings;
   github: GithubSettings;
   /** Update the local agent CLIs every 4 hours while no session uses them. */
