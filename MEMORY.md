@@ -39,7 +39,7 @@ Stable project knowledge. **Read at session start.**
 ### Subscription quota reads are opt-in per agent
 
 - **Date:** 2026-11-22
-- **Decision:** `settings.quotaReads` (owner, #83): off by default for Claude and Codex (undocumented endpoints, CLI sign-in), on for OpenCode Go; `quota::read` returns before any path, file or request when off; Traygent's own User-Agent only, ≥ 30 s between reads. Detail: [ADR-0014](docs/adr/0014-opt-in-subscription-quota-reads.md).
+- **Decision:** `settings.quotaReads` (owner, #83): off by default for Claude and Codex (undocumented endpoints, CLI sign-in), on for OpenCode Go; `quota::read` returns before any path, file or request when off; Traygent's own User-Agent only, ≥ 30 s between scheduled reads. Detail: [ADR-0014](docs/adr/0014-opt-in-subscription-quota-reads.md).
 
 ## Gotchas & Pitfalls
 
