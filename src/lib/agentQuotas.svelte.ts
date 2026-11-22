@@ -1,10 +1,13 @@
 import type { Bridge } from './bridgeTypes';
 import { MINUTE, minuteClock } from './clock';
-import { quotaReadOn, type AgentQuota } from './quotaTypes';
+import {
+  DEFAULT_QUOTA_REFRESH_MINUTES,
+  quotaReadOn,
+  type AgentQuota,
+} from './quotaTypes';
 import { defaultProfile, DEFAULT_PROFILE } from './profiles';
 import type { AgentId, EnvId, Snapshot } from './types';
 
-const REFRESH_INTERVAL = 5 * 60_000;
 // A provider that keeps reporting a reset moments away must not turn into a request loop.
 const MIN_INTERVAL = 30_000;
 // A failed read keeps the last good windows this long: enough for a network blip,
@@ -65,7 +68,9 @@ interface Entry {
   result?: AgentQuota;
   busy: boolean;
   nextRead: number;
+  lastRead?: number;
   goodAt?: number;
+  staleUntil?: number;
 }
 
 /** Cache by launch account. A late reply can only update its own entry. */
@@ -76,17 +81,29 @@ export class AgentQuotas {
   #selected = new Map<AgentId, Entry>();
   #observing = false;
   #expiry: ReturnType<typeof setTimeout> | undefined;
-  #shown = $state.raw<Partial<Record<AgentId, AgentQuota>>>({});
+  #interval = DEFAULT_QUOTA_REFRESH_MINUTES * MINUTE;
+  #shown = $state.raw<Partial<Record<AgentId, Entry>>>({});
 
   constructor(read: Bridge['getAgentQuota']) {
     this.#read = read;
   }
 
   read(agent: AgentId) {
-    return this.#shown[agent];
+    const entry = this.#shown[agent];
+    if (entry?.staleUntil && this.now >= entry.staleUntil && entry.result)
+      return { windows: {}, detail: entry.result.detail };
+    return entry?.result;
   }
 
-  follow(contexts: QuotaContext[]) {
+  updatedAt(agent: AgentId) {
+    return this.#shown[agent]?.goodAt;
+  }
+
+  follow(contexts: QuotaContext[], minutes = DEFAULT_QUOTA_REFRESH_MINUTES) {
+    if (this.#interval !== minutes * MINUTE) {
+      this.#interval = minutes * MINUTE;
+      for (const entry of this.#cache.values()) this.#setNextRead(entry);
+    }
     const next = new Map<AgentId, Entry>();
     for (const context of contexts) {
       const key = JSON.stringify([
@@ -112,9 +129,9 @@ export class AgentQuotas {
   }
 
   #publish() {
-    const shown: Partial<Record<AgentId, AgentQuota>> = {};
+    const shown: Partial<Record<AgentId, Entry>> = {};
     for (const [agent, entry] of this.#selected) {
-      if (entry.result) shown[agent] = entry.result;
+      if (entry.result) shown[agent] = entry;
     }
     this.#shown = shown;
   }
@@ -147,7 +164,7 @@ export class AgentQuotas {
     if (!this.#observing) return;
     const next = Math.min(
       ...[...this.#selected.values()]
-        .flatMap((e) => [e.nextRead, ...resets(e.result)])
+        .flatMap((e) => [e.nextRead, e.staleUntil ?? 0, ...resets(e.result)])
         .filter((t) => t > now),
     );
     if (next - now < MINUTE)
@@ -167,28 +184,39 @@ export class AgentQuotas {
     // windows with the new detail for a while; their own resets still expire them.
     const now = Date.now();
     const previous = entry.result;
+    delete entry.staleUntil;
     if (hasWindows(result)) entry.goodAt = now;
-    entry.result =
+    else if (
+      result.detail &&
       previous &&
       hasWindows(previous) &&
-      now - (entry.goodAt ?? 0) < STALE_LIMIT
-        ? hasWindows(result) || !result.detail
-          ? result
-          : { windows: previous.windows, detail: result.detail }
-        : result;
+      entry.goodAt !== undefined &&
+      now < entry.goodAt + STALE_LIMIT
+    ) {
+      entry.staleUntil = entry.goodAt + STALE_LIMIT;
+      result = { windows: previous.windows, detail: result.detail };
+    }
+    entry.result = result;
     entry.busy = false;
-    entry.nextRead = Math.max(
-      now + MIN_INTERVAL,
-      Math.min(
-        now + REFRESH_INTERVAL,
-        ...resets(entry.result).filter((reset) => reset > now),
-      ),
-    );
+    entry.lastRead = now;
+    this.#setNextRead(entry);
     if (this.#selected.get(agent) === entry) {
       this.now = now;
       this.#publish();
       this.#scheduleExpiry(now);
     }
+  }
+
+  #setNextRead(entry: Entry) {
+    const at = entry.lastRead;
+    if (at === undefined) return;
+    entry.nextRead = Math.max(
+      at + MIN_INTERVAL,
+      Math.min(
+        at + this.#interval,
+        ...resets(entry.result).filter((reset) => reset > at),
+      ),
+    );
   }
 
   /** Timers pause provider reads while hidden. Reopening checks freshness right away. */

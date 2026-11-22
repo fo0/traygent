@@ -27,6 +27,7 @@ async function serveQuotas(
     codex: ['week', 'spark'],
   };
   snapshot.settings.quotaReads = reads;
+  snapshot.settings.quotaRefreshMinutes = 15;
   await installTauriMock(
     page,
     ({ snapshot, quotas }) =>
@@ -65,17 +66,29 @@ test('the selected CLI shows its ordered bars, while the other radios expose wee
   const claude = segment(page, 'claude');
   const codex = segment(page, 'codex');
   const openCode = segment(page, 'opencode');
-  await expect(claude.locator('.weekly-summary')).toHaveText(
-    '3 Tage · 68 % frei',
+  const localTime = await page.evaluate(
+    (time) =>
+      new Date(time).toLocaleTimeString('de-DE', {
+        hour: '2-digit',
+        minute: '2-digit',
+      }),
+    clock,
+  );
+  const updated = claude.locator('.quota-updated');
+  await expect(updated).toHaveText(`Stand ${localTime}`);
+  await updated.hover();
+  await expect(updated).toHaveAttribute(
+    'title',
+    /Zuletzt aktualisiert am .*alle 15 Min/,
   );
   await expect(claude.locator('.quota-caption')).toHaveText([
     'Session 30 % frei',
-    'Woche',
+    'Woche 3 Tage · 68 % frei',
     'Fable 10 % frei',
   ]);
   for (const inactive of [codex, openCode]) {
     await expect(
-      inactive.locator('.weekly-summary, .quota-caption'),
+      inactive.locator('.quota-updated, .quota-caption'),
     ).toHaveCount(0);
     await expect(inactive.locator('.quota-meter')).toHaveCount(1);
   }
@@ -114,14 +127,13 @@ test('the selected CLI shows its ordered bars, while the other radios expose wee
   await expect(openCode.getByRole('radio')).toHaveAccessibleDescription(
     /Keine Daten.*Anmeldung erforderlich/,
   );
-  await expect(openCode.locator('.weekly-summary')).toHaveText('Keine Daten');
+  await expect(openCode.locator('.quota-updated')).toHaveText('Stand –');
   await expect(openCode.locator('.quota-fill')).toHaveCount(0);
   await expect(claude.locator('.quota-meter')).toHaveCount(1);
   await openCode.getByRole('radio').press('ArrowRight');
   await expect(codex.getByRole('radio')).toBeFocused();
-  await expect(codex.locator('.weekly-summary')).toHaveText('0 % frei');
   await expect(codex.locator('.quota-caption')).toHaveText([
-    'Woche',
+    'Woche 0 % frei',
     'Spark 100 % frei',
   ]);
 });
@@ -140,7 +152,7 @@ test('an agent whose read is off is never asked and shows no figure or bar', asy
   );
   const claude = segment(page, 'claude');
   await expect(segment(page, 'opencode').locator('.quota-fill')).toHaveCount(1);
-  await expect(claude.locator('.quota-meter, .weekly-summary')).toHaveCount(0);
+  await expect(claude.locator('.quota-meter, .quota-updated')).toHaveCount(0);
   await expect(claude.locator('.segment-label')).toHaveText('Claude Code');
   await expect(
     claude.getByRole('radio', { name: 'Claude Code', exact: true }),
@@ -167,9 +179,13 @@ test('expired readings disappear while a still-current window stays visible', as
     },
   });
   const selected = segment(page, 'claude');
-  await expect(selected.locator('.weekly-summary')).toContainText('8 % frei');
+  await expect(
+    selected.locator('[data-metric=week] .quota-value'),
+  ).toContainText('8 % frei');
   await page.clock.fastForward(13_100);
-  await expect(selected.locator('.weekly-summary')).toHaveText('Keine Daten');
+  await expect(selected.locator('[data-metric=week] .quota-value')).toHaveText(
+    'Keine Daten',
+  );
   await expect(selected.getByRole('radio')).toHaveAccessibleDescription(
     /Woche · Zeitfenster abgelaufen/,
   );
@@ -180,7 +196,7 @@ test('expired readings disappear while a still-current window stays visible', as
   ).toHaveCount(0);
   await expect(selected.locator('.quota-caption')).toHaveText([
     'Session 70 % frei',
-    'Woche',
+    'Woche Keine Daten',
     'Fable Keine Daten',
   ]);
 });
@@ -196,7 +212,7 @@ test('a long countdown and fractional reading fit at narrow widths', async ({
   });
   await pinFont(page, 'DejaVu Sans');
   const selected = segment(page, 'claude');
-  await expect(selected.locator('.weekly-summary')).toHaveText(
+  await expect(selected.locator('[data-metric=week] .quota-value')).toHaveText(
     '59 Min. · 99,7 % frei',
   );
   for (const width of [320, 351, 375, 398]) {
@@ -204,7 +220,7 @@ test('a long countdown and fractional reading fit at narrow widths', async ({
     const { cut, overflow } = await selected.evaluate((node) => {
       const name = node.querySelector('.segment-label')!;
       const summary = node
-        .querySelector('.weekly-summary')!
+        .querySelector('[data-metric=week] .quota-value')!
         .getBoundingClientRect();
       const track = node.querySelector('.quota-track')!.getBoundingClientRect();
       return {

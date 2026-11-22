@@ -36,6 +36,7 @@
       "opencode": true,
       "codex": false
     },
+    "quotaRefreshMinutes": 5,
     "docker": {
       "images": {
         "claude": "node:22-trixie",

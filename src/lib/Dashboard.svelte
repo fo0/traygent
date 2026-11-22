@@ -5,6 +5,7 @@
   import RecentList from './RecentList.svelte';
   import SectionHeader from './SectionHeader.svelte';
   import { Composer as ComposerState } from './composerState.svelte';
+  import { quotaRefreshMinutes } from './quotaTypes';
   import { quotaContexts } from './agentQuotas.svelte';
   import { catalogEntry, sentOptions } from './agents';
   import { RestartGate } from './rowStart';
@@ -48,7 +49,8 @@
       composer.profile,
       composer.env,
     );
-    untrack(() => panel.quotas.follow(contexts));
+    const minutes = quotaRefreshMinutes(snapshot.settings);
+    untrack(() => panel.quotas.follow(contexts, minutes));
   });
 
   /** „In Composer übernehmen“: the form at the top, ready for Enter. */

@@ -1,5 +1,20 @@
 import type { AgentId, AppSettings } from './types';
 
+export const DEFAULT_QUOTA_REFRESH_MINUTES = 5;
+
+export function validQuotaRefresh(minutes: number) {
+  return Number.isInteger(minutes) && minutes >= 1 && minutes <= 60;
+}
+
+export function quotaRefreshMinutes(
+  settings: Pick<AppSettings, 'quotaRefreshMinutes'>,
+) {
+  const minutes = settings.quotaRefreshMinutes;
+  return minutes !== undefined && validQuotaRefresh(minutes)
+    ? minutes
+    : DEFAULT_QUOTA_REFRESH_MINUTES;
+}
+
 export const QUOTA_LABELS = {
   week: 'Woche',
   session: 'Session',

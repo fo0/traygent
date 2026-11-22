@@ -10,6 +10,7 @@
   import StartupSettings from './StartupSettings.svelte';
   import ThemeSetting from './ThemeSetting.svelte';
   import UpdatePanel from './UpdatePanel.svelte';
+  import QuotaIntervalSetting from './QuotaIntervalSetting.svelte';
   import type { AgentQuotas } from './agentQuotas.svelte';
   import { Autostart } from './autostart.svelte';
   import { errorMessage } from './format';
@@ -120,6 +121,9 @@
   const badges = $derived<
     Partial<Record<SettingsTab, { text: string; tone?: 'danger' }>>
   >({
+    ...(draft.invalidIn('app') && {
+      app: { text: 'Ungültige Eingabe', tone: 'danger' },
+    }),
     ...(draft.invalidIn('agents') && {
       agents: { text: 'Ungültige Eingabe', tone: 'danger' },
     }),
@@ -263,6 +267,7 @@
     {:else if tab === 'app'}
       <ThemeSetting bind:value={theme} />
       <StartupSettings {native} {autostart} />
+      <QuotaIntervalSetting {draft} />
       <DebugSetting {draft} />
     {:else}
       <UpdatePanel

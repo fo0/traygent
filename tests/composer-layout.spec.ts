@@ -20,15 +20,15 @@ test('the weekly meter sits below the prominent agent choice at 480 px', async (
   await page.setViewportSize({ width: 480, height: 760 });
   await page.goto('/');
   const segment = agents(page).locator('.segment').first();
-  expect(await segmentHeight(agents(page))).toBeGreaterThanOrEqual(40);
-  expect(await segmentHeight(agents(page))).toBeLessThanOrEqual(44);
+  expect(await segmentHeight(agents(page))).toBeGreaterThanOrEqual(53);
+  expect(await segmentHeight(agents(page))).toBeLessThanOrEqual(64);
   await expect(segment).toHaveCSS('font-size', '14.5px');
   await expect(segment.locator('svg.mark')).toHaveCSS('width', '18px');
   expect(await segmentHeight(envs(page))).toBe(28);
   for (const width of [479, 360]) {
     await page.setViewportSize({ width, height: 760 });
     await expect(segment.locator('svg.mark')).toHaveCSS('width', '14px');
-    expect(await segmentHeight(agents(page))).toBeLessThanOrEqual(44);
+    expect(await segmentHeight(agents(page))).toBeLessThanOrEqual(64);
   }
 });
 
@@ -45,7 +45,7 @@ async function readCodexQuota(page: Page) {
 }
 
 for (const font of LAYOUT_FONTS) {
-  test(`the CLI name, reset and free quota fit on one line in ${font}`, async ({
+  test(`the CLI name and last update fit on one line in ${font}`, async ({
     page,
   }) => {
     await page.emulateMedia({ reducedMotion: 'reduce' });
@@ -60,15 +60,15 @@ for (const font of LAYOUT_FONTS) {
         const selected = agents(page).locator('.segment:has(input:checked)');
         const label = selected.locator('.segment-label');
         await expect(label).toHaveText(agent);
-        await expect(selected.locator('.weekly-summary')).toContainText(
-          '% frei',
+        await expect(selected.locator('.quota-updated')).toHaveText(
+          /Stand \d\d:\d\d/,
         );
         const layout = await selected.evaluate((node) => {
           const name = node.querySelector('.segment-label')!;
           const bounds = (selector: string) =>
             node.querySelector(selector)!.getBoundingClientRect();
           const dot = bounds('.status-dot');
-          const summary = bounds('.weekly-summary');
+          const summary = bounds('.quota-updated');
           const track = bounds('.quota-track');
           return {
             cut: name.scrollWidth > name.clientWidth,

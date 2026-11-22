@@ -15,6 +15,34 @@ const saveButton = (page: Page) =>
     .getByRole('dialog', { name: 'Einstellungen' })
     .getByRole('button', { name: 'Speichern', exact: true });
 
+test('App validates and saves the quota refresh interval', async ({ page }) => {
+  await page.goto('/');
+  const dialog = await openSettings(page);
+  const openApp = () =>
+    dialog.getByRole('tab', { name: 'App', exact: true }).click();
+  await openApp();
+  const minutes = dialog.getByRole('spinbutton', {
+    name: 'Abfrageintervall (Minuten)',
+  });
+  await expect(minutes).toHaveValue('5');
+  for (const value of ['', '0', '1.5', '61']) {
+    await minutes.fill(value);
+    await expect(minutes).toHaveAttribute('aria-invalid', 'true');
+    await expect(saveButton(page)).toBeDisabled();
+  }
+  await minutes.fill('12');
+  await dialog.getByRole('button', { name: 'Abbrechen' }).click();
+  await openSettings(page);
+  await openApp();
+  await expect(minutes).toHaveValue('5');
+  await minutes.fill('12');
+  await saveButton(page).click();
+  await expect(dialog).toHaveCount(0);
+  await openSettings(page);
+  await openApp();
+  await expect(minutes).toHaveValue('12');
+});
+
 test('Agenten: staged defaults apply with „Speichern“ and reach the composer', async ({
   page,
 }) => {
