@@ -37,7 +37,7 @@ Every start lands in **Workspaces**, so the next one is a single click.
 | Feature                               | What you get                                                                                                                                             |
 | ------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | ⚡ **One-click starts**               | Agent, folder, environment, Enter. Model, effort and permission default to your settings; the session mode starts at **Neu**.                            |
-| **Subscription quotas**               | See the weekly reset and remaining quota beside the selected CLI. Usage bars show all three agents at a glance.                                          |
+| **Subscription quotas**               | See the weekly reset and remaining quota beside the selected CLI. Opt-in per agent: off for Claude Code and Codex, on for OpenCode Go.                   |
 | 🕘 **Workspaces**                     | Up to 20 folder · agent · environment rows; a click restarts one as it was, or lets the agent keep its own model and effort.                             |
 | 🐳 **Local or Docker**                | Run the agent on the host or in a container with shared host sign-in for Claude Code and Codex, plus optional port publishing.                           |
 | 🐙 **Start from a GitHub repository** | Paste a URL, type `owner/name` or search your repositories; Traygent clones it on first use and reuses the folder afterwards.                            |
@@ -86,7 +86,8 @@ Open http://127.0.0.1:1420. The preview is labelled **Demo**.
 - **No shell strings.** Every launch is an argument list of quoted literals ([ADR-0003](docs/adr/0003-launch-through-a-powershell-argv.md)).
 - **Docker ports bind to `127.0.0.1`** unless you type an IP.
 - **The host Docker socket stays outside the container** unless you turn on **Docker-Socket durchreichen** (off by default); with it, the agent controls your host's Docker ([details](docs/USAGE.md#docker-sessions)).
-- **Network access:** Traygent itself contacts only the GitHub API (update check, account check, your repository list) and GitHub release downloads. `git clone`, agent installers and container image pulls run visibly in the terminal Traygent opens for the session or install.
+- **Subscription quotas are opt-in.** Claude Code and Codex quotas come from provider interfaces that are not officially documented and are read with the CLI’s own sign-in; Traygent reads them only after you turn on **Kontingent abfragen** for that agent. It never refreshes or stores a token. OpenCode Go uses your own key and is on by default ([ADR-0014](docs/adr/0014-opt-in-subscription-quota-reads.md)).
+- **Network access:** Traygent itself contacts the GitHub API (update check, account check, your repository list), GitHub release downloads and, for agents with **Kontingent abfragen** on, that provider’s usage endpoint. `git clone`, agent installers and container image pulls run visibly in the terminal Traygent opens for the session or install.
 - **Local state** lives in one JSON file, `%APPDATA%\io.github.fo0.traygent\state.json` ([details](docs/USAGE.md#where-traygent-keeps-its-state)).
 
 ## Limits

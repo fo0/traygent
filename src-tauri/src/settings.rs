@@ -47,6 +47,7 @@ impl Default for AppSettings {
             shared_window: false,
             agents: PerAgent::from_fn(|_| LaunchOptions::default()),
             quota_bars: PerAgent::from_fn(|_| vec![QuotaMetric::Week]),
+            quota_reads: PerAgent::from_fn(default_quota_read),
             docker: DockerSettings::default(),
             github: GithubSettings::default(),
             agent_updates: false,
@@ -82,6 +83,12 @@ pub fn normalize(mut settings: AppSettings) -> AppSettings {
     profiles::normalize(&mut settings);
     share::normalize(&mut settings);
     settings
+}
+
+/// Opt-in where the read reuses a CLI subscription sign-in against an undocumented
+/// endpoint (Claude, Codex); on for OpenCode Go, which uses the user's own API key (ADR-0014).
+pub fn default_quota_read(agent: AgentId) -> bool {
+    agent == AgentId::Opencode
 }
 
 fn normalize_quota_bars(agent: AgentId, bars: &[QuotaMetric]) -> Vec<QuotaMetric> {

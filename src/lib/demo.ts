@@ -108,7 +108,7 @@ export function createDemoBridge(latency = 150, detection = 600): DemoBridge {
       return copy();
     },
     async getAgentQuota(agent, profile, env) {
-      return demoQuota(agent, profile, env, data.profiles, quotaEpoch);
+      return demoQuota(agent, profile, env, data, quotaEpoch);
     },
     async refreshDetection() {
       await delay();

@@ -91,6 +91,7 @@ describe('golden snapshot fixture', () => {
           'agents',
           'docker',
           'quotaBars',
+          'quotaReads',
           'github',
           'agentUpdates',
           'profiles',
@@ -105,6 +106,9 @@ describe('golden snapshot fixture', () => {
     for (const agent of AGENTS) {
       const id = agent as keyof typeof settings.profiles;
       expect(settings.quotaBars?.[id]).toEqual(['week']);
+      expect(settings.quotaReads?.[id], `quotaReads.${agent}`).toBe(
+        agent === 'opencode',
+      );
       expect(settings.profiles[id], `settings.profiles.${agent}`).toEqual([]);
       expect(settings.agentProfile[id], `agentProfile.${agent}`).toBe(
         'default',

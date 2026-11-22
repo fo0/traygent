@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { demoSettings } from './demoData';
 import { envsProblem, lastEnv, shownEnv, toggleEnv } from './environments';
-import { configuredQuotaBars } from './quotaTypes';
+import { configuredQuotaBars, quotaReadOn } from './quotaTypes';
 import { SettingsDraft } from './settingsDraft.svelte';
 import {
   argsProblem,
@@ -81,6 +81,38 @@ describe('SettingsDraft', () => {
     expect(draft.saved.quotaBars).toEqual({
       codex: ['sparkWeek', 'week', 'session'],
     });
+  });
+
+  it('stages the quota read switch per agent and restores the implicit defaults', () => {
+    const old = demoSettings();
+    delete old.quotaReads;
+    const draft = new SettingsDraft(old);
+    expect(quotaReadOn(draft.value, 'claude')).toBe(false);
+    expect(quotaReadOn(draft.value, 'opencode')).toBe(true);
+    draft.setQuotaRead('claude', true);
+    expect(draft.dirty).toBe(true);
+    expect(old.quotaReads).toBeUndefined();
+    // Written whole: OpenCode keeps its default instead of a missing key.
+    expect(draft.current().quotaReads).toEqual({
+      claude: true,
+      opencode: true,
+      codex: false,
+    });
+    draft.setQuotaRead('claude', false);
+    expect(draft.dirty).toBe(false);
+    expect(draft.value.quotaReads).toBeUndefined();
+
+    draft.setQuotaRead('opencode', false);
+    draft.commit(draft.current());
+    expect(draft.saved.quotaReads).toEqual({
+      claude: false,
+      opencode: false,
+      codex: false,
+    });
+    draft.setQuotaRead('codex', true);
+    expect(draft.dirty).toBe(true);
+    draft.setQuotaRead('codex', false);
+    expect(draft.dirty).toBe(false);
   });
 
   it('stages the Docker Node switch: on by default, off only once saved', () => {
