@@ -25,6 +25,7 @@ function pending() {
 }
 
 afterEach(() => {
+  vi.unstubAllGlobals();
   vi.useRealTimers();
 });
 
@@ -115,6 +116,24 @@ describe('agent quotas', () => {
     vi.setSystemTime(now + 30_000);
     quotas.refresh();
     expect(get).toHaveBeenCalledTimes(2);
+  });
+
+  it('updates the display at a reset that falls inside the minimum interval without reading', async () => {
+    vi.useFakeTimers();
+    const now = Date.now();
+    const get = vi
+      .fn()
+      .mockResolvedValue(usage(100, new Date(now + 10_000).toISOString()));
+    const quotas = new AgentQuotas(get);
+    vi.stubGlobal('window', new EventTarget());
+    const stop = quotas.observe();
+    quotas.follow([standard]);
+    await Promise.resolve();
+    await Promise.resolve();
+    vi.advanceTimersByTime(10_000);
+    expect(quotas.now).toBe(now + 10_000);
+    expect(get).toHaveBeenCalledTimes(1);
+    stop();
   });
 
   it('discards the previous account display while a replacement sign-in or environment is loading', async () => {
