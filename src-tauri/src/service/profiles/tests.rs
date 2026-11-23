@@ -388,6 +388,8 @@ fn the_sign_in_terminal_runs_auth_login_in_the_profiles_environment() {
         [
             "$Host.UI.RawUI.WindowTitle='Claude Code · Team anmelden'",
             SET_TEAM,
+            "$env:BUN_OPTIONS=($env:BUN_OPTIONS+' --max-http-header-size=1048576').Trim()",
+            "$env:NODE_OPTIONS=($env:NODE_OPTIONS+' --max-http-header-size=1048576').Trim()",
             &format!("& '{CLAUDE_EXE}' 'auth' 'login'"),
         ]
     );

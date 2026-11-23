@@ -30,7 +30,10 @@ fn a_sign_in_runs_hidden_unless_debug_is_on() {
     };
     assert_eq!(hidden.cwd, r"C:\Users\max");
     let script = decode_command(hidden.args.last().unwrap());
-    assert!(script.contains(&format!("{SET_TEAM}; & '{CLAUDE_EXE}' 'auth' 'login'; ")));
+    assert!(script.starts_with(&format!(
+        "$LASTEXITCODE=$null; {SET_TEAM}; $env:BUN_OPTIONS="
+    )));
+    assert!(script.contains(&format!("; & '{CLAUDE_EXE}' 'auth' 'login'; ")));
     assert_eq!(fs.created(), [r"C:\Users\max\.claude-team"]);
     // Refused like the terminal, and nothing is created then.
     let refused = |service: &Service, profile: &str| {
