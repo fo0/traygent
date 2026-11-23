@@ -8,6 +8,7 @@ use std::{
     io::ErrorKind,
     path::{Path, PathBuf},
     ptr, slice,
+    time::{Duration, Instant},
 };
 
 const UNAVAILABLE: &str = "Die OpenCode-Anmeldedatenbank konnte nicht gelesen werden.";
@@ -17,10 +18,15 @@ const READONLY: c_int = 0x01;
 const URI: c_int = 0x40;
 const ROW: c_int = 100;
 const DONE: c_int = 101;
+// A view named `credential` may call only innocuous functions (SQLite >= 3.31; older
+// versions ignore the pragma), and the progress handler ends any statement after the limit.
+const UNTRUSTED_SCHEMA: &CStr = c"PRAGMA trusted_schema=OFF";
+const PROGRESS_OPS: c_int = 1000;
+const QUERY_LIMIT: Duration = Duration::from_secs(2);
 const GO_ROW: &CStr = c"SELECT value FROM credential WHERE integration_id='opencode-go' ORDER BY active DESC, time_created DESC, id DESC LIMIT 1";
 
 // The C ABI is shared by WinSQLite (included in Windows 10/11) and libsqlite3.
-// Only opening, reading, limiting and releasing are available to production code.
+// Only opening, reading, limiting (size and time) and releasing are available to production code.
 #[cfg_attr(windows, link(name = "winsqlite3", kind = "raw-dylib"))]
 #[cfg_attr(
     target_os = "linux",
@@ -37,6 +43,12 @@ unsafe extern "C" {
     fn sqlite3_close(db: *mut c_void) -> c_int;
     fn sqlite3_busy_timeout(db: *mut c_void, ms: c_int) -> c_int;
     fn sqlite3_limit(db: *mut c_void, category: c_int, limit: c_int) -> c_int;
+    fn sqlite3_progress_handler(
+        db: *mut c_void,
+        ops: c_int,
+        callback: Option<unsafe extern "C" fn(*mut c_void) -> c_int>,
+        arg: *mut c_void,
+    );
     fn sqlite3_prepare_v2(
         db: *mut c_void,
         sql: *const c_char,
@@ -127,7 +139,16 @@ pub(super) fn go_key(path: &Path) -> Result<SecretToken, &'static str> {
     Ok(token)
 }
 
+/// Progress handler: a non-zero return interrupts the running statement.
+unsafe extern "C" fn past_deadline(deadline: *mut c_void) -> c_int {
+    // SAFETY: `query` passes a pointer to an `Instant` that outlives its connection.
+    let deadline = unsafe { *deadline.cast::<Instant>() };
+    c_int::from(Instant::now() >= deadline)
+}
+
 fn query(uri: &CStr) -> Result<SecretToken, &'static str> {
+    // Declared before the connection, so it outlives every call of the progress handler.
+    let deadline = Instant::now() + QUERY_LIMIT;
     let mut db = Db(ptr::null_mut());
     // SQLite owns both handles. The SQL string is static, and the result bytes are borrowed
     // only between SQLITE_ROW and finalize, never across another step or column conversion.
@@ -137,6 +158,20 @@ fn query(uri: &CStr) -> Result<SecretToken, &'static str> {
         }
         sqlite3_busy_timeout(db.0, 250);
         sqlite3_limit(db.0, 0 /* SQLITE_LIMIT_LENGTH */, MAX_ROW);
+        let arg = ptr::from_ref(&deadline).cast_mut().cast::<c_void>();
+        sqlite3_progress_handler(db.0, PROGRESS_OPS, Some(past_deadline), arg);
+        let mut pragma = Statement(ptr::null_mut());
+        if sqlite3_prepare_v2(
+            db.0,
+            UNTRUSTED_SCHEMA.as_ptr(),
+            -1,
+            &mut pragma.0,
+            ptr::null_mut(),
+        ) != 0
+            || sqlite3_step(pragma.0) != DONE
+        {
+            return Err(UNAVAILABLE);
+        }
         let mut stmt = Statement(ptr::null_mut());
         if sqlite3_prepare_v2(db.0, GO_ROW.as_ptr(), -1, &mut stmt.0, ptr::null_mut()) != 0 {
             return Err(UNAVAILABLE);
@@ -269,6 +304,24 @@ mod tests {
         let missing = dir.0.join("missing.db");
         assert!(go_key(&missing).is_err());
         assert!(!missing.exists());
+    }
+
+    #[test]
+    fn a_crafted_credential_view_cannot_pin_the_reader() {
+        let dir = TempDir::new("opencode-endless-view");
+        let path = dir.0.join("opencode.db");
+        let name = CString::new(path.to_str().unwrap()).unwrap();
+        let mut db = Db(ptr::null_mut());
+        assert_eq!(
+            unsafe { sqlite3_open_v2(name.as_ptr(), &mut db.0, 2 | 4, ptr::null()) },
+            0
+        );
+        // An endless recursion that never yields a row.
+        sql(&db, "CREATE VIEW credential AS WITH RECURSIVE r(n) AS (SELECT 1 UNION ALL SELECT n + 1 FROM r) SELECT n AS id, 'opencode-go' AS integration_id, '{}' AS value, 1 AS active, n AS time_created FROM r WHERE n < 0");
+        drop(db);
+        let started = Instant::now();
+        assert_eq!(go_key(&path).err(), Some(UNAVAILABLE));
+        assert!(started.elapsed() < QUERY_LIMIT * 3);
     }
 
     #[test]
