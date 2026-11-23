@@ -153,6 +153,11 @@ fn docker_requires_the_selected_profiles_home_and_keeps_ambient_auth_out() {
     assert!(plan.args.last().unwrap().len() <= MAX_ENCODED_CHARS);
 }
 
+const BUN_ROOM: &str =
+    "$env:BUN_OPTIONS=($env:BUN_OPTIONS+' --max-http-header-size=1048576').Trim()";
+const NODE_ROOM: &str =
+    "$env:NODE_OPTIONS=($env:NODE_OPTIONS+' --max-http-header-size=1048576').Trim()";
+
 #[test]
 fn the_debug_login_terminal_signs_a_profile_in_and_stays_open() {
     let plan = login_plan(
@@ -178,6 +183,8 @@ fn the_debug_login_terminal_signs_a_profile_in_and_stays_open() {
             "$Host.UI.RawUI.WindowTitle='Claude Code · Team", // split at the label's own `; `
             "%X% ''A'' anmelden'",
             r"$env:CLAUDE_CONFIG_DIR='C:\Users\Max O''Neil\.claude-team'",
+            BUN_ROOM,
+            NODE_ROOM,
             &format!("& '{CLAUDE}' 'auth' 'login'"),
         ]
     );
@@ -237,6 +244,10 @@ fn the_hidden_login_runs_the_same_call_and_exits_with_the_clis_code() {
         [
             "$LASTEXITCODE=$null",
             r"$env:CLAUDE_CONFIG_DIR='C:\Users\Max O''Neil\.claude-team'",
+            // Room for the cookies the browser sends to the sign-in callback; the user's own
+            // options stay in front.
+            BUN_ROOM,
+            NODE_ROOM,
             &format!("& '{CLAUDE}' 'auth' 'login'"),
             // A CLI that could not run leaves no code: that is a failure, never a success.
             "if ($null -eq $LASTEXITCODE) { exit 1 }",
@@ -252,7 +263,9 @@ fn the_hidden_login_runs_the_same_call_and_exits_with_the_clis_code() {
     )
     .unwrap();
     let script = decode_command(&default.args[4]);
-    assert!(script.contains(&format!("; {CLEAR}; & '{shim}' 'auth' 'login'; ")));
+    assert!(script.contains(&format!(
+        "; {CLEAR}; {BUN_ROOM}; {NODE_ROOM}; & '{shim}' 'auth' 'login'; "
+    )));
     let refused = |agent, resolved: &Resolved| {
         hidden_login_plan(agent, resolved, r"C:\Users\max").unwrap_err()
     };
