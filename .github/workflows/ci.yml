@@ -32,9 +32,10 @@ jobs:
           fi
           files=$(gh api --paginate "repos/$GITHUB_REPOSITORY/pulls/$PR_NUMBER/files" --jq '.[] | .filename, (.previous_filename // empty)')
           touches() { grep -qE "$1" <<< "$files" && echo true || echo false; }
-          # release:test reads scripts/ and desktop-release.yml.
-          echo "rust=$(touches '^(src-tauri/|fixtures/|\.github/workflows/ci\.yml$)')" >> "$GITHUB_OUTPUT"
-          echo "desktop=$(touches '^(src-tauri/|fixtures/|scripts/|\.github/workflows/|package\.json$|pnpm-lock\.yaml$|pnpm-workspace\.yaml$|\.node-version$)')" >> "$GITHUB_OUTPUT"
+          # Rust tests embed fixtures/; rust-toolchain.toml picks the compiler; release:test reads
+          # scripts/ and desktop-release.yml.
+          echo "rust=$(touches '^(src-tauri/|fixtures/|rust-toolchain\.toml$|\.github/workflows/ci\.yml$)')" >> "$GITHUB_OUTPUT"
+          echo "desktop=$(touches '^(src-tauri/|fixtures/|rust-toolchain\.toml$|scripts/|\.github/workflows/|package\.json$|pnpm-lock\.yaml$|pnpm-workspace\.yaml$|\.node-version$)')" >> "$GITHUB_OUTPUT"
   panel:
     runs-on: ubuntu-latest
     timeout-minutes: 20
@@ -72,8 +73,8 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
-      - name: Install Rust stable
-        run: rustup toolchain install stable --profile minimal --component clippy,rustfmt --no-self-update && rustup default stable
+      - name: Install Rust from rust-toolchain.toml
+        run: rustup toolchain install --no-self-update
       - name: Cache Rust dependencies
         uses: Swatinem/rust-cache@d1527c8f67ef9af357290475d4af4b0fab8f12e0 # v2.9.3
         with:
@@ -98,8 +99,8 @@ jobs:
         with:
           node-version-file: .node-version
           cache: pnpm
-      - name: Install Rust stable
-        run: rustup toolchain install stable --profile minimal --component clippy --no-self-update && rustup default stable
+      - name: Install Rust from rust-toolchain.toml
+        run: rustup toolchain install --no-self-update
       - name: Cache Rust dependencies
         uses: Swatinem/rust-cache@d1527c8f67ef9af357290475d4af4b0fab8f12e0 # v2.9.3
         with:

@@ -101,7 +101,7 @@ Open http://127.0.0.1:1420. The preview is labelled **Demo**.
 
 ## Development
 
-Built with **Tauri 2, Rust, Svelte 5 and TypeScript**. Prerequisites: **Node.js 24** (`.node-version`), **pnpm 11.19.0** (`packageManager`), a stable **Rust** toolchain and the [Tauri prerequisites](https://v2.tauri.app/start/prerequisites/) (on Windows: Microsoft C++ Build Tools, the MSVC Rust toolchain, WebView2).
+Built with **Tauri 2, Rust, Svelte 5 and TypeScript**. Prerequisites: **Node.js 24** (`.node-version`), **pnpm 11.19.0** (`packageManager`), **Rust** (the version pinned in `rust-toolchain.toml`; rustup installs it on first use) and the [Tauri prerequisites](https://v2.tauri.app/start/prerequisites/) (on Windows: Microsoft C++ Build Tools, the MSVC Rust toolchain, WebView2).
 
 ```sh
 pnpm install --frozen-lockfile

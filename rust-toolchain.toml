@@ -1,0 +1,7 @@
+# Pins the Rust toolchain for local builds, CI and releases, so a new stable release
+# cannot turn `-D warnings` red on its own; rustup installs this version on first use.
+# Bump it deliberately in its own pull request (CI then runs the Rust and Windows jobs).
+[toolchain]
+channel = "1.99.1"
+components = ["clippy", "rustfmt"]
+profile = "minimal"
