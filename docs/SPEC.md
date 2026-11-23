@@ -584,8 +584,12 @@ Commands (Rust `#[tauri::command]`, German `Err` strings; panel calls only via `
   memory only; read at every detection, after a sync and a settings save.
 - **Sign-in (#41):** `profile_login { agent, profile }` („Standard“ included, only on a click)
   creates the profile directory and runs, in `%USERPROFILE%` (else `C:\`), the env line (for
-  „Standard“ always the `Remove-Item`) and `& '<cli>' 'auth' 'login'` (an npm `.cmd` shim the
-  same way). Refused before anything runs: „<Agent> wird gerade aktualisiert.“, „<Agent> ist
+  „Standard“ always the `Remove-Item`), the header room and `& '<cli>' 'auth' 'login'` (an npm
+  `.cmd` shim the same way). Header room (#89): `--max-http-header-size=1048576` appended to
+  `BUN_OPTIONS` and `NODE_OPTIONS` of that process — the browser sends every `localhost` cookie
+  to the CLI's callback, and past the default 16 KiB the CLI answers 431 and never gets the code.
+  With „Debug“ the terminal stays open and keeps both variables for what is started in it. Refused
+  before anything runs: „<Agent> wird gerade aktualisiert.“, „<Agent> ist
   nicht installiert.“, „Profil nicht gefunden.“, and „Der Profilordner gehört nicht zu Claude
   Code.“ for an existing foreign directory (the rule above, with the agent's extra directories;
   also when that cannot be checked) — a sign-in never writes credentials into it.

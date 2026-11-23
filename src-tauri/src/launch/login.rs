@@ -94,6 +94,19 @@ fn login_call(agent: AgentId, resolved: &Resolved) -> Result<Vec<String>, String
         .map(|arg| arg.to_string())
         .collect();
     let mut script: Vec<String> = profile_env(agent, resolved, true)?.into_iter().collect();
+    script.extend(HEADER_ROOM_VARS.map(header_room));
     script.push(invoke(&cli.path, &args));
     Ok(script)
+}
+
+/// The CLI's sign-in ends on `http://localhost:<port>/callback`, and the browser sends every
+/// cookie any local site ever set for `localhost` along (cookies ignore the port). Past the
+/// runtime's 16 KiB header limit the CLI answers 431 and never sees the code (#89), so both
+/// runtimes the CLI ships on get room for them — appended, so the user's own options stay.
+const HEADER_ROOM: &str = "--max-http-header-size=1048576";
+const HEADER_ROOM_VARS: [&str; 2] = ["BUN_OPTIONS", "NODE_OPTIONS"];
+
+fn header_room(name: &str) -> String {
+    let flag = ps_literal(&format!(" {HEADER_ROOM}"));
+    format!("$env:{name}=($env:{name}+{flag}).Trim()")
 }
