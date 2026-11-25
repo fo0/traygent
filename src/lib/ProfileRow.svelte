@@ -3,7 +3,13 @@
   import CopyField from './CopyField.svelte';
   import Icon from './Icon.svelte';
   import { dateTime } from './format';
-  import { SIGNED_OUT, planLabel, rowAccount } from './profileRow';
+  import {
+    SIGNED_OUT,
+    planLabel,
+    rowAccount,
+    type TileChoice,
+  } from './profileRow';
+  import { MAX_QUOTA_PROFILES } from './quotaTypes';
   import { repeatClick, repeatKey } from './rowStart';
   import { STANDARD_LABEL, profileFolder, renameProblem } from './profiles';
   import type { SettingsDraft } from './settingsDraft.svelte';
@@ -12,7 +18,8 @@
   // One profile in Settings → Agenten → „Profile“ (#37, #41, #43): a single
   // line — name, sign-in dot, account (or organization, when another row has
   // the same account),
-  // warning, „Anmelden“ while signed out, remove — that opens in place to its
+  // warning, „Anmelden“ while signed out, the staged „Im Tile zeigen“ (#94),
+  // remove — that opens in place to its
   // details with „Neu anmelden“. A pending sign-in turns the same button
   // into its cancel; when it leaves a signed-in row the focus moves to the
   // details toggle. An extra profile's name is a staged rename; id and
@@ -27,9 +34,11 @@
     busy,
     running,
     cancellable,
+    tile,
     onToggle,
     onLogin,
     onCancel,
+    onTile,
   }: {
     agent: AgentId;
     id: string;
@@ -45,10 +54,27 @@
     running: boolean;
     /** The pending sign-in runs hidden: the button cancels it. */
     cancellable: boolean;
+    /** Its place in the quota tile (#94); absent while there is no choice. */
+    tile?: TileChoice | undefined;
     onToggle: () => void;
     onLogin: () => void;
     onCancel: () => void;
+    onTile?: (show: boolean) => void;
   } = $props();
+
+  /** Staged: one more read per shown profile, the start profile always. */
+  const tileTitle = $derived(
+    !tile
+      ? ''
+      : tile.start
+        ? 'Startprofil · immer im Tile'
+        : !tile.on && tile.full
+          ? `Höchstens ${MAX_QUOTA_PROFILES} Profile`
+          : 'Im Tile zeigen · jedes gezeigte Profil ist eine weitere Kontingentabfrage',
+  );
+  const tileLocked = $derived(
+    !!tile && (tile.start || (!tile.on && tile.full)),
+  );
 
   const list = $derived(draft.value.profiles[agent] ?? []);
   /** Its place in the staged list; -1 for „Standard“. */
@@ -172,6 +198,16 @@
             name="refresh"
             size={14}
           />{:else}Anmelden{/if}</button
+      >{/if}
+    {#if tile}<button
+        type="button"
+        class="icon-button small profile-tile"
+        aria-label={`${shown} im Tile zeigen`}
+        aria-pressed={tile.on}
+        aria-disabled={tileLocked ? 'true' : undefined}
+        title={tileTitle}
+        onclick={() => !tileLocked && onTile?.(!tile.on)}
+        ><Icon name="gauge" size={14} /></button
       >{/if}
     {#if index < 0}<span class="profile-slot" aria-hidden="true"
       ></span>{:else}<button

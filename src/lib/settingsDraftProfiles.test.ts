@@ -181,3 +181,76 @@ describe('SettingsDraft profiles', () => {
     expect(draft.value.agentProfile.claude).toBe('kunde');
   });
 });
+
+/** The demo with a third and fourth Claude profile. */
+function fourProfiles(): AppSettings {
+  const settings = demoSettings();
+  settings.profiles.claude = [
+    { id: 'team', label: 'Team' },
+    { id: 'work', label: 'Work' },
+    { id: 'side', label: 'Side' },
+  ];
+  return settings;
+}
+
+/* The profiles of the quota tile (#94): staged, capped, the start always. */
+describe('SettingsDraft quota profiles', () => {
+  it('shows the start profile alone until another one is switched on', () => {
+    const draft = new SettingsDraft(fourProfiles());
+    expect(draft.quotaProfiles('claude')).toEqual(['default']);
+    draft.setQuotaProfile('claude', 'work', true);
+    expect(draft.quotaProfiles('claude')).toEqual(['default', 'work']);
+    expect(draft.saved.quotaProfiles?.claude).toEqual([]);
+    expect(draft.dirty).toBe(true);
+    // Switched off again: back at the baseline, nothing staged.
+    draft.setQuotaProfile('claude', 'work', false);
+    expect(draft.current().quotaProfiles?.claude).toEqual([]);
+    expect(draft.dirty).toBe(false);
+  });
+
+  it('refuses a fourth profile and never switches the start profile off', () => {
+    const draft = new SettingsDraft(fourProfiles());
+    draft.setQuotaProfile('claude', 'team', true);
+    draft.setQuotaProfile('claude', 'work', true);
+    draft.setQuotaProfile('claude', 'side', true);
+    expect(draft.quotaProfiles('claude')).toEqual(['default', 'team', 'work']);
+    draft.setQuotaProfile('claude', 'default', false);
+    expect(draft.quotaProfiles('claude')).toEqual(['default', 'team', 'work']);
+  });
+
+  it('keeps the old start profile shown when another one becomes the default', () => {
+    const draft = new SettingsDraft(fourProfiles());
+    draft.setQuotaProfile('claude', 'team', true);
+    draft.value.agentProfile.claude = 'side';
+    expect(draft.quotaProfiles('claude')).toEqual(['default', 'team', 'side']);
+  });
+
+  it('drops a removed profile and brings it back with the undone removal', () => {
+    const saved = fourProfiles();
+    saved.quotaProfiles = { claude: ['default', 'team'] };
+    const draft = new SettingsDraft(saved);
+    draft.removeProfile('claude', 'team');
+    expect(draft.current().quotaProfiles?.claude).toEqual(['default']);
+    expect(draft.quotaProfiles('claude')).toEqual(['default']);
+    return draft
+      .addProfile('claude', 'Team', () => Promise.reject(new Error('no save')))
+      .then((result) => {
+        expect(result).toBe('');
+        expect(draft.quotaProfiles('claude')).toEqual(['default', 'team']);
+        expect(draft.dirty).toBe(false);
+      });
+  });
+
+  it('stages nothing on an older snapshot without the setting', () => {
+    const saved = fourProfiles();
+    delete saved.quotaProfiles;
+    const draft = new SettingsDraft(saved);
+    draft.setQuotaProfile('claude', 'team', true);
+    expect(draft.current().quotaProfiles).toEqual({
+      claude: ['default', 'team'],
+    });
+    draft.setQuotaProfile('claude', 'team', false);
+    expect(draft.current().quotaProfiles).toBeUndefined();
+    expect(draft.dirty).toBe(false);
+  });
+});

@@ -37,6 +37,11 @@
       "codex": false
     },
     "quotaRefreshMinutes": 15,
+    "quotaProfiles": {
+      "claude": [],
+      "opencode": [],
+      "codex": []
+    },
     "docker": {
       "images": {
         "claude": "node:22-trixie",

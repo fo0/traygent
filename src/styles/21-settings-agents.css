@@ -197,6 +197,20 @@
   border-radius: 7px;
   background: var(--raised);
 }
+/* „Im Tile zeigen“ in a profile row (#94): quiet off, accent on. */
+.profile-list .profile-tile {
+  flex: none;
+  min-width: 24px;
+  min-height: 24px;
+  color: var(--text-3);
+}
+.profile-list .profile-tile[aria-pressed='true'] {
+  color: var(--accent);
+}
+.profile-list .profile-tile[aria-disabled='true'] {
+  opacity: 0.55;
+  cursor: default;
+}
 @media (max-width: 420px) {
   .field-grid {
     grid-template-columns: minmax(0, 1fr);

@@ -119,6 +119,12 @@
       wire('8.8,12.2 11,14.4 15.2,10.2'),
     ],
     bolt: [wire('13,3 6,13.5 11.5,13.5 10.5,21 18,10 12.5,10 13,3')],
+    // A meter: a profile's quota in the dashboard tile (#94).
+    gauge: [
+      { tag: 'path', attributes: { d: 'M3.5 17a8.5 8.5 0 0 1 17 0' } },
+      line(12, 17, 16, 11),
+      ring(12, 17, 1.2),
+    ],
     // Composer chips: Modell and Session (Denken uses `signal`).
     cpu: [
       box(6.5, 6.5, 11, 11),
