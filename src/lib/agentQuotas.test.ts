@@ -1,6 +1,7 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { demoSnapshot } from './demoData';
-import { AgentQuotas, quotaContexts } from './agentQuotas.svelte';
+import { AgentQuotas } from './agentQuotas.svelte';
+import { quotaContexts } from './quotaContexts';
 import { quotaView } from './quotaDisplay';
 import type { AgentQuota } from './quotaTypes';
 
@@ -99,7 +100,11 @@ describe('agent quotas', () => {
     quotas.refresh();
     await Promise.resolve();
     expect(get).toHaveBeenCalledTimes(2);
-    const view = quotaView(quotas.read('claude'), ['week'], quotas.now);
+    const view = quotaView(
+      [{ id: 'default', name: '', start: true, quota: quotas.read('claude') }],
+      ['week'],
+      quotas.now,
+    );
     expect(view.week.used).toBeNull();
     expect(view.hint).toMatch(/Woche · Zeitfenster abgelaufen/);
   });

@@ -411,6 +411,10 @@ pub struct AppSettings {
     pub quota_reads: PerAgent<bool>,
     /// Minutes between scheduled quota reads for enabled agents.
     pub quota_refresh_minutes: u32,
+    /// Profile ids per agent the dashboard's quota tile shows (#94): `default` or one of
+    /// `profiles`' ids, each once, at most [`crate::settings::quota_profiles::MAX`]. The
+    /// start profile is always shown; empty = the start profile only.
+    pub quota_profiles: PerAgent<Vec<String>>,
     pub docker: DockerSettings,
     pub github: GithubSettings,
     /// Update the local agent CLIs in the background while no session uses them.

@@ -35,12 +35,20 @@
   });
   const reading = $derived(quotaReadOn(draft.value, agent));
   const view = $derived(
+    // The preview shows the bars of the agent's lead profile, without a name.
     quotaView(
-      quotas.read(agent),
+      [
+        {
+          id: agent,
+          name: '',
+          start: true,
+          quota: quotas.read(agent),
+          updatedAt: quotas.updatedAt(agent),
+        },
+      ],
       enabled,
       quotas.now,
       reading,
-      quotas.updatedAt(agent),
       quotaRefreshMinutes(draft.value),
     ),
   );

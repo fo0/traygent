@@ -17,6 +17,7 @@
   } from './agents';
   import type { Composer } from './composerState.svelte';
   import type { AgentQuotas } from './agentQuotas.svelte';
+  import { tileProfiles } from './quotaContexts';
   import { quotaView } from './quotaDisplay';
   import {
     configuredQuotaBars,
@@ -93,12 +94,21 @@
     snapshot.catalog.map((item) => {
       const status = agentStatus(snapshot, item.id, composer.env);
       const active = item.id === composer.agent;
+      // The selected agent shows every chosen profile (#94), the others their default.
+      const readings = tileProfiles(
+        snapshot,
+        item.id,
+        active ? composer.profile : undefined,
+      ).map((profile) => ({
+        ...profile,
+        quota: quotas.read(item.id, profile.id),
+        updatedAt: quotas.updatedAt(item.id, profile.id),
+      }));
       const view = quotaView(
-        quotas.read(item.id),
+        readings,
         active ? configuredQuotaBars(snapshot.settings, item.id) : ['week'],
         quotas.now,
         quotaReadOn(snapshot.settings, item.id),
-        quotas.updatedAt(item.id),
         quotaRefreshMinutes(snapshot.settings),
       );
       return {

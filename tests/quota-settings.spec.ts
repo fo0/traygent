@@ -12,7 +12,7 @@ test('weekly quota stays enabled and per-agent bar choices are staged until save
   const dialog = page.getByRole('dialog', { name: 'Einstellungen' });
   const group = dialog.getByRole('region', { name: 'Kontingent', exact: true });
   const preview = group.getByRole('group', { name: 'Vorschau' });
-  const bars = preview.locator('[data-metric]');
+  const bars = preview.locator('.quota-track');
   const agent = dialog.getByRole('radiogroup', { name: 'Agent', exact: true });
   const week = group.getByRole('checkbox', { name: 'Woche', exact: true });
   const fable = group.getByRole('checkbox', { name: 'Fable', exact: true });
@@ -107,4 +107,42 @@ test('the quota read switch is staged until saved and locks the bar choices whil
   await settings.click();
   await expect(read).not.toBeChecked();
   await expect(fable).toBeDisabled();
+});
+
+test('profiles shown in the quota tile are staged per row while the read is on (#94)', async ({
+  page,
+}) => {
+  await page.goto('/');
+  const settings = page.getByRole('button', {
+    name: 'Einstellungen',
+    exact: true,
+  });
+  await settings.click();
+  const dialog = page.getByRole('dialog', { name: 'Einstellungen' });
+  const list = dialog.getByRole('list', { name: 'Profile' });
+  const standard = list.getByRole('button', {
+    name: 'Standard im Tile zeigen',
+  });
+  const team = list.getByRole('button', { name: 'Team im Tile zeigen' });
+  const save = dialog.getByRole('button', { name: 'Speichern', exact: true });
+  // The start profile is always shown; its switch stays on.
+  await expect(standard).toHaveAttribute('aria-pressed', 'true');
+  await expect(standard).toHaveAttribute('aria-disabled', 'true');
+  await expect(team).toHaveAttribute('aria-pressed', 'false');
+  await team.click();
+  await expect(team).toHaveAttribute('aria-pressed', 'true');
+  await expect(save).not.toHaveAttribute('aria-disabled', 'true');
+  // Without the read there is nothing to show.
+  await dialog.getByText('Kontingent abfragen', { exact: true }).click();
+  await expect(team).toHaveCount(0);
+  await dialog.getByText('Kontingent abfragen', { exact: true }).click();
+  await save.click();
+  await expect(dialog).toHaveCount(0);
+
+  await settings.click();
+  await expect(team).toHaveAttribute('aria-pressed', 'true');
+  // Removing the profile drops it from the tile.
+  await list.getByRole('button', { name: 'Team entfernen' }).click();
+  await expect(team).toHaveCount(0);
+  await expect(standard).toHaveCount(0);
 });

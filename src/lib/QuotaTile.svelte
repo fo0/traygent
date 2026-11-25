@@ -1,5 +1,7 @@
 <script lang="ts">
   import Icon from './Icon.svelte';
+  import QuotaBar from './QuotaBar.svelte';
+  import QuotaProfileRows from './QuotaProfileRows.svelte';
   import { AGENT_ICONS } from './agents';
   import type { QuotaView } from './quotaDisplay';
   import type { AgentId, ProbeState } from './types';
@@ -38,31 +40,14 @@
       <span class="quota-updated" title={view.refreshHint}>{view.updated}</span>
     {/if}
   </span>
-  {#each view.rows as row (row.metric)}
-    <span class="quota-meter" data-metric={row.metric}>
-      {#if active}
-        <span class="quota-caption">
-          <span>{row.label}</span>
-          <span class="quota-value">
-            {#if row.metric === 'week' && row.countdown}
-              {row.countdown} ·
-            {/if}
-            <b>{row.free}</b>
-          </span>
-        </span>
-      {/if}
-      <span class="quota-track" class:unknown={row.used === null}>
-        {#if row.used !== null}
-          <span
-            class="quota-fill"
-            class:warning={row.used >= 70}
-            class:critical={row.used >= 90}
-            style:width={`${row.used}%`}
-          ></span>
-        {/if}
-      </span>
-    </span>
-  {/each}
+  {#if active}
+    <QuotaProfileRows profiles={view.profiles} />
+  {:else if !view.off}
+    <!-- Another agent: its weekly bar alone, in state colours. -->
+    <span class="quota-meter" data-metric="week"
+      ><QuotaBar row={view.week} /></span
+    >
+  {/if}
 </span>
 
 <style>
@@ -75,8 +60,7 @@
     min-width: 0;
   }
   .quota-heading,
-  .quota-updated,
-  .quota-caption {
+  .quota-updated {
     display: flex;
     align-items: center;
     white-space: nowrap;
@@ -92,58 +76,23 @@
   .segment-label {
     font-weight: 620;
   }
+  .quota-meter {
+    display: grid;
+  }
   .status-dot {
     width: 6px;
     height: 6px;
   }
-  .quota-updated,
-  .quota-caption {
+  .quota-updated {
+    /* Keep the refresh tooltip above the radio's transparent hit area. */
+    position: relative;
+    margin-inline-start: auto;
     gap: 4px;
     color: var(--text-2);
     font-size: 11px;
     font-weight: 400;
     line-height: 1.2;
     font-variant-numeric: tabular-nums;
-  }
-  .quota-updated {
-    /* Keep the refresh tooltip above the radio's transparent hit area. */
-    position: relative;
-    margin-inline-start: auto;
-  }
-  .quota-meter {
-    display: grid;
-    gap: 3px;
-  }
-  .quota-caption {
-    justify-content: space-between;
-    color: var(--text-3);
-  }
-  .quota-caption b {
-    font-weight: 550;
-    color: var(--text-2);
-  }
-  .quota-track {
-    display: block;
-    height: 3px;
-    border-radius: 2px;
-    background: var(--border-strong);
-  }
-  .quota-fill {
-    display: block;
-    height: 100%;
-    border-radius: inherit;
-    background: var(--ok);
-  }
-  .quota-fill.warning {
-    background: var(--wait);
-  }
-  .quota-fill.critical {
-    background: var(--fail);
-  }
-  .quota-track.unknown {
-    background: transparent;
-    border-bottom: 1px dashed var(--text-3);
-    border-radius: 0;
   }
   @container (max-width: 365px) {
     .quota-heading,
@@ -174,22 +123,7 @@
     }
   }
   @media (forced-colors: active) {
-    .quota-track {
-      forced-color-adjust: none;
-      background: GrayText;
-    }
-    .quota-fill,
-    .quota-fill.warning,
-    .quota-fill.critical {
-      background: CanvasText;
-    }
-    .quota-track.unknown {
-      background: transparent;
-      border-color: GrayText;
-    }
-    .quota-updated,
-    .quota-caption,
-    .quota-caption b {
+    .quota-updated {
       color: inherit;
     }
   }

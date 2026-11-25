@@ -1,12 +1,8 @@
 import type { Bridge } from './bridgeTypes';
 import { MINUTE, minuteClock } from './clock';
-import {
-  DEFAULT_QUOTA_REFRESH_MINUTES,
-  quotaReadOn,
-  type AgentQuota,
-} from './quotaTypes';
-import { defaultProfile, DEFAULT_PROFILE } from './profiles';
-import type { AgentId, EnvId, Snapshot } from './types';
+import type { QuotaContext } from './quotaContexts';
+import { DEFAULT_QUOTA_REFRESH_MINUTES, type AgentQuota } from './quotaTypes';
+import type { AgentId } from './types';
 
 // A provider that keeps reporting a reset moments away must not turn into a request loop.
 const MIN_INTERVAL = 30_000;
@@ -17,43 +13,6 @@ const unavailable: AgentQuota = {
   windows: {},
   detail: 'Kontingent konnte nicht geladen werden.',
 };
-
-interface QuotaContext {
-  agent: AgentId;
-  env: EnvId;
-  profile: string;
-  identity: string;
-}
-
-export function quotaContexts(
-  snapshot: Snapshot,
-  active: AgentId,
-  selectedProfile: string,
-  env: EnvId,
-): QuotaContext[] {
-  const { settings, profiles, catalog } = snapshot;
-  // An agent whose read is off gets no context, so the provider is never asked.
-  const reading = catalog.filter(({ id }) => quotaReadOn(settings, id));
-  return reading.map(({ id: agent }) => {
-    const profile =
-      agent === active ? selectedProfile : defaultProfile(settings, agent);
-    const status = profiles?.find((p) => p.agent === agent && p.id === profile);
-    // With its first managed profile, Claude Standard switches from the inherited
-    // CLAUDE_CONFIG_DIR to the agent's default home, even if its status looks identical.
-    const managedHome =
-      agent === 'claude' &&
-      profile === DEFAULT_PROFILE &&
-      !!settings.profiles?.claude?.length;
-    const identity = JSON.stringify([
-      managedHome,
-      status?.signedIn,
-      status?.account,
-      status?.organization,
-      status?.plan,
-    ]);
-    return { agent, env, profile, identity };
-  });
-}
 
 const hasWindows = (quota?: AgentQuota) =>
   Object.keys(quota?.windows ?? {}).length > 0;
@@ -73,30 +32,51 @@ interface Entry {
   staleUntil?: number;
 }
 
-/** Cache by launch account. A late reply can only update its own entry. */
+/** Where an agent's profile sits among the shown readings. */
+const slot = (agent: AgentId, profile: string) =>
+  JSON.stringify([agent, profile]);
+
+interface Shown {
+  entries: Record<string, Entry>;
+  /** Per agent, the profile `read(agent)` answers for. */
+  lead: Partial<Record<AgentId, string>>;
+}
+
+/**
+ * Cache by launch account, one entry per shown profile (#94). A late reply
+ * can only update its own entry.
+ */
 export class AgentQuotas {
   now = $state(Date.now());
   #read: Bridge['getAgentQuota'];
   #cache = new Map<string, Entry>();
-  #selected = new Map<AgentId, Entry>();
+  #selected = new Map<string, Entry>();
+  #lead = new Map<AgentId, string>();
   #observing = false;
   #expiry: ReturnType<typeof setTimeout> | undefined;
   #interval = DEFAULT_QUOTA_REFRESH_MINUTES * MINUTE;
-  #shown = $state.raw<Partial<Record<AgentId, Entry>>>({});
+  #shown = $state.raw<Shown>({ entries: {}, lead: {} });
 
   constructor(read: Bridge['getAgentQuota']) {
     this.#read = read;
   }
 
-  read(agent: AgentId) {
-    const entry = this.#shown[agent];
+  #entry(agent: AgentId, profile?: string) {
+    const { entries, lead } = this.#shown;
+    const id = profile ?? lead[agent];
+    return id === undefined ? undefined : entries[slot(agent, id)];
+  }
+
+  /** The reading of `agent`'s `profile`; without one, of its lead profile. */
+  read(agent: AgentId, profile?: string) {
+    const entry = this.#entry(agent, profile);
     if (entry?.staleUntil && this.now >= entry.staleUntil && entry.result)
       return { windows: {}, detail: entry.result.detail };
     return entry?.result;
   }
 
-  updatedAt(agent: AgentId) {
-    return this.#shown[agent]?.goodAt;
+  updatedAt(agent: AgentId, profile?: string) {
+    return this.#entry(agent, profile)?.goodAt;
   }
 
   follow(contexts: QuotaContext[], minutes = DEFAULT_QUOTA_REFRESH_MINUTES) {
@@ -104,36 +84,40 @@ export class AgentQuotas {
       this.#interval = minutes * MINUTE;
       for (const entry of this.#cache.values()) this.#setNextRead(entry);
     }
-    const next = new Map<AgentId, Entry>();
+    const next = new Map<string, Entry>();
+    const lead = new Map<AgentId, string>();
     for (const context of contexts) {
-      const key = JSON.stringify([
-        context.agent,
-        context.env,
-        context.profile,
-        context.identity,
-      ]);
+      const { agent, env, profile, identity } = context;
+      const key = JSON.stringify([agent, env, profile, identity]);
       const entry = this.#cache.get(key) ?? {
         context,
         busy: false,
         nextRead: 0,
       };
       this.#cache.set(key, entry);
-      next.set(context.agent, entry);
+      next.set(slot(agent, profile), entry);
+      if (context.lead || !lead.has(agent)) lead.set(agent, profile);
     }
     this.#selected = next;
+    this.#lead = lead;
     // A switched-off agent keeps nothing cached: switching it back on reads afresh.
     for (const [key, entry] of this.#cache)
-      if (!next.has(entry.context.agent)) this.#cache.delete(key);
+      if (!lead.has(entry.context.agent)) this.#cache.delete(key);
     this.#publish();
     this.refresh();
   }
 
+  #isSelected(entry: Entry) {
+    const { agent, profile } = entry.context;
+    return this.#selected.get(slot(agent, profile)) === entry;
+  }
+
   #publish() {
-    const shown: Partial<Record<AgentId, Entry>> = {};
-    for (const [agent, entry] of this.#selected) {
-      if (entry.result) shown[agent] = entry;
+    const entries: Record<string, Entry> = {};
+    for (const [at, entry] of this.#selected) {
+      if (entry.result) entries[at] = entry;
     }
-    this.#shown = shown;
+    this.#shown = { entries, lead: Object.fromEntries(this.#lead) };
   }
 
   refresh(force = false) {
@@ -146,11 +130,7 @@ export class AgentQuotas {
     }
     this.#scheduleExpiry(now);
     for (const [key, entry] of this.#cache) {
-      if (
-        entry !== this.#selected.get(entry.context.agent) &&
-        !entry.busy &&
-        entry.nextRead <= now
-      ) {
+      if (!this.#isSelected(entry) && !entry.busy && entry.nextRead <= now) {
         this.#cache.delete(key);
       }
     }
@@ -200,7 +180,7 @@ export class AgentQuotas {
     entry.busy = false;
     entry.lastRead = now;
     this.#setNextRead(entry);
-    if (this.#selected.get(agent) === entry) {
+    if (this.#isSelected(entry)) {
       this.now = now;
       this.#publish();
       this.#scheduleExpiry(now);
