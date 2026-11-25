@@ -241,6 +241,20 @@ describe('SettingsDraft quota profiles', () => {
       });
   });
 
+  it('undoes the removal of the start profile without leaving the draft dirty', async () => {
+    const saved = fourProfiles();
+    saved.agentProfile.claude = 'team';
+    saved.quotaProfiles = { claude: ['default', 'team'] };
+    const draft = new SettingsDraft(saved);
+    draft.removeProfile('claude', 'team');
+    expect(draft.value.agentProfile.claude).toBe('default');
+    expect(draft.current().quotaProfiles?.claude).toEqual(['default']);
+    const save = () => Promise.reject(new Error('no save'));
+    expect(await draft.addProfile('claude', 'Team', save)).toBe('');
+    expect(draft.current().quotaProfiles?.claude).toEqual(['default', 'team']);
+    expect(draft.dirty).toBe(false);
+  });
+
   it('stages nothing on an older snapshot without the setting', () => {
     const saved = fourProfiles();
     delete saved.quotaProfiles;

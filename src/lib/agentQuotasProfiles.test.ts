@@ -116,6 +116,21 @@ describe('agent quotas per profile', () => {
     expect(quotas.read('claude', 'team')).toBeUndefined();
   });
 
+  it('reads a hidden profile neither while hidden nor when shown again soon', async () => {
+    const get = vi.fn().mockResolvedValue(usage(40));
+    const quotas = new AgentQuotas(get);
+    quotas.follow([standard, team]);
+    await Promise.resolve();
+    expect(get).toHaveBeenCalledTimes(2);
+    quotas.follow([standard]);
+    quotas.refresh();
+    expect(quotas.read('claude', 'team')).toBeUndefined();
+    // Back within the minimum interval (ADR-0014): the kept reading, no request.
+    quotas.follow([standard, team]);
+    expect(quotas.read('claude', 'team')).toEqual(usage(40));
+    expect(get).toHaveBeenCalledTimes(2);
+  });
+
   it('forgets every profile of an agent whose read is switched off', async () => {
     const get = vi.fn().mockResolvedValue(usage(15));
     const quotas = new AgentQuotas(get);
