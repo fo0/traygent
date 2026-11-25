@@ -49,6 +49,19 @@
   /* Product marks with a colour of their own, at least 3:1 on every surface. */
   --brand-claude: #d97757;
 
+  /*
+   * Quota metrics (#94): the word, figure and bar of each metric in the
+   * selected agent's tile. Text at 11px, so at least 4.5:1 on every surface;
+   * the colours of one agent's metrics stay apart (token test).
+   */
+  --quota-week: var(--run);
+  --quota-session: #2dd4bf;
+  --quota-fable: var(--accent);
+  --quota-sonnet: #f472b6;
+  --quota-spark: var(--accent);
+  --quota-spark-week: var(--quota-sonnet);
+  --quota-month: var(--quota-sonnet);
+
   --scrollbar: #3a3a42;
   --backdrop: rgba(5, 5, 7, 0.72);
   --shadow: 0 24px 60px rgba(0, 0, 0, 0.6), 0 0 0 1px rgba(255, 255, 255, 0.05);
@@ -105,6 +118,8 @@
     --wait: #8a5d00;
     --none: #e2e2e8;
     --brand-claude: #c15f3c;
+    --quota-session: #0f766e;
+    --quota-sonnet: #be185d;
     --scrollbar: #c4c4cc;
     --backdrop: rgba(17, 17, 20, 0.36);
     --shadow:
@@ -137,6 +152,8 @@
   --wait: #8a5d00;
   --none: #e2e2e8;
   --brand-claude: #c15f3c;
+  --quota-session: #0f766e;
+  --quota-sonnet: #be185d;
   --scrollbar: #c4c4cc;
   --backdrop: rgba(17, 17, 20, 0.36);
   --shadow:

@@ -14,6 +14,8 @@
     profileId,
     renameProblem,
   } from './profiles';
+  import type { TileChoice } from './profileRow';
+  import { MAX_QUOTA_PROFILES, quotaReadOn } from './quotaTypes';
   import type { SettingsDraft } from './settingsDraft.svelte';
   import type { AgentCatalogEntry, Snapshot } from './types';
 
@@ -44,6 +46,20 @@
     { id: DEFAULT_PROFILE, label: STANDARD_LABEL },
     ...extra,
   ]);
+  /** The quota tile's profiles (#94): a choice only while read and with two. */
+  const tiled = $derived(
+    quotaReadOn(draft.value, agent) && rows.length > 1
+      ? draft.quotaProfiles(agent)
+      : null,
+  );
+  const tile = (id: string): TileChoice | undefined =>
+    tiled
+      ? {
+          on: tiled.includes(id),
+          start: id === (draft.value.agentProfile[agent] ?? DEFAULT_PROFILE),
+          full: tiled.length >= MAX_QUOTA_PROFILES,
+        }
+      : undefined;
   /** Invalid renames, each named as its row shows it. */
   const renames = $derived(
     extra.flatMap((item, index) => {
@@ -171,6 +187,8 @@
         {busy}
         running={actions.running(agent, row.id)}
         cancellable={actions.cancellable(agent, row.id)}
+        tile={tile(row.id)}
+        onTile={(show) => draft.setQuotaProfile(agent, row.id, show)}
         onToggle={() => (opened = opened === row.id ? '' : row.id)}
         onLogin={() => void login(row.id)}
         onCancel={() => void actions.cancel(agent, row.id)}

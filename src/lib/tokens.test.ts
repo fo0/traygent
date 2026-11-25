@@ -1,6 +1,8 @@
 import { readFileSync, readdirSync } from 'node:fs';
 import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
+import { quotaColorToken } from './quotaDisplay';
+import { QUOTA_METRICS } from './quotaTypes';
 
 /*
  * Reads the design tokens straight from the CSS, resolves both themes and
@@ -143,13 +145,65 @@ const TINTED: [string, string][] = [
   ['--accent', '--accent-soft'],
 ];
 
+/** CIE L*a*b* (D65) of an opaque colour, for the distance between hues. */
+function lab([r, g, b]: Rgba): [number, number, number] {
+  const linear = (c: number) => {
+    const s = c / 255;
+    return s <= 0.04045 ? s / 12.92 : ((s + 0.055) / 1.055) ** 2.4;
+  };
+  const [lr, lg, lb] = [linear(r), linear(g), linear(b)];
+  const x = (0.4124 * lr + 0.3576 * lg + 0.1805 * lb) / 0.95047;
+  const y = 0.2126 * lr + 0.7152 * lg + 0.0722 * lb;
+  const z = (0.0193 * lr + 0.1192 * lg + 0.9505 * lb) / 1.08883;
+  const f = (t: number) =>
+    t > 216 / 24389 ? Math.cbrt(t) : ((t * 24389) / 27 + 16) / 116;
+  return [116 * f(y) - 16, 500 * (f(x) - f(y)), 200 * (f(y) - f(z))];
+}
+
+/** CIE76 colour difference; about 2.3 is just noticeable. */
+function distance(first: Rgba, second: Rgba): number {
+  const [a, b] = [lab(first), lab(second)];
+  return Math.hypot(a[0] - b[0], a[1] - b[1], a[2] - b[2]);
+}
+
+/** Every metric's colour token (#94), drawn as 11px text in the quota tile. */
+const QUOTA = [...new Set(Object.values(QUOTA_METRICS).flat())].map(
+  quotaColorToken,
+);
+
 describe.each(Object.entries(THEMES))('%s theme contrast', (_, theme) => {
-  it.each([...TEXT, ...STATUS])('%s reaches 4.5:1 on every surface', (fg) => {
-    for (const surface of SURFACES) {
-      const ratio = contrast(paint(theme, fg), paint(theme, surface));
-      expect(ratio, `${fg} on ${surface}`).toBeGreaterThanOrEqual(4.5);
-    }
+  it.each([...TEXT, ...STATUS, ...QUOTA])(
+    '%s reaches 4.5:1 on every surface',
+    (fg) => {
+      for (const surface of SURFACES) {
+        const ratio = contrast(paint(theme, fg), paint(theme, surface));
+        expect(ratio, `${fg} on ${surface}`).toBeGreaterThanOrEqual(4.5);
+      }
+    },
+  );
+
+  // A Docker agent that is down tints the selected tile (19-segmented.css).
+  it.each(QUOTA)('%s reaches 4.5:1 on the warning tint', (fg) => {
+    const ratio = contrast(
+      paint(theme, fg),
+      paint(theme, '--raised', '--wait-soft'),
+    );
+    expect(ratio).toBeGreaterThanOrEqual(4.5);
   });
+
+  it.each(Object.entries(QUOTA_METRICS))(
+    "%s's quota metrics keep colours apart",
+    (_, metrics) => {
+      for (const [index, first] of metrics.entries())
+        for (const second of metrics.slice(index + 1)) {
+          const gap = distance(
+            paint(theme, quotaColorToken(first)),
+            paint(theme, quotaColorToken(second)),
+          );
+          expect(gap, `${first} / ${second}`).toBeGreaterThanOrEqual(20);
+        }
+    },
+  );
 
   it.each(['--accent', '--accent-hover'])(
     '--on-accent reaches 4.5:1 on %s',

@@ -78,6 +78,33 @@ export function quotaReadOn(
   return typeof value === 'boolean' ? value : QUOTA_READ_DEFAULTS[agent];
 }
 
+/** At most this many profiles share the quota tile: each one is one more read. */
+export const MAX_QUOTA_PROFILES = 3;
+
+/**
+ * The profile ids the quota tile shows for `agent` (#94), in the order of
+ * `known` (the agent's profiles, the default first): the saved choice
+ * (`quotaProfiles`) plus `startProfile`, which is always shown; ids not in
+ * `known` are dropped. Past `MAX_QUOTA_PROFILES` the start profile stays and
+ * the earliest others fill up. Mirrors `settings::quota_profiles` in Rust.
+ */
+export function shownQuotaProfiles(
+  settings: Pick<AppSettings, 'quotaProfiles'>,
+  agent: AgentId,
+  startProfile: string,
+  known: string[],
+): string[] {
+  const list = settings.quotaProfiles?.[agent];
+  const chosen = new Set(Array.isArray(list) ? list : []);
+  chosen.add(startProfile);
+  const ordered = known.filter((id) => chosen.has(id));
+  if (!known.includes(startProfile)) ordered.unshift(startProfile);
+  const others = ordered
+    .filter((id) => id !== startProfile)
+    .slice(0, MAX_QUOTA_PROFILES - 1);
+  return ordered.filter((id) => id === startProfile || others.includes(id));
+}
+
 /** The tile's description while the agent's read is off. */
 export const QUOTA_OFF_HINT = 'Kontingentabfrage ausgeschaltet';
 

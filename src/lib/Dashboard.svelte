@@ -6,7 +6,7 @@
   import SectionHeader from './SectionHeader.svelte';
   import { Composer as ComposerState } from './composerState.svelte';
   import { quotaRefreshMinutes } from './quotaTypes';
-  import { quotaContexts } from './agentQuotas.svelte';
+  import { quotaContexts } from './quotaContexts';
   import { catalogEntry, sentOptions } from './agents';
   import { RestartGate } from './rowStart';
   import type { Panel } from './panel.svelte';

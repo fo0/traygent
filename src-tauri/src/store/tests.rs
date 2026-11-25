@@ -45,6 +45,7 @@ fn sample() -> Persisted {
         },
     ];
     settings.agent_profile.claude = "team".into();
+    settings.quota_profiles.claude = vec!["team".into(), "default".into()];
     let mut recents = Vec::new();
     let request = LaunchRequest {
         agent: AgentId::Claude,

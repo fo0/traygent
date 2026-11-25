@@ -6,6 +6,7 @@ use crate::models::{
 use crate::{catalog, launch, ports};
 
 pub mod profiles;
+pub mod quota_profiles;
 pub mod share;
 
 /// Base image for every agent's container (docs/AGENT_RECIPES.md §4).
@@ -50,6 +51,7 @@ impl Default for AppSettings {
             quota_bars: PerAgent::from_fn(|_| vec![QuotaMetric::Week]),
             quota_reads: PerAgent::from_fn(default_quota_read),
             quota_refresh_minutes: 15,
+            quota_profiles: PerAgent::default(),
             docker: DockerSettings::default(),
             github: GithubSettings::default(),
             agent_updates: false,
@@ -83,6 +85,7 @@ pub fn normalize(mut settings: AppSettings) -> AppSettings {
     let root = settings.github.clone_root.trim();
     settings.github.clone_root = launch::normalize_folder(root).unwrap_or_else(|_| root.into());
     profiles::normalize(&mut settings);
+    quota_profiles::normalize(&mut settings);
     share::normalize(&mut settings);
     settings
 }
@@ -183,6 +186,7 @@ pub fn sanitize(settings: AppSettings) -> AppSettings {
         settings.github.clone_root = defaults.github.clone_root;
     }
     profiles::sanitize(&mut settings);
+    quota_profiles::sanitize(&mut settings);
     share::sanitize(&mut settings);
     settings
 }
@@ -205,6 +209,7 @@ pub fn validate(settings: &AppSettings) -> Result<(), String> {
     ports::normalize_ports(&settings.docker.ports).map(drop)?;
     validate_clone_root(&settings.github.clone_root)?;
     profiles::validate(settings)?;
+    quota_profiles::validate(settings)?;
     share::validate(settings)
 }
 

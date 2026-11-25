@@ -191,6 +191,8 @@ export function demoSettings(): AppSettings {
     // Both states on show: Codex keeps the shipped default (off).
     quotaRefreshMinutes: DEFAULT_QUOTA_REFRESH_MINUTES,
     quotaReads: { claude: true, opencode: true, codex: false },
+    // Only „Standard“ is signed in: the tile shows the start profile alone.
+    quotaProfiles: { claude: [], opencode: [], codex: [] },
     github: { cloneRoot: '' },
     agentUpdates: false,
     debug: false,

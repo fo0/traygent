@@ -36,10 +36,22 @@ Brand top left: icon + „Traygent“. Window ~480×760, frameless, tray popup l
 2. **Neue Session** composer (one card, no prose), directly under the AppBar like RepoWatch's
    search field — no visible section heading; the section is named for assistive tech only and
    the checked agent is the page's focus landing:
-   - The selected agent shows its name and environment status on the left. The last successful quota read appears
-     on the right. Hovering over its timestamp shows the refresh interval. The weekly reset
-     countdown and remaining percentage appear on the week’s meter row. Each agent button has a
-     bottom bar showing weekly consumption. Inactive buttons keep their mark and status dot.
+   - The selected agent shows its name and environment status on the left. „Stand hh:mm“ on the
+     right is the oldest successful quota read among its shown profiles. Hovering over it shows
+     the refresh interval. Below, per shown profile (#94: the start profile plus those chosen
+     with „Im Tile zeigen“, at most 3, in list order; each one read with its own profile) one
+     label line and that profile's bars stacked directly under it (3px tracks, no caption
+     between them). The line reads `<Profil>: Woche 64 % · Fable 81 %` — the enabled windows in
+     their configured order, each word and figure in the metric's colour (`--quota-*` tokens),
+     the figure the **used** share — with the weekly reset countdown right-aligned („3 Tage“,
+     „5 Std.“, nothing when unknown). The start profile's name is bold; an agent without extra
+     profiles shows the line without a name. From 70 % used the figure turns `--wait`, from
+     90 % `--fail` and bold, and the bar ends in a short cap of that colour. No data, a
+     signed-out profile or a failed read: `–` and a dashed track, the detail in the tooltip.
+     The line never wraps: the profile name ellipsizes first. The tooltip and accessible
+     description carry per profile and metric the used and free share, the reset date, the
+     detail and the refresh hint. The other agent buttons keep their mark, status dot and one
+     bottom bar of weekly consumption in state colours (their saved default profile).
      In Settings → Agenten, users can enable and order additional windows for the active button.
      The week stays enabled. Missing or expired values never count as an unused allowance.
    - Folder: one field („Ordner oder Repo“) for a folder **or** a GitHub repository + quick list
@@ -152,7 +164,11 @@ Brand top left: icon + „Traygent“. Window ~480×760, frameless, tray popup l
   lists the profile; a forced-colours ring when signed out), the account or „Nicht angemeldet“ — when another signed-in
   profile of the agent has the same account (ignoring case) but another organization, the
   organization instead of the account (#41); tooltip: account · organization —, a warning icon
-  after a failed sync, „Anmelden“ only while the profile is signed out (immediate,
+  after a failed sync, the staged icon switch „Im Tile zeigen“ (#94, `settings.quotaProfiles`:
+  only while the agent's quota read is on and a second profile exists; `aria-pressed`, tooltip
+  „Im Tile zeigen · jedes gezeigte Profil ist eine weitere Kontingentabfrage“; the start profile
+  always on and locked, a fourth disabled with „Höchstens 3 Profile“; a removed profile leaves
+  the list; read through `quotaTypes.ts → shownQuotaProfiles`), „Anmelden“ only while the profile is signed out (immediate,
   `profile_login`, tooltip „Im Browser anmelden“) and a remove button (staged, undone by
   „Abbrechen“; none for „Standard“). While a hidden sign-in runs the same button turns into a
   spinning icon (accessible name „<Name>: Anmeldung abbrechen“, `aria-busy`, tooltip „Anmeldung
