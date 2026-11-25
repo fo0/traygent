@@ -83,6 +83,7 @@
     .quota-fill,
     .quota-fill.warning,
     .quota-fill.critical,
+    .quota-fill.metric,
     .quota-fill.metric.warning,
     .quota-fill.metric.critical {
       background: CanvasText;

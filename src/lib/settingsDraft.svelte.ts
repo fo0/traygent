@@ -178,9 +178,21 @@ export class SettingsDraft {
       (this.value.agentProfile[agent] ?? DEFAULT_PROFILE) === DEFAULT_PROFILE
     )
       this.value.agentProfile[agent] = profile.id;
-    // So does its place in the quota tile, while there is room.
-    if (this.saved.quotaProfiles?.[agent]?.includes(profile.id))
-      this.setQuotaProfile(agent, profile.id, true);
+    // So does its saved place in the quota tile, while there is room: the
+    // staged list itself, as the start profile already counts as shown.
+    const saved = this.saved.quotaProfiles?.[agent] ?? [];
+    const shown = this.value.quotaProfiles?.[agent];
+    const rank = (id: string) =>
+      saved.includes(id) ? saved.indexOf(id) : saved.length;
+    if (
+      shown &&
+      shown.length < MAX_QUOTA_PROFILES &&
+      saved.includes(profile.id) &&
+      !shown.includes(profile.id)
+    )
+      this.value.quotaProfiles![agent] = [...shown, profile.id].sort(
+        (a, b) => rank(a) - rank(b),
+      );
   }
 
   /**
