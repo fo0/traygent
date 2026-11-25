@@ -93,6 +93,7 @@ describe('golden snapshot fixture', () => {
           'quotaBars',
           'quotaReads',
           'quotaRefreshMinutes',
+          'quotaProfiles',
           'github',
           'agentUpdates',
           'profiles',
@@ -110,6 +111,10 @@ describe('golden snapshot fixture', () => {
       expect(settings.quotaBars?.[id]).toEqual(['week']);
       expect(settings.quotaReads?.[id], `quotaReads.${agent}`).toBe(
         agent === 'opencode',
+      );
+      // The tile shows the start profile alone.
+      expect(settings.quotaProfiles?.[id], `quotaProfiles.${agent}`).toEqual(
+        [],
       );
       expect(settings.profiles[id], `settings.profiles.${agent}`).toEqual([]);
       expect(settings.agentProfile[id], `agentProfile.${agent}`).toBe(

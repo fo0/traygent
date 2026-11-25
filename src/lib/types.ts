@@ -236,6 +236,12 @@ export interface AppSettings {
   quotaReads?: Partial<Record<AgentId, boolean>>;
   /** Minutes between visible-panel subscription quota reads; defaults to 15. */
   quotaRefreshMinutes?: number;
+  /**
+   * Profile ids per agent the dashboard's quota tile shows (#94), at most
+   * `MAX_QUOTA_PROFILES`; the start profile is always shown. Read through
+   * `shownQuotaProfiles`; absent or empty = the start profile only.
+   */
+  quotaProfiles?: Partial<Record<AgentId, string[]>>;
   docker: DockerSettings;
   github: GithubSettings;
   /** Update the local agent CLIs every 4 hours while no session uses them. */

@@ -152,7 +152,11 @@ Brand top left: icon + „Traygent“. Window ~480×760, frameless, tray popup l
   lists the profile; a forced-colours ring when signed out), the account or „Nicht angemeldet“ — when another signed-in
   profile of the agent has the same account (ignoring case) but another organization, the
   organization instead of the account (#41); tooltip: account · organization —, a warning icon
-  after a failed sync, „Anmelden“ only while the profile is signed out (immediate,
+  after a failed sync, the staged icon switch „Im Tile zeigen“ (#94, `settings.quotaProfiles`:
+  only while the agent's quota read is on and a second profile exists; `aria-pressed`, tooltip
+  „Im Tile zeigen · jedes gezeigte Profil ist eine weitere Kontingentabfrage“; the start profile
+  always on and locked, a fourth disabled with „Höchstens 3 Profile“; a removed profile leaves
+  the list; read through `quotaTypes.ts → shownQuotaProfiles`), „Anmelden“ only while the profile is signed out (immediate,
   `profile_login`, tooltip „Im Browser anmelden“) and a remove button (staged, undone by
   „Abbrechen“; none for „Standard“). While a hidden sign-in runs the same button turns into a
   spinning icon (accessible name „<Name>: Anmeldung abbrechen“, `aria-busy`, tooltip „Anmeldung

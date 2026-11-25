@@ -2,7 +2,12 @@ import { toggleEnv } from './environments';
 import { errorMessage } from './format';
 import { emptyShare, type ShareKind } from './profileShare';
 import { DEFAULT_PROFILE, newProfileProblem, profileId } from './profiles';
-import { quotaReadOn, type QuotaMetric } from './quotaTypes';
+import {
+  MAX_QUOTA_PROFILES,
+  quotaReadOn,
+  shownQuotaProfiles,
+  type QuotaMetric,
+} from './quotaTypes';
 import type { AgentId, AgentProfile, AppSettings, EnvId } from './types';
 import { settingsProblems, type SettingsField } from './validation';
 
@@ -173,6 +178,9 @@ export class SettingsDraft {
       (this.value.agentProfile[agent] ?? DEFAULT_PROFILE) === DEFAULT_PROFILE
     )
       this.value.agentProfile[agent] = profile.id;
+    // So does its place in the quota tile, while there is room.
+    if (this.saved.quotaProfiles?.[agent]?.includes(profile.id))
+      this.setQuotaProfile(agent, profile.id, true);
   }
 
   /**
@@ -186,6 +194,9 @@ export class SettingsDraft {
     this.value.profiles[agent] = list.filter((profile) => profile.id !== id);
     if (this.value.agentProfile[agent] === id)
       this.value.agentProfile[agent] = DEFAULT_PROFILE;
+    const shown = this.value.quotaProfiles?.[agent];
+    if (shown?.includes(id))
+      this.value.quotaProfiles![agent] = shown.filter((item) => item !== id);
     if (this.value.profiles[agent].length) return;
     for (const kind of ['dirs', 'files'] as const)
       if (this.problem(`agents.${agent}.share.${kind}`))
@@ -232,6 +243,46 @@ export class SettingsDraft {
       return;
     }
     this.value.quotaReads = reads;
+  }
+
+  /** The quota tile's profiles of `agent` as staged; the default profile starts. */
+  quotaProfiles(agent: AgentId): string[] {
+    return shownQuotaProfiles(this.value, agent, ...this.#tile(agent));
+  }
+
+  /** The start profile and the staged profile order of `agent`. */
+  #tile(agent: AgentId): [string, string[]] {
+    const ids = (this.value.profiles[agent] ?? []).map((item) => item.id);
+    return [
+      this.value.agentProfile[agent] ?? DEFAULT_PROFILE,
+      [DEFAULT_PROFILE, ...ids],
+    ];
+  }
+
+  /**
+   * Stages whether profile `id` of `agent` shows in the quota tile (#94),
+   * refused past `MAX_QUOTA_PROFILES`. Saved as shown, so the start profile
+   * stays when the default changes; back at the baseline, nothing staged.
+   */
+  setQuotaProfile(agent: AgentId, id: string, show: boolean) {
+    const shown = this.quotaProfiles(agent);
+    if (show === shown.includes(id)) return;
+    if (show && shown.length >= MAX_QUOTA_PROFILES) return;
+    const next = show ? [...shown, id] : shown.filter((item) => item !== id);
+    const tile = this.#tile(agent);
+    const saved = this.saved.quotaProfiles?.[agent];
+    const back = same(
+      shownQuotaProfiles({ quotaProfiles: { [agent]: next } }, agent, ...tile),
+      shownQuotaProfiles(this.saved, agent, ...tile),
+    );
+    if (!back || saved) {
+      (this.value.quotaProfiles ??= {})[agent] = back ? [...saved!] : next;
+      return;
+    }
+    const rest = this.value.quotaProfiles ?? {};
+    delete rest[agent];
+    if (!this.saved.quotaProfiles && !Object.keys(rest).length)
+      delete this.value.quotaProfiles;
   }
 
   /** Stages the extra shared folders or files of `agent`. */

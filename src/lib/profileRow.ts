@@ -20,6 +20,16 @@ export interface RowAccount {
   out: boolean;
 }
 
+/** A row's switch „Im Tile zeigen“ (#94), staged like the other settings. */
+export interface TileChoice {
+  /** Shown in the dashboard's quota tile. */
+  on: boolean;
+  /** The start profile: always shown, the switch stays on. */
+  start: boolean;
+  /** `MAX_QUOTA_PROFILES` are shown: another one cannot be switched on. */
+  full: boolean;
+}
+
 /** A plan as shown: `max` → „Max“; `''` without one. */
 export function planLabel(plan: string | undefined): string {
   return plan ? plan.charAt(0).toUpperCase() + plan.slice(1) : '';
