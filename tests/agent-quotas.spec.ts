@@ -81,38 +81,48 @@ test('the selected CLI shows its ordered bars, while the other radios expose wee
     'title',
     /Zuletzt aktualisiert am .*alle 12 Min/,
   );
-  await expect(claude.locator('.quota-caption')).toHaveText([
-    'Session 30 % frei',
-    'Woche 3 Tage · 68 % frei',
-    'Fable 10 % frei',
+  // The used share in the configured order; the weekly reset on the right.
+  await expect(claude.locator('.quota-metric')).toHaveText([
+    'Session 70 %',
+    'Woche 32 %',
+    'Fable 90 %',
   ]);
+  await expect(claude.locator('.quota-name')).toHaveText('Standard:');
+  await expect(claude.locator('.quota-countdown')).toHaveText('3 Tage');
   for (const inactive of [codex, openCode]) {
-    await expect(
-      inactive.locator('.quota-updated, .quota-caption'),
-    ).toHaveCount(0);
+    await expect(inactive.locator('.quota-updated, .quota-line')).toHaveCount(
+      0,
+    );
     await expect(inactive.locator('.quota-meter')).toHaveCount(1);
   }
-  for (const [metric, token, used] of [
-    ['session', '--wait', 70],
-    ['week', '--ok', 32],
-    ['fable', '--fail', 90],
+  // Each metric keeps its colour; the figure and the bar's end show the state.
+  for (const [metric, token, used, cap] of [
+    ['session', '--wait', 70, true],
+    ['week', '--quota-week', 32, false],
+    ['fable', '--fail', 90, true],
   ] as const) {
-    const fill = claude.locator(`[data-metric="${metric}"] .quota-fill`);
-    const paint = await fill.evaluate((node, token) => {
+    const figure = claude.locator(
+      `.quota-metric[data-metric="${metric}"] .quota-figure`,
+    );
+    const fill = claude.locator(
+      `.quota-track[data-metric="${metric}"] .quota-fill`,
+    );
+    const colour = await figure.evaluate((node, token) => {
       // Resolve the token in the active theme through the same CSS colour property.
       const probe = document.createElement('span');
       probe.style.color = `var(${token})`;
       node.append(probe);
       const expected = getComputedStyle(probe).color;
       probe.remove();
-      return {
-        expected,
-        actual: getComputedStyle(node).backgroundColor,
-        width: (node as HTMLElement).style.width,
-      };
+      return { expected, actual: getComputedStyle(node).color };
     }, token);
-    expect(paint.actual).toBe(paint.expected);
-    expect(paint.width).toBe(`${used}%`);
+    expect(colour.actual, metric).toBe(colour.expected);
+    const bar = await fill.evaluate((node) => ({
+      image: getComputedStyle(node).backgroundImage,
+      width: (node as HTMLElement).style.width,
+    }));
+    expect(bar.width).toBe(`${used}%`);
+    expect(bar.image.startsWith('linear-gradient'), metric).toBe(cap);
   }
   const claudeRadio = claude.getByRole('radio', {
     name: 'Claude Code',
@@ -132,10 +142,11 @@ test('the selected CLI shows its ordered bars, while the other radios expose wee
   await expect(claude.locator('.quota-meter')).toHaveCount(1);
   await openCode.getByRole('radio').press('ArrowRight');
   await expect(codex.getByRole('radio')).toBeFocused();
-  await expect(codex.locator('.quota-caption')).toHaveText([
-    'Woche 0 % frei',
-    'Spark 100 % frei',
+  await expect(codex.locator('.quota-metric')).toHaveText([
+    'Woche 100 %',
+    'Spark 0 %',
   ]);
+  await expect(codex.locator('.quota-name, .quota-countdown')).toHaveCount(0);
 });
 
 test('an agent whose read is off is never asked and shows no figure or bar', async ({
@@ -179,13 +190,14 @@ test('expired readings disappear while a still-current window stays visible', as
     },
   });
   const selected = segment(page, 'claude');
-  await expect(
-    selected.locator('[data-metric=week] .quota-value'),
-  ).toContainText('8 % frei');
+  const week = selected.locator('.quota-metric[data-metric=week]');
+  await expect(week).toHaveText('Woche 92 %');
   await page.clock.fastForward(13_100);
-  await expect(selected.locator('[data-metric=week] .quota-value')).toHaveText(
-    'Keine Daten',
-  );
+  await expect(week).toHaveText('Woche –');
+  await expect(week).toHaveAttribute('data-level', 'unknown');
+  await expect(
+    selected.locator('.quota-track[data-metric=week].unknown'),
+  ).toHaveCount(1);
   await expect(selected.getByRole('radio')).toHaveAccessibleDescription(
     /Woche · Zeitfenster abgelaufen/,
   );
@@ -194,10 +206,10 @@ test('expired readings disappear while a still-current window stays visible', as
       '[data-metric="week"] .quota-fill, [data-metric="fable"] .quota-fill',
     ),
   ).toHaveCount(0);
-  await expect(selected.locator('.quota-caption')).toHaveText([
-    'Session 70 % frei',
-    'Woche Keine Daten',
-    'Fable Keine Daten',
+  await expect(selected.locator('.quota-metric')).toHaveText([
+    'Session 30 %',
+    'Woche –',
+    'Fable –',
   ]);
 });
 
@@ -212,23 +224,39 @@ test('a long countdown and fractional reading fit at narrow widths', async ({
   });
   await pinFont(page, 'DejaVu Sans');
   const selected = segment(page, 'claude');
-  await expect(selected.locator('[data-metric=week] .quota-value')).toHaveText(
-    '59 Min. · 99,7 % frei',
-  );
+  await expect(selected.locator('.quota-metric')).toHaveText([
+    'Session –',
+    'Woche 0,3 %',
+    'Fable –',
+  ]);
+  await expect(selected.locator('.quota-countdown')).toHaveText('59 Min.');
   for (const width of [320, 351, 375, 398]) {
     await page.setViewportSize({ width, height: 760 });
-    const { cut, overflow } = await selected.evaluate((node) => {
-      const name = node.querySelector('.segment-label')!;
-      const summary = node
-        .querySelector('[data-metric=week] .quota-value')!
-        .getBoundingClientRect();
-      const track = node.querySelector('.quota-track')!.getBoundingClientRect();
-      return {
-        cut: name.scrollWidth > name.clientWidth,
-        overflow: Math.abs(track.right - summary.right),
-      };
-    });
+    const { cut, figures, overflow, lines } = await selected.evaluate(
+      (node) => {
+        const name = node.querySelector('.segment-label')!;
+        const metrics = node.querySelector('.quota-metrics')!;
+        const summary = node
+          .querySelector('.quota-countdown')!
+          .getBoundingClientRect();
+        const track = node
+          .querySelector('.quota-track')!
+          .getBoundingClientRect();
+        return {
+          cut: name.scrollWidth > name.clientWidth,
+          figures: metrics.scrollWidth > metrics.clientWidth,
+          overflow: Math.abs(track.right - summary.right),
+          // One 11px line: nothing wraps.
+          lines: Math.round(
+            node.querySelector('.quota-line')!.getBoundingClientRect().height /
+              13,
+          ),
+        };
+      },
+    );
     expect(cut, `${width}px`).toBe(false);
+    expect(figures, `${width}px`).toBe(false);
     expect(overflow, `${width}px`).toBeLessThan(1);
+    expect(lines, `${width}px`).toBe(1);
   }
 });

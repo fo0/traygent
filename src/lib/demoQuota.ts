@@ -1,3 +1,4 @@
+import { DEFAULT_PROFILE } from './profiles';
 import { quotaReadOn, type AgentQuota, type QuotaMetric } from './quotaTypes';
 import type { AgentId, EnvId, Snapshot } from './types';
 
@@ -20,6 +21,19 @@ const samples: Record<
     sparkWeek: [44, 11],
   },
 };
+
+/**
+ * Another profile's figures (#94), so two shown profiles never look alike:
+ * shifted by a fixed step from the profile id, the same on every read.
+ */
+function shifted(
+  profile: string,
+  [used, hours]: [number, number],
+): [number, number] {
+  if (profile === DEFAULT_PROFILE) return [used, hours];
+  const seed = [...profile].reduce((sum, c) => sum + c.codePointAt(0)!, 0);
+  return [(used + 37 * ((seed % 5) + 1)) % 100, hours + 24 * (seed % 3)];
+}
 
 /**
  * Invented usage for the browser demo. Reset times stay fixed across
@@ -47,10 +61,13 @@ export function demoQuota(
       detail: 'Bei Claude Code anmelden, um das Kontingent zu sehen.',
     };
   const windows = Object.fromEntries(
-    Object.entries(samples[agent]).map(([metric, [used, hours]]) => [
-      metric,
-      { used, resetAt: new Date(epoch + hours * HOURS).toISOString() },
-    ]),
+    Object.entries(samples[agent]).map(([metric, sample]) => {
+      const [used, hours] = shifted(profile, sample);
+      return [
+        metric,
+        { used, resetAt: new Date(epoch + hours * HOURS).toISOString() },
+      ];
+    }),
   );
   return { windows, detail: null };
 }

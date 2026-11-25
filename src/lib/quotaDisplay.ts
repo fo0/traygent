@@ -11,12 +11,34 @@ const HOUR = 60 * MINUTE;
 const DAY = 24 * HOUR;
 const percent = new Intl.NumberFormat('de-DE', { maximumFractionDigits: 1 });
 
+/** From this share used on, a figure and its bar end show the warning state. */
+export const QUOTA_WARNING = 70;
+/** From this share used on, the critical state. */
+export const QUOTA_CRITICAL = 90;
+
 function resetCountdown(milliseconds: number) {
   if (milliseconds >= DAY)
     return plural(Math.round(milliseconds / DAY), 'Tag', 'Tage');
   if (milliseconds >= HOUR) return `${Math.round(milliseconds / HOUR)} Std.`;
   return `${Math.ceil(milliseconds / MINUTE)} Min.`;
 }
+
+/** The design token of a metric's colour (`00-tokens.css`): `--quota-spark-week`. */
+export const quotaColorToken = (metric: QuotaMetric) =>
+  `--quota-${metric.replace(/[A-Z]/g, (c) => `-${c.toLowerCase()}`)}`;
+
+/** The metric's colour as a CSS value, for its word, figure and bar (#94). */
+export const quotaColor = (metric: QuotaMetric) =>
+  `var(${quotaColorToken(metric)})`;
+
+export type QuotaLevel = 'ok' | 'warning' | 'critical';
+
+const level = (used: number): QuotaLevel =>
+  used >= QUOTA_CRITICAL
+    ? 'critical'
+    : used >= QUOTA_WARNING
+      ? 'warning'
+      : 'ok';
 
 function quotaRow(
   quota: AgentQuota | undefined,
@@ -39,7 +61,9 @@ function quotaRow(
       metric,
       label,
       used: null,
-      free: 'Keine Daten',
+      /** The figure the label line shows: the share used, `–` without one. */
+      value: '–',
+      level: null,
       countdown: '',
       hint: `${label} · ${reason}`,
     };
@@ -52,30 +76,78 @@ function quotaRow(
     metric,
     label,
     used,
-    free,
+    value: `${percent.format(used)} %`,
+    level: level(used),
     countdown: reset === null ? '' : resetCountdown(reset - now),
     hint: `${label} · ${percent.format(used)} % verbraucht · ${free} · ${resetHint}`,
   };
 }
 
+export type QuotaRow = ReturnType<typeof quotaRow>;
+
+/** One profile's reading, as the tile receives it. */
+export interface ProfileReading {
+  id: string;
+  /** The label line's prefix; `''` for an agent without extra profiles. */
+  name: string;
+  /** The start profile: its name is emphasized. */
+  start: boolean;
+  quota: AgentQuota | undefined;
+  /** When its last good reading arrived. */
+  updatedAt?: number | undefined;
+}
+
 /**
- * Weekly summary and configured rows, with one description for hover and
- * speech. With the read off (`read: false`) the tile shows no figure and no
- * bar: a chosen state, not missing data.
+ * One label line and its stacked bars: the configured rows, the countdown to
+ * the weekly reset, and the profile's part of the description.
+ */
+function profileView(
+  reading: ProfileReading,
+  metrics: readonly QuotaMetric[],
+  now: number,
+) {
+  const rows = metrics.map((metric) => quotaRow(reading.quota, metric, now));
+  const week = rows.find((row) => row.metric === 'week');
+  const lines = [...rows.map((row) => row.hint), reading.quota?.detail]
+    .filter(Boolean)
+    .map((line) => (reading.name ? `${reading.name} · ${line}` : line));
+  return {
+    id: reading.id,
+    name: reading.name,
+    start: reading.start,
+    rows,
+    countdown: week?.countdown ?? '',
+    hint: lines.join('\n'),
+  };
+}
+
+export type ProfileView = ReturnType<typeof profileView>;
+
+/**
+ * The tile's view model (#94): per shown profile one label line with its
+ * rows, a weekly summary of the first, and one description for hover and
+ * speech. „Stand“ is the oldest good reading among the profiles, so it never
+ * claims fresher figures than one of them has. With the read off
+ * (`read: false`) the tile shows no figure and no bar: a chosen state, not
+ * missing data.
  */
 export function quotaView(
-  quota: AgentQuota | undefined,
+  readings: readonly ProfileReading[],
   metrics: readonly QuotaMetric[],
   now: number,
   read = true,
-  updatedAt?: number,
   refreshMinutes?: number,
 ) {
-  const week = quotaRow(quota, 'week', now);
-  if (!read) return { week, rows: [], hint: QUOTA_OFF_HINT, off: true };
-  const rows = metrics.map((metric) =>
-    metric === 'week' ? week : quotaRow(quota, metric, now),
+  const week = quotaRow(readings[0]?.quota, 'week', now);
+  if (!read)
+    return { week, profiles: [], hint: QUOTA_OFF_HINT, off: true as const };
+  const profiles = readings.map((reading) =>
+    profileView(reading, metrics, now),
   );
+  const good = readings
+    .map((reading) => reading.updatedAt)
+    .filter((at): at is number => at !== undefined);
+  const updatedAt = good.length ? Math.min(...good) : undefined;
   const updated =
     updatedAt === undefined ? 'Stand –' : `Stand ${clockTime(updatedAt)}`;
   const refreshHint = [
@@ -88,10 +160,10 @@ export function quotaView(
   ]
     .filter(Boolean)
     .join(' · ');
-  const hint = [...rows.map((row) => row.hint), quota?.detail, refreshHint]
+  const hint = [...profiles.map((profile) => profile.hint), refreshHint]
     .filter(Boolean)
     .join('\n');
-  return { week, rows, hint, updated, refreshHint, off: false };
+  return { week, profiles, hint, updated, refreshHint, off: false as const };
 }
 
 export type QuotaView = ReturnType<typeof quotaView>;
