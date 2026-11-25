@@ -12,7 +12,7 @@ test('weekly quota stays enabled and per-agent bar choices are staged until save
   const dialog = page.getByRole('dialog', { name: 'Einstellungen' });
   const group = dialog.getByRole('region', { name: 'Kontingent', exact: true });
   const preview = group.getByRole('group', { name: 'Vorschau' });
-  const bars = preview.locator('[data-metric]');
+  const bars = preview.locator('.quota-track');
   const agent = dialog.getByRole('radiogroup', { name: 'Agent', exact: true });
   const week = group.getByRole('checkbox', { name: 'Woche', exact: true });
   const fable = group.getByRole('checkbox', { name: 'Fable', exact: true });
