@@ -89,8 +89,9 @@ fn retry_after_secs(value: Option<&str>, now: DateTime<Utc>) -> u64 {
     let Some(value) = value.map(str::trim) else {
         return 0;
     };
-    if let Ok(secs) = value.parse::<u64>() {
-        return secs;
+    if !value.is_empty() && value.bytes().all(|byte| byte.is_ascii_digit()) {
+        // Past `u64` still asks for a long wait; `rate_limited` caps it.
+        return value.parse().unwrap_or(u64::MAX);
     }
     DateTime::parse_from_rfc2822(value)
         .ok()
@@ -449,6 +450,7 @@ mod tests {
             (Some("Sun, 01 Feb 2026 12:05:00 GMT"), 300),
             (Some("Sun, 01 Feb 2026 11:00:00 GMT"), 0),
             (Some("999999999"), MAX_RETRY_AFTER_SECS),
+            (Some("99999999999999999999999"), MAX_RETRY_AFTER_SECS),
         ] {
             let quota = limited(header);
             assert_eq!(quota.retry_after_secs, Some(secs), "{header:?}");
