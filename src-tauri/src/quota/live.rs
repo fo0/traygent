@@ -1,4 +1,5 @@
 use super::{opencode, windows, AgentQuota};
+use crate::github::http::read_within;
 use crate::{
     github::secret::{wipe, SecretToken},
     models::AgentId,
@@ -16,7 +17,7 @@ use std::path::Path;
 use std::time::Duration;
 
 const MAX_AUTH_BYTES: u64 = 1024 * 1024;
-const MAX_USAGE_BYTES: u64 = 256 * 1024;
+const MAX_USAGE_BYTES: usize = 256 * 1024;
 const MAX_TOKEN_BYTES: usize = 8 * 1024;
 const UNREADABLE: &str = "Die Anmeldedatei konnte nicht gelesen werden.";
 const UNREACHABLE: &str = "Der Anbieter ist nicht erreichbar.";
@@ -58,7 +59,10 @@ pub(super) fn fetch(agent: AgentId, path: &Path) -> Result<AgentQuota, &'static 
         header_percent("x-codex-primary-used-percent"),
         header_percent("x-codex-secondary-used-percent"),
     ];
-    let bytes = read_bounded(response, MAX_USAGE_BYTES, 0).ok_or(INVALID_RESPONSE)?;
+    let bytes = read_within(response, MAX_USAGE_BYTES + 1, Duration::from_secs(10)).ok();
+    let bytes = bytes
+        .filter(|bytes| bytes.len() <= MAX_USAGE_BYTES)
+        .ok_or(INVALID_RESPONSE)?;
     let body = serde_json::from_slice(without_bom(&bytes)).map_err(|_| INVALID_RESPONSE)?;
     Ok(windows::parse(agent, &body, codex_used, Utc::now()))
 }

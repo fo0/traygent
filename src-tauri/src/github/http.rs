@@ -5,8 +5,8 @@ use super::api::{
     UNREACHABLE,
 };
 use super::secret::SecretToken;
-use std::io::Read;
-use std::time::Duration;
+use std::io::{self, Read};
+use std::time::{Duration, Instant};
 
 const MAX_HEADER_BYTES: usize = 4096;
 
@@ -50,10 +50,7 @@ impl Transport for HttpTransport {
                 (value.len() <= MAX_HEADER_BYTES).then(|| (name.to_string(), value.to_string()))
             })
             .collect();
-        let mut body = Vec::new();
-        response
-            .take(MAX_BODY_BYTES as u64 + 1)
-            .read_to_end(&mut body)
+        let body = read_within(response, MAX_BODY_BYTES + 1, Duration::from_secs(30))
             .map_err(|_| UNREACHABLE)?;
         if body.len() > MAX_BODY_BYTES {
             return Err(INVALID_RESPONSE.into());
@@ -63,5 +60,38 @@ impl Transport for HttpTransport {
             headers,
             body,
         })
+    }
+}
+
+/// Reads at most `max` bytes of `body` and stops once `budget` of wall-clock time has passed:
+/// reqwest's blocking timeout bounds each read only, so a body that drips would hold the
+/// caller indefinitely. The last read may still take up to that per-read timeout.
+pub(crate) fn read_within(body: impl Read, max: usize, budget: Duration) -> io::Result<Vec<u8>> {
+    let deadline = Instant::now() + budget;
+    let (mut body, mut bytes, mut chunk) = (body.take(max as u64), Vec::new(), [0; 16 * 1024]);
+    loop {
+        match body.read(&mut chunk) {
+            Ok(0) => return Ok(bytes),
+            Ok(read) => bytes.extend_from_slice(&chunk[..read]),
+            Err(error) if error.kind() == io::ErrorKind::Interrupted => {}
+            Err(error) => return Err(error),
+        }
+        if Instant::now() >= deadline {
+            return Err(io::ErrorKind::TimedOut.into());
+        }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn read_within_caps_the_body_and_stops_at_the_deadline() {
+        let long = Duration::from_secs(60);
+        assert_eq!(read_within(&b"abcdef"[..], 4, long).unwrap(), b"abcd");
+        assert_eq!(read_within(&b""[..], 4, Duration::ZERO).unwrap(), b"");
+        let late = read_within(&b"abc"[..], 4, Duration::ZERO).unwrap_err();
+        assert_eq!(late.kind(), io::ErrorKind::TimedOut);
     }
 }
