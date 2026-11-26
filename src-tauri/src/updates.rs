@@ -3,9 +3,10 @@
 //! Builds with a compiled-in updater public key install Tauri-signed packages; the standard
 //! unsigned builds install the release's NSIS EXE after checking its exact name, URL, size
 //! and the SHA-256 digest GitHub publishes for the asset (`installer`).
+use crate::github::http::read_within;
 use chrono::{DateTime, SecondsFormat, Utc};
 use serde::{Deserialize, Serialize};
-use std::{io::Read, time::Duration};
+use std::time::Duration;
 
 pub mod installer;
 pub use installer::Installer;
@@ -189,10 +190,7 @@ pub fn fetch_latest_release(current: &str) -> Result<Option<Release>, String> {
         .send()
         .map_err(|_| CHECK_FAILED)?;
     let status = response.status().as_u16();
-    let mut body = Vec::new();
-    response
-        .take(MAX_RELEASE_BYTES as u64 + 1)
-        .read_to_end(&mut body)
+    let body = read_within(response, MAX_RELEASE_BYTES + 1, Duration::from_secs(20))
         .map_err(|_| CHECK_FAILED)?;
     parse_latest_release(status, &body, current)
 }
