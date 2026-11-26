@@ -36,6 +36,11 @@ export interface QuotaWindow {
 export interface AgentQuota {
   windows: Partial<Record<QuotaMetric, QuotaWindow>>;
   detail: string | null;
+  /**
+   * Only on a read the provider refused as too frequent (HTTP 429, #100):
+   * the seconds its `Retry-After` asks to wait, at most a day; `0` without one.
+   */
+  retryAfterSecs?: number;
 }
 
 export const QUOTA_METRICS: Record<AgentId, readonly QuotaMetric[]> = {
