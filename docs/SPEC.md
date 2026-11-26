@@ -53,7 +53,8 @@ Brand top left: icon + „Traygent“. Window ~480×760, frameless, tray popup l
      keeps the last figures with their „Stand“ until their own reset; the tooltip names the
      next attempt („Zu viele Abfragen. Nächster Versuch um hh:mm.“). Reads of one provider run
      one at a time, at least 5 s apart (plus up to 2 s jitter); a limited account waits 5, 10,
-     20, 40, then 60 minutes, at least its `Retry-After`, also on a manual refresh.
+     20, 40, then 60 minutes or its `Retry-After`, whichever is longer, also on a manual refresh,
+     while the automatic read still waits for its regular interval.
      The line never wraps: the profile name ellipsizes first. The tooltip and accessible
      description carry per profile and metric the used and free share, the reset date, the
      detail and the refresh hint. The other agent buttons keep their mark, status dot and one

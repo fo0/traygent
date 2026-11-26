@@ -236,18 +236,14 @@ export class AgentQuotas {
       return result;
     }
     if (rateLimited(result)) {
-      const until = this.#backoff.limited(
-        entry.key,
-        now,
-        result.retryAfterSecs,
-      );
+      this.#backoff.limited(entry.key, now, result.retryAfterSecs);
       const windows = Object.fromEntries(
         Object.entries(shown ? previous : {}).filter(
           ([, window]) => window?.resetAt != null || fresh,
         ),
       );
-      const detail = `Zu viele Abfragen. Nächster Versuch um ${clockTime(until)}.`;
-      return { windows, detail, retryAfterSecs: result.retryAfterSecs };
+      // `#setNextRead` names the next attempt in the detail.
+      return { ...result, windows };
     }
     if (result.detail && shown && fresh) {
       entry.staleUntil = entry.goodAt! + STALE_LIMIT;
@@ -267,6 +263,12 @@ export class AgentQuotas {
         ...resets(entry.result).filter((reset) => reset > at),
       ),
     );
+    // The regular interval can put the next read past the backoff (#100).
+    if (rateLimited(entry.result))
+      entry.result = {
+        ...entry.result,
+        detail: `Zu viele Abfragen. Nächster Versuch um ${clockTime(entry.nextRead)}.`,
+      };
   }
 
   /** Timers pause provider reads while hidden. Reopening checks freshness right away. */

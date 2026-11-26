@@ -1,5 +1,6 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { AgentQuotas } from './agentQuotas.svelte';
+import { clockTime } from './format';
 import { quotaView } from './quotaDisplay';
 import type { AgentQuota } from './quotaTypes';
 
@@ -96,8 +97,9 @@ describe('paced quota reads', () => {
     quotas.follow([standard]);
     await flush();
     expect(get).toHaveBeenCalledTimes(1);
-    expect(quotas.read('claude')?.detail).toMatch(
-      /^Zu viele Abfragen\. Nächster Versuch um \d\d:\d\d\.$/,
+    // The regular 15-minute read comes after the 5-minute backoff: it is named.
+    expect(quotas.read('claude')?.detail).toBe(
+      `Zu viele Abfragen. Nächster Versuch um ${clockTime(t0 + 15 * MINUTE)}.`,
     );
     await at(t0 + 5 * MINUTE - 1, 1);
     await at(t0 + 5 * MINUTE, 2);
