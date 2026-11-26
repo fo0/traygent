@@ -1,4 +1,4 @@
-import { describe, expect, it, vi } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 import { AgentQuotas } from './agentQuotas.svelte';
 import { demoSnapshot } from './demoData';
 import { quotaContexts, tileProfiles } from './quotaContexts';
@@ -25,6 +25,10 @@ function pending() {
   });
   return { promise, resolve };
 }
+
+afterEach(() => {
+  vi.useRealTimers();
+});
 
 describe('tile profiles', () => {
   it('names profiles only when the agent has more than „Standard“', () => {
@@ -80,9 +84,13 @@ describe('agent quotas per profile', () => {
       .mockImplementation(async (_agent: string, profile: string) =>
         usage(profile === 'team' ? 80 : 30),
       );
-    const quotas = new AgentQuotas(get);
+    vi.useFakeTimers();
+    const quotas = new AgentQuotas(get, () => 0);
     quotas.follow([standard, { ...team, lead: true }]);
     await Promise.resolve();
+    // One Claude read at a time, a gap apart (#100).
+    expect(get).toHaveBeenCalledTimes(1);
+    await vi.advanceTimersByTimeAsync(5_000);
     expect(get.mock.calls).toEqual([
       ['claude', 'default', 'local'],
       ['claude', 'team', 'local'],
@@ -98,29 +106,32 @@ describe('agent quotas per profile', () => {
   });
 
   it('lets a late reply update only its own profile, and only while shown', async () => {
+    vi.useFakeTimers();
     const first = pending();
     const second = pending();
     const get = vi
       .fn()
       .mockReturnValueOnce(first.promise)
       .mockReturnValueOnce(second.promise);
-    const quotas = new AgentQuotas(get);
+    const quotas = new AgentQuotas(get, () => 0);
     quotas.follow([standard, team]);
+    first.resolve(usage(12));
+    await first.promise;
+    await vi.advanceTimersByTimeAsync(5_000);
+    expect(get).toHaveBeenCalledTimes(2);
     quotas.follow([standard]);
     second.resolve(usage(55));
     await second.promise;
     expect(quotas.read('claude', 'team')).toBeUndefined();
-    first.resolve(usage(12));
-    await first.promise;
     expect(quotas.read('claude', 'default')).toEqual(usage(12));
-    expect(quotas.read('claude', 'team')).toBeUndefined();
   });
 
   it('reads a hidden profile neither while hidden nor when shown again soon', async () => {
+    vi.useFakeTimers();
     const get = vi.fn().mockResolvedValue(usage(40));
-    const quotas = new AgentQuotas(get);
+    const quotas = new AgentQuotas(get, () => 0);
     quotas.follow([standard, team]);
-    await Promise.resolve();
+    await vi.advanceTimersByTimeAsync(5_000);
     expect(get).toHaveBeenCalledTimes(2);
     quotas.follow([standard]);
     quotas.refresh();
@@ -132,15 +143,17 @@ describe('agent quotas per profile', () => {
   });
 
   it('forgets every profile of an agent whose read is switched off', async () => {
+    vi.useFakeTimers();
     const get = vi.fn().mockResolvedValue(usage(15));
-    const quotas = new AgentQuotas(get);
+    const quotas = new AgentQuotas(get, () => 0);
     quotas.follow([standard, team]);
-    await Promise.resolve();
+    await vi.advanceTimersByTimeAsync(5_000);
     expect(quotas.read('claude', 'team')).toEqual(usage(15));
     quotas.follow([]);
     quotas.follow([standard, team]);
     expect(quotas.read('claude', 'default')).toBeUndefined();
     expect(quotas.read('claude', 'team')).toBeUndefined();
+    await vi.advanceTimersByTimeAsync(10_000);
     expect(get).toHaveBeenCalledTimes(4);
   });
 });

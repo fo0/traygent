@@ -5,9 +5,9 @@ use crate::{
     models::AgentId,
     profiles::files::without_bom,
 };
-use chrono::Utc;
+use chrono::{DateTime, Utc};
 use reqwest::blocking::{Client, RequestBuilder};
-use reqwest::header::HeaderValue;
+use reqwest::header::{HeaderValue, RETRY_AFTER};
 use serde::Deserialize;
 use serde_json::value::RawValue;
 use std::collections::BTreeMap;
@@ -43,17 +43,13 @@ pub(super) fn fetch(agent: AgentId, path: &Path) -> Result<AgentQuota, &'static 
         .map_err(|_| UNREACHABLE)?;
     let request = usage_request(&client, agent, login(agent, path)?)?;
     let response = request.send().map_err(|_| UNREACHABLE)?;
-    match response.status().as_u16() {
-        200..=299 => {}
-        401 => return Err("Anmeldung abgelaufen oder ungültig. Bitte im CLI erneut anmelden."),
-        403 if agent == AgentId::Opencode => {
-            return Err("Zugriff verweigert. Bitte OpenCode-Go-Abo und Anmeldung prüfen.");
-        }
-        403 => return Err("Der Anbieter verweigert den Zugriff auf die Kontingente."),
-        429 => return Err("Zu viele Abfragen. Bitte später erneut versuchen."),
-        _ => return Err("Der Anbieter konnte die Kontingente nicht liefern."),
-    }
     let headers = response.headers();
+    let retry_after = headers
+        .get(RETRY_AFTER)
+        .and_then(|value| value.to_str().ok());
+    if let Some(refusal) = refusal(agent, response.status().as_u16(), retry_after, Utc::now()) {
+        return refusal;
+    }
     let header_percent = |name: &str| headers.get(name)?.to_str().ok()?.parse::<f64>().ok();
     let codex_used = [
         header_percent("x-codex-primary-used-percent"),
@@ -65,6 +61,42 @@ pub(super) fn fetch(agent: AgentId, path: &Path) -> Result<AgentQuota, &'static 
         .ok_or(INVALID_RESPONSE)?;
     let body = serde_json::from_slice(without_bom(&bytes)).map_err(|_| INVALID_RESPONSE)?;
     Ok(windows::parse(agent, &body, codex_used, Utc::now()))
+}
+
+/// The answer to a status that carries no usage; `None` for a success. A 429 is not an
+/// error but a limited read (#100): it carries the wait the provider asks for.
+fn refusal(
+    agent: AgentId,
+    status: u16,
+    retry_after: Option<&str>,
+    now: DateTime<Utc>,
+) -> Option<Result<AgentQuota, &'static str>> {
+    Some(match status {
+        200..=299 => return None,
+        401 => Err("Anmeldung abgelaufen oder ungültig. Bitte im CLI erneut anmelden."),
+        403 if agent == AgentId::Opencode => {
+            Err("Zugriff verweigert. Bitte OpenCode-Go-Abo und Anmeldung prüfen.")
+        }
+        403 => Err("Der Anbieter verweigert den Zugriff auf die Kontingente."),
+        429 => Ok(AgentQuota::rate_limited(retry_after_secs(retry_after, now))),
+        _ => Err("Der Anbieter konnte die Kontingente nicht liefern."),
+    })
+}
+
+/// `Retry-After` as delay seconds or an HTTP date; `0` when missing, invalid or past.
+/// `AgentQuota::rate_limited` caps it.
+fn retry_after_secs(value: Option<&str>, now: DateTime<Utc>) -> u64 {
+    let Some(value) = value.map(str::trim) else {
+        return 0;
+    };
+    if !value.is_empty() && value.bytes().all(|byte| byte.is_ascii_digit()) {
+        // Past `u64` still asks for a long wait; `rate_limited` caps it.
+        return value.parse().unwrap_or(u64::MAX);
+    }
+    DateTime::parse_from_rfc2822(value)
+        .ok()
+        .and_then(|at| u64::try_from((at.to_utc() - now).num_seconds()).ok())
+        .unwrap_or(0)
 }
 
 fn login_required(agent: AgentId) -> &'static str {
@@ -251,6 +283,7 @@ fn codex_file_login(sections: &BTreeMap<String, &RawValue>) -> bool {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::quota::{MAX_RETRY_AFTER_SECS, RATE_LIMITED};
     use crate::testing::TempDir;
     use serde_json::json;
 
@@ -396,6 +429,50 @@ mod tests {
         ] {
             assert!(parse_cli_login(agent, auth.as_bytes()).is_ok());
         }
+    }
+
+    #[test]
+    fn a_429_is_a_limited_read_with_the_providers_wait() {
+        let now = DateTime::parse_from_rfc3339("2026-02-01T12:00:00Z")
+            .unwrap()
+            .to_utc();
+        let limited = |retry_after: Option<&str>| {
+            refusal(AgentId::Claude, 429, retry_after, now)
+                .unwrap()
+                .unwrap()
+        };
+        for (header, secs) in [
+            (None, 0),
+            (Some("0"), 0),
+            (Some(" 120 "), 120),
+            (Some("-5"), 0),
+            (Some("soon"), 0),
+            (Some("Sun, 01 Feb 2026 12:05:00 GMT"), 300),
+            (Some("Sun, 01 Feb 2026 11:00:00 GMT"), 0),
+            (Some("999999999"), MAX_RETRY_AFTER_SECS),
+            (Some("99999999999999999999999"), MAX_RETRY_AFTER_SECS),
+        ] {
+            let quota = limited(header);
+            assert_eq!(quota.retry_after_secs, Some(secs), "{header:?}");
+            assert!(quota.windows.is_empty());
+            assert_eq!(quota.detail.as_deref(), Some(RATE_LIMITED));
+        }
+        assert_eq!(
+            serde_json::to_value(limited(Some("30"))).unwrap(),
+            json!({"windows": {}, "detail": RATE_LIMITED, "retryAfterSecs": 30})
+        );
+        // Every other answer keeps its shape: no `retryAfterSecs` on the wire.
+        assert!(refusal(AgentId::Claude, 200, Some("30"), now).is_none());
+        for status in [401, 403, 500, 503] {
+            assert!(refusal(AgentId::Claude, status, Some("30"), now)
+                .unwrap()
+                .is_err());
+        }
+        assert!(!serde_json::to_value(AgentQuota::unavailable("x"))
+            .unwrap()
+            .as_object()
+            .unwrap()
+            .contains_key("retryAfterSecs"));
     }
 
     #[test]

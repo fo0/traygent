@@ -24,13 +24,30 @@ pub struct QuotaWindow {
 pub struct AgentQuota {
     pub windows: BTreeMap<QuotaMetric, QuotaWindow>,
     pub detail: Option<String>,
+    /// Set only when the provider limited the read (HTTP 429, #100): the seconds its
+    /// `Retry-After` asks to wait, capped at `MAX_RETRY_AFTER_SECS`; `0` without one.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub retry_after_secs: Option<u64>,
 }
+
+/// The longest `Retry-After` taken over from a provider: one day.
+pub const MAX_RETRY_AFTER_SECS: u64 = 24 * 60 * 60;
+pub const RATE_LIMITED: &str = "Zu viele Abfragen. Bitte später erneut versuchen.";
 
 impl AgentQuota {
     pub fn unavailable(detail: impl Into<String>) -> Self {
         Self {
             windows: BTreeMap::new(),
             detail: Some(detail.into()),
+            retry_after_secs: None,
+        }
+    }
+
+    /// The provider refused the read as too frequent (#100). The panel backs off.
+    pub fn rate_limited(retry_after_secs: u64) -> Self {
+        Self {
+            retry_after_secs: Some(retry_after_secs.min(MAX_RETRY_AFTER_SECS)),
+            ..Self::unavailable(RATE_LIMITED)
         }
     }
 
@@ -39,6 +56,7 @@ impl AgentQuota {
         Self {
             windows: BTreeMap::new(),
             detail: None,
+            retry_after_secs: None,
         }
     }
 }

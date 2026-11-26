@@ -48,6 +48,13 @@ Brand top left: icon + „Traygent“. Window ~480×760, frameless, tray popup l
      profiles shows the line without a name. From 70 % used the figure turns `--wait`, from
      90 % `--fail` and bold, and the bar ends in a short cap of that colour. No data, a
      signed-out profile or a failed read: `–` and a dashed track, the detail in the tooltip.
+     A read the provider limits (HTTP 429, #100; `get_agent_quota` answers no windows, the
+     detail and `retryAfterSecs`, its `Retry-After` in seconds, at most a day, `0` without one)
+     keeps the last figures with their „Stand“ until their own reset; the tooltip names the
+     next attempt („Zu viele Abfragen. Nächster Versuch um hh:mm.“). Reads of one provider run
+     one at a time, at least 5 s apart (plus up to 2 s jitter); a limited account waits 5, 10,
+     20, 40, then 60 minutes or its `Retry-After`, whichever is longer, also on a manual refresh,
+     while the automatic read still waits for its regular interval.
      The line never wraps: the profile name ellipsizes first. The tooltip and accessible
      description carry per profile and metric the used and free share, the reset date, the
      detail and the refresh hint. The other agent buttons keep their mark, status dot and one
