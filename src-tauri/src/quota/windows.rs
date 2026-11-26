@@ -87,6 +87,7 @@ pub(super) fn parse(
     AgentQuota {
         windows,
         detail: None,
+        retry_after_secs: None,
     }
 }
 

@@ -1,13 +1,17 @@
 import type { Bridge } from './bridgeTypes';
 import { MINUTE, minuteClock } from './clock';
+import { clockTime } from './format';
 import type { QuotaContext } from './quotaContexts';
+import { Backoff, ProviderQueue, rateLimited } from './quotaSchedule';
 import { DEFAULT_QUOTA_REFRESH_MINUTES, type AgentQuota } from './quotaTypes';
 import type { AgentId } from './types';
 
 // A provider that keeps reporting a reset moments away must not turn into a request loop.
 const MIN_INTERVAL = 30_000;
 // A failed read keeps the last good windows this long: enough for a network blip,
-// short enough that a signed-out account does not keep its old figures.
+// short enough that a signed-out account does not keep its old figures. A read the
+// provider limited (429, #100) says nothing about the account: windows with a reset
+// stay until it; only those without one follow this limit.
 const STALE_LIMIT = 15 * 60_000;
 const unavailable: AgentQuota = {
   windows: {},
@@ -22,10 +26,16 @@ const resets = (quota?: AgentQuota) =>
     .map((window) => Date.parse(window.resetAt ?? ''))
     .filter((reset) => !Number.isNaN(reset));
 
+const hidden = () => typeof document !== 'undefined' && document.hidden;
+
 interface Entry {
+  /** The account: agent, environment, profile and sign-in. */
+  key: string;
   context: QuotaContext;
   result?: AgentQuota;
   busy: boolean;
+  /** Due, waiting for its provider to be free (#100). */
+  queued: boolean;
   nextRead: number;
   lastRead?: number;
   goodAt?: number;
@@ -44,7 +54,8 @@ interface Shown {
 
 /**
  * Cache by launch account, one entry per shown profile (#94). A late reply
- * can only update its own entry.
+ * can only update its own entry. Reads of one provider run one at a time,
+ * paced and backed off by `quotaSchedule.ts` (#100).
  */
 export class AgentQuotas {
   now = $state(Date.now());
@@ -54,11 +65,16 @@ export class AgentQuotas {
   #lead = new Map<AgentId, string>();
   #observing = false;
   #expiry: ReturnType<typeof setTimeout> | undefined;
+  #pumpTimer: ReturnType<typeof setTimeout> | undefined;
+  #queue: ProviderQueue;
+  #backoff = new Backoff();
   #interval = DEFAULT_QUOTA_REFRESH_MINUTES * MINUTE;
   #shown = $state.raw<Shown>({ entries: {}, lead: {} });
 
-  constructor(read: Bridge['getAgentQuota']) {
+  /** `random` (0–1) spreads the reads of one provider; tests pin it. */
+  constructor(read: Bridge['getAgentQuota'], random?: () => number) {
     this.#read = read;
+    this.#queue = new ProviderQueue(random);
   }
 
   #entry(agent: AgentId, profile?: string) {
@@ -90,8 +106,10 @@ export class AgentQuotas {
       const { agent, env, profile, identity } = context;
       const key = JSON.stringify([agent, env, profile, identity]);
       const entry = this.#cache.get(key) ?? {
+        key,
         context,
         busy: false,
+        queued: false,
         nextRead: 0,
       };
       this.#cache.set(key, entry);
@@ -120,20 +138,47 @@ export class AgentQuotas {
     this.#shown = { entries, lead: Object.fromEntries(this.#lead) };
   }
 
+  /** `force` skips the regular interval, never the queue or a backoff (#100). */
   refresh(force = false) {
-    if (!force && typeof document !== 'undefined' && document.hidden) return;
+    if (!force && hidden()) return;
     const now = Date.now();
     this.now = now;
     for (const entry of this.#selected.values()) {
-      if (!entry.busy && (force || now >= entry.nextRead))
-        void this.#load(entry);
+      if (
+        !entry.busy &&
+        now >= this.#backoff.until(entry.key) &&
+        (force || now >= entry.nextRead)
+      )
+        entry.queued = true;
     }
-    this.#scheduleExpiry(now);
     for (const [key, entry] of this.#cache) {
-      if (!this.#isSelected(entry) && !entry.busy && entry.nextRead <= now) {
-        this.#cache.delete(key);
+      if (this.#isSelected(entry)) continue;
+      entry.queued = false;
+      if (!entry.busy && entry.nextRead <= now) this.#cache.delete(key);
+    }
+    this.#pump(now);
+    this.#scheduleExpiry(now);
+  }
+
+  /** Starts each provider's next queued read once it is free; wakes up for the rest. */
+  #pump(now: number) {
+    clearTimeout(this.#pumpTimer);
+    let wake = Infinity;
+    for (const entry of this.#selected.values()) {
+      if (!entry.queued || entry.busy) continue;
+      const free = this.#queue.freeAt(entry.context.agent);
+      if (free > now) wake = Math.min(wake, free);
+      else {
+        entry.queued = false;
+        void this.#load(entry);
       }
     }
+    // In flight (`Infinity`): its end pumps. A hidden panel starts nothing more
+    // until the next refresh.
+    if (wake < Infinity)
+      this.#pumpTimer = setTimeout(() => {
+        if (!hidden()) this.#pump(Date.now());
+      }, wake - now);
   }
 
   // The shared clock drives countdowns. A reported window ending between ticks
@@ -152,31 +197,18 @@ export class AgentQuotas {
   }
 
   async #load(entry: Entry) {
-    entry.busy = true;
     const { agent, env, profile } = entry.context;
+    entry.busy = true;
+    this.#queue.start(agent);
     let result: AgentQuota;
     try {
       result = (await this.#read(agent, profile, env)) ?? unavailable;
     } catch {
       result = unavailable;
     }
-    // A failed read (no windows, only a detail; a switched-off read has neither) keeps the last good
-    // windows with the new detail for a while; their own resets still expire them.
     const now = Date.now();
-    const previous = entry.result;
-    delete entry.staleUntil;
-    if (hasWindows(result)) entry.goodAt = now;
-    else if (
-      result.detail &&
-      previous &&
-      hasWindows(previous) &&
-      entry.goodAt !== undefined &&
-      now < entry.goodAt + STALE_LIMIT
-    ) {
-      entry.staleUntil = entry.goodAt + STALE_LIMIT;
-      result = { windows: previous.windows, detail: result.detail };
-    }
-    entry.result = result;
+    this.#queue.finish(agent, now);
+    entry.result = this.#settle(entry, result, now);
     entry.busy = false;
     entry.lastRead = now;
     this.#setNextRead(entry);
@@ -185,6 +217,43 @@ export class AgentQuotas {
       this.#publish();
       this.#scheduleExpiry(now);
     }
+    if (!hidden()) this.#pump(now);
+  }
+
+  // A failed read (no windows, only a detail; a switched-off read has neither) keeps the last good
+  // windows with the new detail for a while; their own resets still expire them.
+  #settle(entry: Entry, result: AgentQuota, now: number): AgentQuota {
+    const previous = entry.result?.windows ?? {};
+    const shown =
+      hasWindows(entry.result) &&
+      !(entry.staleUntil !== undefined && now >= entry.staleUntil);
+    const fresh =
+      entry.goodAt !== undefined && now < entry.goodAt + STALE_LIMIT;
+    delete entry.staleUntil;
+    if (hasWindows(result)) {
+      entry.goodAt = now;
+      this.#backoff.clear(entry.key);
+      return result;
+    }
+    if (rateLimited(result)) {
+      const until = this.#backoff.limited(
+        entry.key,
+        now,
+        result.retryAfterSecs,
+      );
+      const windows = Object.fromEntries(
+        Object.entries(shown ? previous : {}).filter(
+          ([, window]) => window?.resetAt != null || fresh,
+        ),
+      );
+      const detail = `Zu viele Abfragen. Nächster Versuch um ${clockTime(until)}.`;
+      return { windows, detail, retryAfterSecs: result.retryAfterSecs };
+    }
+    if (result.detail && shown && fresh) {
+      entry.staleUntil = entry.goodAt! + STALE_LIMIT;
+      return { windows: previous, detail: result.detail };
+    }
+    return result;
   }
 
   #setNextRead(entry: Entry) {
@@ -192,6 +261,7 @@ export class AgentQuotas {
     if (at === undefined) return;
     entry.nextRead = Math.max(
       at + MIN_INTERVAL,
+      this.#backoff.until(entry.key),
       Math.min(
         at + this.#interval,
         ...resets(entry.result).filter((reset) => reset > at),
@@ -208,6 +278,7 @@ export class AgentQuotas {
     return () => {
       this.#observing = false;
       clearTimeout(this.#expiry);
+      clearTimeout(this.#pumpTimer);
       stopClock();
       window.removeEventListener('focus', tick);
     };
