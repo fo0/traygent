@@ -63,8 +63,9 @@ impl Transport for HttpTransport {
     }
 }
 
-/// Reads at most `max` bytes of `body` within `budget` of wall-clock time: reqwest's blocking
-/// timeout bounds each read only, so a body that drips would hold the caller indefinitely.
+/// Reads at most `max` bytes of `body` and stops once `budget` of wall-clock time has passed:
+/// reqwest's blocking timeout bounds each read only, so a body that drips would hold the
+/// caller indefinitely. The last read may still take up to that per-read timeout.
 pub(crate) fn read_within(body: impl Read, max: usize, budget: Duration) -> io::Result<Vec<u8>> {
     let deadline = Instant::now() + budget;
     let (mut body, mut bytes, mut chunk) = (body.take(max as u64), Vec::new(), [0; 16 * 1024]);
