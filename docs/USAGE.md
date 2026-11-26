@@ -12,6 +12,8 @@ Everything the panel does, control by control. The UI labels are German; each on
 - [Several accounts — „Profile“](#several-accounts--profile)
 - [Docker sessions](#docker-sessions)
 - [Where Traygent keeps its state](#where-traygent-keeps-its-state)
+- [Privacy and security](#privacy-and-security)
+- [Limits](#limits)
 
 ## New session — „Neue Session“
 
@@ -112,3 +114,23 @@ On a profile's first sync **Standard** wins, but nothing is lost: a folder of th
 ## Where Traygent keeps its state
 
 Settings, recent sessions and the connected GitHub account's login and id live in one versioned JSON file, `%APPDATA%\io.github.fo0.traygent\state.json`, written atomically ([ADR-0002](adr/0002-versioned-json-state-file.md)). A corrupt file is moved aside as `state.json.corrupt-<timestamp>` and replaced by defaults; a file from a newer Traygent is read but never overwritten. The theme stays in the panel's local storage; the GitHub token stays in the Windows Credential Manager (entry `traygent`, user `github-<id>`).
+
+## Privacy and security
+
+- **GitHub sign-in.** Traygent stores the connected account’s token in Windows Credential Manager. With **GitHub-Token weitergeben** enabled, Git and the GitHub CLI in Docker use that account. Host clones use your Windows Git credentials. [Docker sessions](#docker-sessions).
+- **Profiles never touch your sign-in.** Traygent only checks that a profile's `.credentials.json` holds a sign-in and names its plan; it never copies it, keeps a token or starts the CLI for it ([details](#several-accounts--profile)).
+- **No shell strings.** Every launch is an argument list of quoted literals ([ADR-0003](adr/0003-launch-through-a-powershell-argv.md)).
+- **Docker ports bind to `127.0.0.1`** unless you type an IP.
+- **The host Docker socket stays outside the container** unless you turn on **Docker-Socket durchreichen** (off by default); with it, the agent controls your host's Docker ([details](#docker-sessions)).
+- **Subscription quotas are opt-in.** Claude Code and Codex quotas come from provider interfaces that are not officially documented and are read with the CLI’s own sign-in; Traygent reads them only after you turn on **Kontingent abfragen** for that agent. It never refreshes or stores a token. OpenCode Go uses your own key and is on by default ([ADR-0014](adr/0014-opt-in-subscription-quota-reads.md)).
+- **Network access:** Traygent itself contacts the GitHub API (update check, account check, your repository list), GitHub release downloads and, for agents with **Kontingent abfragen** on, that provider’s usage endpoint. `git clone`, agent installers and container image pulls run visibly in the terminal Traygent opens for the session or install.
+- **Local state** lives in one JSON file, `%APPDATA%\io.github.fo0.traygent\state.json` ([details](#where-traygent-keeps-its-state)).
+
+## Limits
+
+- **Windows only.** Elsewhere only the browser demo runs. **WSL** is reserved and shown as „Bald verfügbar“ (coming soon).
+- **German UI.** Labels are German; the [user guide](USAGE.md) explains them.
+- **GitHub.com, one account.** GitHub Enterprise hosts are not recognised; repositories outside the account's list are found only when typed as `owner/name` or pasted as a URL. A repository created since the last list read appears after **Aktualisieren**; a token rotated in `gh` must be imported again.
+- **PATH after a fresh install.** Detection finds a CLI installed after Traygent started, but terminals Traygent opens inherit its PATH; tools an agent calls itself (for example Git) may need a new login or a Traygent restart.
+- **Not yet:** corporate CA import into containers and GPU passthrough — the `claude/cli-starter.bat` of agent-tools still covers those. Planned work: [BACKLOG.md](../BACKLOG.md).
+- Some launch details still await confirmation on a real Windows host; they are tracked in [BACKLOG.md](../BACKLOG.md).
