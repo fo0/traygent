@@ -65,6 +65,8 @@ test('two shown profiles get a label line each, with names, used shares and the 
     'Woche 64 %',
     'Fable 81 %',
   ]);
+  // Reads of one provider run one after another, 5–7 s apart (#100).
+  await page.clock.fastForward(7_000);
   await expect(blocks.nth(1).locator('.quota-metric')).toHaveText([
     'Woche 93 %',
     'Fable 12,5 %',

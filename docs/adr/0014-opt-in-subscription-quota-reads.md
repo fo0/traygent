@@ -43,4 +43,5 @@ We will make every quota read opt-in per agent through the setting `quotaReads` 
 ## References
 
 - Issue #83; commit 42b162e (CLI `User-Agent` removed, refresh interval bounded).
+- Issue #100: reads paced per provider and a per-account 429 backoff honouring `Retry-After` (`src/lib/quotaSchedule.ts`).
 - `src-tauri/src/quota.rs → read`, `src-tauri/src/quota/gate_tests.rs`, `src/lib/quotaContexts.ts → quotaContexts` (in `agentQuotas.svelte.ts` until #94), `src/lib/QuotaSettings.svelte`.
