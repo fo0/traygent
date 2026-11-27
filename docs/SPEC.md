@@ -48,6 +48,11 @@ Brand top left: icon + „Traygent“. Window ~480×760, frameless, tray popup l
      profiles shows the line without a name. From 70 % used the figure turns `--wait`, from
      90 % `--fail` and bold, and the bar ends in a short cap of that colour. No data, a
      signed-out profile or a failed read: `–` and a dashed track, the detail in the tooltip.
+     Claude Code's figures come from its own CLI, `claude -p /usage --output-format json
+--no-session-persistence --setting-sources user` run hidden on the host with the profile's
+     sign-in (also for a Docker session; never in a profile directory that is missing or not
+     Claude Code's; [ADR-0015](adr/0015-read-the-claude-code-quota-through-the-cli.md)); Codex
+     and OpenCode Go are read from the provider (ADR-0014).
      A read the provider limits (HTTP 429, #100; `get_agent_quota` answers no windows, the
      detail and `retryAfterSecs`, its `Retry-After` in seconds, at most a day, `0` without one)
      keeps the last figures with their „Stand“ until their own reset; the tooltip names the
@@ -152,9 +157,11 @@ Brand top left: icon + „Traygent“. Window ~480×760, frameless, tray popup l
 
 - **Agenten**: per agent a section, opening with „Kontingent“: the staged switch „Kontingent
   abfragen“ (`settings.quotaReads`, default off for Claude Code and Codex, on for OpenCode;
-  tooltip „Nutzt die CLI-Anmeldung gegen eine nicht offiziell dokumentierte Schnittstelle des
-  Anbieters“, for OpenCode „Nutzt den eigenen OpenCode-Go-Schlüssel aus der OpenCode-Anmeldung“;
-  [ADR-0014](adr/0014-opt-in-subscription-quota-reads.md)), then the bar choices
+  tooltip for Claude Code „Startet die Claude-Code-CLI (/usage) mit der Anmeldung dieses
+  Profils“, for Codex „Nutzt die CLI-Anmeldung gegen eine nicht offiziell dokumentierte
+  Schnittstelle des Anbieters“, for OpenCode „Nutzt den eigenen OpenCode-Go-Schlüssel aus der
+  OpenCode-Anmeldung“; [ADR-0014](adr/0014-opt-in-subscription-quota-reads.md),
+  [ADR-0015](adr/0015-read-the-claude-code-quota-through-the-cli.md)), then the bar choices
   (`settings.quotaBars`, the week always on, tooltip „Bei allen CLIs immer sichtbar“; disabled
   while the read is off) and a „Vorschau“ tile. With the read off the panel never calls
   `get_agent_quota` for that agent, drops its cached reading, and its composer button shows no
@@ -183,7 +190,7 @@ Brand top left: icon + „Traygent“. Window ~480×760, frameless, tray popup l
   läuft · Abbrechen“) whose click sends `cancel_profile_login`; the second click of a
   multi-click and an auto-repeated Enter or Space never act (`rowStart.ts → repeatClick` /
   `repeatKey`), so they cannot cancel the sign-in their first press started. Cancel exists for
-  the hidden sign-in only: with „Debug“ the button just waits until the terminal opened —
+  the hidden sign-in only: at the log level „Debug“ the button just waits until the terminal opened —
   spinning, `aria-busy`, `aria-disabled`, name „<Name> anmelden“ and tooltip unchanged, no
   action. A second sign-in of a pending profile is ignored in both modes. Success —
   only when the answer reads the profile signed in — shows the answer's statuses and the 3 s
@@ -236,10 +243,14 @@ Brand top left: icon + „Traygent“. Window ~480×760, frameless, tray popup l
   Anmeldung prüfen“ (lists gh sign-ins, one consent line, „Übernehmen“) and a masked token field
   with „Verbinden“. Account actions apply at once; the clone root („Klon-Ordner“, placeholder
   the default) is staged like every setting.
-- **App**: theme (System/Hell/Dunkel), quota refresh interval (1–60 minutes, default 15), Mit Windows starten, „Fehlersuche“ with the staged switch
-  „Debug“ (`settings.debug`, default off, tooltip „Anmeldung im sichtbaren Terminal, Fehler mit
-  Ausgabe“): a profile sign-in opens the visible terminal instead of running hidden (#41). The
-  panel shortens no error or `syncError` text, so „Debug“ changes the sign-in only.
+- **App**: theme (System/Hell/Dunkel), quota refresh interval (1–60 minutes, default 15), Mit Windows starten, „Protokoll“
+  (#109): the staged radio group „Info“ / „Debug“ (`settings.logLevel`, `"info" | "debug"`,
+  default `info`; tooltip on „Debug“ „Ausführliches Protokoll; Profil-Anmeldung im sichtbaren
+  Terminal“) and, natively only, the immediate button „Ordner öffnen“ (`open_log_folder`; a
+  failure stays inline in the section). „Debug“ adds every quota read to the local log
+  (`docs/ARCHITECTURE.md → Local log`) and opens a profile sign-in in the visible terminal
+  instead of running it hidden (#41). Saved with „Speichern“, applied at once and at every start;
+  a file from before #109 with `debug: true` loads as `debug`, an unknown value as `info`.
 - **Updates**: in-app updates — „Nach Updates suchen“, changelog, „Installieren“ — as in RepoWatch.
   Below it „Agenten“: the staged checkbox „Automatisch aktualisieren“ (`settings.agentUpdates`,
   default off), „Jetzt aktualisieren“ and one line per agent with its last result; see
@@ -295,8 +306,9 @@ Commands (Rust `#[tauri::command]`, German `Err` strings; panel calls only via `
 | `github_disconnect`                | –                                                                                                | `Snapshot` (deletes the vault copy; gh stays signed in)                                     |
 | `github_refresh_repos`             | –                                                                                                | `Snapshot` (returns with `github.loading`, event follows)                                   |
 | `sync_profiles`                    | –                                                                                                | `Snapshot` (syncs every profile now, statuses in `profiles`)                                |
-| `profile_login`                    | `{ agent, profile }`                                                                             | `Snapshot` (hidden: after the sign-in; „Debug“: once opened)                                |
+| `profile_login`                    | `{ agent, profile }`                                                                             | `Snapshot` (hidden: after the sign-in; level „Debug“: once opened)                          |
 | `cancel_profile_login`             | `{ agent, profile }`                                                                             | `boolean` (ends that profile's sign-in; false: none running)                                |
+| `open_log_folder`                  | –                                                                                                | `void` (creates the log folder if missing, shows it in Explorer)                            |
 | shell commands kept from RepoWatch | autostart_status, set_autostart, open_startup_settings, check_update, install_update, hide_panel | unchanged                                                                                   |
 
 ## Repositories (GitHub, [ADR-0005](adr/0005-start-from-a-github-repository.md))
@@ -612,12 +624,12 @@ Commands (Rust `#[tauri::command]`, German `Err` strings; panel calls only via `
   `.cmd` shim the same way). Header room (#89): `--max-http-header-size=1048576` appended to
   `BUN_OPTIONS` and `NODE_OPTIONS` of that process — the browser sends every `localhost` cookie
   to the CLI's callback, and past the default 16 KiB the CLI answers 431 and never gets the code.
-  With „Debug“ the terminal stays open and keeps both variables for what is started in it. Refused
+  At the log level „Debug“ the terminal stays open and keeps both variables for what is started in it. Refused
   before anything runs: „<Agent> wird gerade aktualisiert.“, „<Agent> ist
   nicht installiert.“, „Profil nicht gefunden.“, and „Der Profilordner gehört nicht zu Claude
   Code.“ for an existing foreign directory (the rule above, with the agent's extra directories;
   also when that cannot be checked) — a sign-in never writes credentials into it.
-  - **Hidden** (`settings.debug` off, the default): the script, preceded by `$LASTEXITCODE=$null`
+  - **Hidden** (`settings.logLevel` `info`, the default): the script, preceded by `$LASTEXITCODE=$null`
     and followed by `if ($null -eq $LASTEXITCODE) { exit 1 }; exit $LASTEXITCODE`, runs as
     `powershell.exe -NoLogo -NoProfile -NonInteractive -EncodedCommand <Base64>` without a
     window (`CREATE_NO_WINDOW`), stdin closed, stdout and stderr to the null device — the
@@ -638,7 +650,7 @@ Commands (Rust `#[tauri::command]`, German `Err` strings; panel calls only via `
     (`RunEvent::Exit`: „Traygent beenden“, the updater's restart) cancels every running sign-in
     and waits at most 3 s for the trees (best effort). A prompt for a pasted code gets end of
     input (stdin closed) and ends the CLI or reaches the limit — it never hangs.
-  - **Visible** (`settings.debug` on): a terminal titled „<Agent> · <Label> anmelden“ runs the
+  - **Visible** (`settings.logLevel` `debug`): a terminal titled „<Agent> · <Label> anmelden“ runs the
     same lines and stays open like the install terminal (`-NoExit`), so every line of the CLI can
     be read; it is not registered and cannot be cancelled, and the command resolves with the
     current snapshot once it opened. A status watch

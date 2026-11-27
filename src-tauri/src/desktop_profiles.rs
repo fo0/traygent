@@ -6,6 +6,7 @@ use crate::desktop::{work, NativeState, FAILED};
 use crate::desktop_agents::SNAPSHOT_EVENT;
 use std::time::Instant;
 use tauri::{AppHandle, Emitter, Manager};
+use traygent_core::app_log::{self, Level};
 use traygent_core::detect::{Host, RealFs};
 use traygent_core::profiles::watch::{self, Watch, WatchHost};
 use traygent_core::profiles::{login, system_linker, SyncOutcome, SyncPlan};
@@ -101,22 +102,53 @@ pub async fn sync_profiles(app: AppHandle) -> Result<Snapshot, String> {
     .await
 }
 
-/// Signs the agent's profile in; only ever on an explicit click (#41). Hidden („Debug“
-/// off): resolves when the sign-in ended, with the statuses read anew after exit code 0, or
-/// rejects with the German reason; only it can be cancelled. Visible („Debug“ on): no
-/// ticket and no cancel; resolves once the terminal opened and leaves a status watch behind.
+/// Signs the agent's profile in; only ever on an explicit click (#41). Hidden (log level
+/// „Info“): resolves when the sign-in ended, with the statuses read anew after exit code 0,
+/// or rejects with the German reason; only it can be cancelled. Visible (log level „Debug“,
+/// #109): no ticket and no cancel; resolves once the terminal opened and leaves a status
+/// watch behind. Start and outcome are logged with agent, profile, mode and duration —
+/// never the CLI's output.
 #[tauri::command]
 pub async fn profile_login(
     app: AppHandle,
     agent: AgentId,
     profile: String,
 ) -> Result<Snapshot, String> {
+    let who = format!(
+        "agent={} profile={}",
+        agent.id(),
+        traygent_core::profiles::log_id(&profile)
+    );
+    // Read under a short lock, never behind blocking work.
+    let visible = app.state::<NativeState>().lock().settings().log_level == Level::Debug;
+    let mode = if visible { "visible" } else { "hidden" };
+    app_log::info(&format!("sign-in start: {who} {mode}"));
+    let started = Instant::now();
+    let result = sign_in(app, agent, profile, visible).await;
+    let took = started.elapsed().as_secs();
+    let end = match &result {
+        Ok((_, true)) => format!("signed in after {took}s"),
+        Ok((_, false)) => "visible terminal opened".to_string(),
+        Err(error) if error == login::LOGIN_CANCELLED => format!("cancelled after {took}s"),
+        Err(error) if error == login::LOGIN_TIMEOUT => format!("timed out after {took}s"),
+        Err(error) => format!("failed after {took}s reason={error}"),
+    };
+    app_log::info(&format!("sign-in: {who} {end}"));
+    result.map(|(snapshot, _)| snapshot)
+}
+
+/// The sign-in itself; `true` beside the snapshot when it ran hidden and signed in.
+async fn sign_in(
+    app: AppHandle,
+    agent: AgentId,
+    profile: String,
+    visible: bool,
+) -> Result<(Snapshot, bool), String> {
     let key = (agent, profile.clone());
     // A hidden sign-in is registered before any work, so a cancel can never miss it; it also
     // refuses a second one of the profile while it runs and ends with the worker, also on a
-    // panic. The setting is read under a short lock, never behind blocking work.
-    let debug = app.state::<NativeState>().lock().settings().debug;
-    let early = if debug {
+    // panic.
+    let early = if visible {
         None
     } else {
         Some(login::begin(key.clone())?)
@@ -127,7 +159,7 @@ pub async fn profile_login(
     let hidden = work(app.clone(), move |service| {
         match service.prepare_sign_in(agent, &id, &Host::current(), &RealFs)? {
             SignIn::Visible { plan, fallback } => {
-                // „Debug“ was switched on meanwhile: a visible sign-in keeps no ticket.
+                // „Debug“ was chosen meanwhile: a visible sign-in keeps no ticket.
                 drop(early);
                 crate::desktop_agents::start(&plan, fallback.as_ref())?;
                 let before = service.profile_facts(agent, &id);
@@ -135,7 +167,7 @@ pub async fn profile_login(
                 Ok(None)
             }
             SignIn::Hidden(plan) => {
-                // „Debug“ was switched off meanwhile: register now.
+                // „Info“ was chosen meanwhile: register now.
                 let ticket = match early {
                     Some(ticket) => ticket,
                     None => login::begin(late)?,
@@ -146,7 +178,7 @@ pub async fn profile_login(
     })
     .await?;
     let Some((plan, ticket)) = hidden else {
-        return work(app, |service| Ok(service.snapshot())).await;
+        return work(app, |service| Ok((service.snapshot(), false))).await;
     };
     tauri::async_runtime::spawn_blocking(move || {
         login::sign_in(&login::ProcessLoginRunner, &plan, &ticket)
@@ -159,7 +191,8 @@ pub async fn profile_login(
     .await?;
     let outcome = run_plan(plan, false).await?;
     work(app, move |service| {
-        service.finish_sign_in(agent, &profile, outcome)
+        let snapshot = service.finish_sign_in(agent, &profile, outcome)?;
+        Ok((snapshot, true))
     })
     .await
 }

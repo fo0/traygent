@@ -1,0 +1,15 @@
+You are currently using your subscription to power your Claude Code usage
+
+Current week (all models): 82% used · resets Nov 29, 7:59am (Europe/Berlin)
+Current week (Fable): 74% used · resets Nov 29, 8am (Europe/Berlin)
+
+What's contributing to your usage?
+Approximate · sessions on this machine only · shares overlap
+
+Last 24h · 814 requests · 2 sessions
+  66%  Start fresh when you switch tasks · run /clear
+  65%  Check which model "agent-a" subagents use
+  14%  Turn off server-a when you don't need it
+  Top skills: /skill-a 1%, /skill-b 1%, /skill-c 1%
+  Top subagents: agent-a 65%, agent-b 7%, agent-c 6%, agent-d 2%, agent-e 1%
+  Top MCP servers: server-a 14%, server-b 9%

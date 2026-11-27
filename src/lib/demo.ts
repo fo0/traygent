@@ -7,6 +7,7 @@ import {
   scheduleSteps,
 } from './demoAgentUpdates';
 import { demoQuota } from './demoQuota';
+import { visibleSignIn } from './logLevel';
 import { DEMO_PICKED_FOLDER, demoSnapshot } from './demoData';
 import {
   DEMO_ACCOUNT,
@@ -76,7 +77,7 @@ export function createDemoBridge(latency = 150, detection = 600): DemoBridge {
   const signIns = demoSignIns(
     {
       profiles: () => data.profiles,
-      debug: () => data.settings.debug,
+      visible: () => visibleSignIn(data.settings),
       commit: (profiles) => change({ profiles }),
       snapshot: copy,
       emit,
@@ -304,6 +305,8 @@ export function createDemoBridge(latency = 150, detection = 600): DemoBridge {
     async cancelProfileLogin(agent, profile) {
       return signIns.cancel(agent, profile);
     },
+    /** The demo writes no log file: nothing to show. */
+    async openLogFolder() {},
     async observe(callback) {
       listeners.add(callback);
       return () => listeners.delete(callback);

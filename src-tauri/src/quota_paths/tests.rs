@@ -3,6 +3,17 @@ use crate::models::AgentProfile;
 use crate::testing::{windows_host, TempDir};
 
 // These fixtures do not inherit a developer's own CLI credentials or provider flags.
+fn quota_source(
+    agent: AgentId,
+    profile: Option<&str>,
+    env: EnvId,
+    settings: &AppSettings,
+    host: &Host,
+) -> Result<QuotaSource, &'static str> {
+    choose_source(agent, profile, env, settings, host, |_| false)
+}
+
+/// The file a read uses; panics for a CLI read.
 fn credentials_path(
     agent: AgentId,
     profile: Option<&str>,
@@ -10,7 +21,23 @@ fn credentials_path(
     settings: &AppSettings,
     host: &Host,
 ) -> Result<PathBuf, &'static str> {
-    choose_path(agent, profile, env, settings, host, |_| false)
+    quota_source(agent, profile, env, settings, host).map(|source| match source {
+        QuotaSource::File(path) => path,
+        QuotaSource::ClaudeCli { .. } => panic!("{agent:?} reads through its CLI"),
+    })
+}
+
+/// The profile directory a Claude Code CLI read sets; panics for a file read.
+fn claude_dir(
+    profile: Option<&str>,
+    env: EnvId,
+    settings: &AppSettings,
+    host: &Host,
+) -> Result<Option<String>, &'static str> {
+    quota_source(AgentId::Claude, profile, env, settings, host).map(|source| match source {
+        QuotaSource::ClaudeCli { profile_dir } => profile_dir,
+        QuotaSource::File(path) => panic!("a file read of {path:?}"),
+    })
 }
 
 fn profile(id: &str) -> AgentProfile {
@@ -25,30 +52,26 @@ fn standard_windows_accounts_use_the_same_sources_as_launches() {
     let mut host = windows_host();
     let mut settings = AppSettings::default();
     for env in [EnvId::Local, EnvId::Docker] {
-        for (agent, expected) in [
-            (AgentId::Claude, r"C:\Users\max\.claude\.credentials.json"),
-            (AgentId::Codex, r"C:\Users\max\.codex\auth.json"),
-        ] {
-            let path = credentials_path(agent, None, env, &settings, &host).unwrap();
-            assert_eq!(path, PathBuf::from(expected));
-        }
+        let path = credentials_path(AgentId::Codex, None, env, &settings, &host).unwrap();
+        assert_eq!(path, PathBuf::from(r"C:\Users\max\.codex\auth.json"));
+        // Claude Code's CLI finds its own default home: no directory is set.
+        assert_eq!(claude_dir(None, env, &settings, &host), Ok(None));
     }
     host.codex_home = Some(r"D:\My Codex".into());
     host.claude_config_dir = Some(r"D:\My Claude".into());
     for env in [EnvId::Local, EnvId::Docker] {
         let path = credentials_path(AgentId::Codex, None, env, &settings, &host).unwrap();
         assert_eq!(path, PathBuf::from(r"D:\My Codex\auth.json"));
-        let path = credentials_path(AgentId::Claude, None, env, &settings, &host).unwrap();
-        assert_eq!(path, PathBuf::from(r"D:\My Claude\.credentials.json"));
+        assert_eq!(claude_dir(None, env, &settings, &host), Ok(None));
     }
     settings.profiles.claude.push(profile("team"));
     for env in [EnvId::Local, EnvId::Docker] {
         for (id, expected) in [
-            ("default", r"C:\Users\max\.claude\.credentials.json"),
-            ("team", r"C:\Users\max\.claude-team\.credentials.json"),
+            ("default", None),
+            ("team", Some(r"C:\Users\max\.claude-team")),
         ] {
-            let path = credentials_path(AgentId::Claude, Some(id), env, &settings, &host).unwrap();
-            assert_eq!(path, PathBuf::from(expected));
+            let dir = claude_dir(Some(id), env, &settings, &host).unwrap();
+            assert_eq!(dir.as_deref(), expected);
         }
     }
 }
@@ -100,18 +123,18 @@ fn unknown_profiles_paths_and_unsupported_environments_never_choose_a_host_accou
     for env in [EnvId::Local, EnvId::Docker] {
         for id in ["missing", "../other", r"C:\secrets", ""] {
             assert_eq!(
-                credentials_path(AgentId::Claude, Some(id), env, &settings, &host),
+                quota_source(AgentId::Claude, Some(id), env, &settings, &host),
                 Err(PROFILE_MISSING)
             );
         }
         assert_eq!(
-            credentials_path(AgentId::Codex, Some("team"), env, &settings, &host),
+            quota_source(AgentId::Codex, Some("team"), env, &settings, &host),
             Err(PROFILE_MISSING)
         );
     }
     for agent in AgentId::ALL {
         assert_eq!(
-            credentials_path(agent, None, EnvId::Wsl, &settings, &host),
+            quota_source(agent, None, EnvId::Wsl, &settings, &host),
             Err(WSL)
         );
     }
@@ -148,7 +171,7 @@ fn file_quota_follows_the_credentials_inherited_by_each_launch() {
             "CLAUDE_CODE_USE_VERTEX",
         ] {
             let read = |env| {
-                choose_path(AgentId::Claude, Some(id), env, settings, &host, |name| {
+                choose_source(AgentId::Claude, Some(id), env, settings, &host, |name| {
                     name == var
                 })
             };
@@ -162,7 +185,7 @@ fn file_quota_follows_the_credentials_inherited_by_each_launch() {
         }
     }
     let codex = |env, var| {
-        choose_path(AgentId::Codex, None, env, &unmanaged, &host, |name| {
+        choose_source(AgentId::Codex, None, env, &unmanaged, &host, |name| {
             name == var
         })
     };
@@ -173,7 +196,7 @@ fn file_quota_follows_the_credentials_inherited_by_each_launch() {
         assert!(codex(EnvId::Docker, var).is_ok());
     }
     // OpenCode v2's active stored credential wins over an available environment key.
-    let go = choose_path(
+    let go = choose_source(
         AgentId::Opencode,
         None,
         EnvId::Local,
@@ -184,12 +207,14 @@ fn file_quota_follows_the_credentials_inherited_by_each_launch() {
     .unwrap();
     assert_eq!(
         go,
-        PathBuf::from(r"C:\Users\max\.local\share\opencode\opencode.db")
+        QuotaSource::File(PathBuf::from(
+            r"C:\Users\max\.local\share\opencode\opencode.db"
+        ))
     );
 }
 
 #[test]
-fn switching_profile_uses_only_the_selected_accounts_credential_file() {
+fn switching_profile_uses_only_the_selected_accounts_directory() {
     let temp = TempDir::new("quota-profiles");
     let host = Host {
         user_profile: Some(temp.0.to_str().unwrap().into()),
@@ -199,30 +224,24 @@ fn switching_profile_uses_only_the_selected_accounts_credential_file() {
     let mut settings = AppSettings::default();
     for id in ["daily", "team"] {
         settings.profiles.claude.push(profile(id));
-        let dir = temp.0.join(format!(".claude-{id}"));
-        std::fs::create_dir(&dir).unwrap();
-        std::fs::write(
-            dir.join(".credentials.json"),
-            format!(r#"{{"testProfile":"{id}"}}"#),
-        )
-        .unwrap();
+        std::fs::create_dir(temp.0.join(format!(".claude-{id}"))).unwrap();
     }
     for (id, env) in [
         ("team", EnvId::Local),
         ("daily", EnvId::Docker),
         ("team", EnvId::Docker),
     ] {
-        let selected = credentials_path(AgentId::Claude, Some(id), env, &settings, &host).unwrap();
-        let read = std::fs::read(selected).unwrap();
-        let record: serde_json::Value = serde_json::from_slice(&read).unwrap();
-        assert_eq!(record["testProfile"], id);
+        let dir = claude_dir(Some(id), env, &settings, &host)
+            .unwrap()
+            .unwrap();
+        assert_eq!(PathBuf::from(dir), temp.0.join(format!(".claude-{id}")));
     }
     #[cfg(unix)]
     {
         settings.profiles.claude.push(profile("linked"));
         std::os::unix::fs::symlink(temp.0.join(".claude-team"), temp.0.join(".claude-linked"))
             .unwrap();
-        assert!(credentials_path(
+        assert!(quota_source(
             AgentId::Claude,
             Some("linked"),
             EnvId::Local,

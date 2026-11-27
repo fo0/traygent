@@ -15,33 +15,8 @@ pub(super) fn parse(
     use QuotaMetric::*;
     let mut windows = Windows::new();
     match agent {
-        AgentId::Claude => {
-            for (metric, field) in [
-                (Week, "seven_day"),
-                (Session, "five_hour"),
-                (Sonnet, "seven_day_sonnet"),
-            ] {
-                insert_window(
-                    &mut windows,
-                    metric,
-                    &body[field],
-                    "utilization",
-                    "resets_at",
-                );
-            }
-            if let Some(limits) = body["limits"].as_array() {
-                for limit in limits {
-                    if limit["kind"] == "weekly_scoped"
-                        && limit
-                            .pointer("/scope/model/display_name")
-                            .and_then(Value::as_str)
-                            == Some("Fable")
-                    {
-                        insert_window(&mut windows, Fable, limit, "percent", "resets_at");
-                    }
-                }
-            }
-        }
+        // Claude Code's quota is read through its CLI (`claude_usage.rs`, ADR-0015).
+        AgentId::Claude => {}
         AgentId::Codex => {
             codex_windows(
                 &mut windows,

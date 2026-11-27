@@ -232,11 +232,12 @@ fn repository_fields_are_optional_and_camel_case() {
     );
     let updating: AppSettings = serde_json::from_value(json!({ "agentUpdates": true })).unwrap();
     assert!(updating.agent_updates);
-    // Settings from before „Debug“ (#41) load with it off.
-    assert!(!settings.debug && !updating.debug);
-    assert_eq!(serde_json::to_value(&settings).unwrap()["debug"], false);
-    let debug: AppSettings = serde_json::from_value(json!({ "debug": true })).unwrap();
-    assert!(debug.debug);
+    // Settings from before the log level (#109) load at „info“; IPC names it in lower case.
+    assert_eq!(settings.log_level, crate::app_log::Level::Info);
+    assert_eq!(updating.log_level, crate::app_log::Level::Info);
+    assert_eq!(serde_json::to_value(&settings).unwrap()["logLevel"], "info");
+    let debug: AppSettings = serde_json::from_value(json!({ "logLevel": "debug" })).unwrap();
+    assert_eq!(debug.log_level, crate::app_log::Level::Debug);
     assert_eq!(
         serde_json::to_value(&settings).unwrap()["github"],
         json!({ "cloneRoot": "" })

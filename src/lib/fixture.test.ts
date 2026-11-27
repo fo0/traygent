@@ -99,7 +99,7 @@ describe('golden snapshot fixture', () => {
           'profiles',
           'agentProfile',
           'profileShare',
-          'debug',
+          'logLevel',
         ],
       },
       'settings',
@@ -128,8 +128,8 @@ describe('golden snapshot fixture', () => {
     }
     // Agent CLIs update automatically only after the user opted in.
     expect(settings.agentUpdates).toBe(false);
-    // Sign-ins run hidden until „Debug“ is switched on.
-    expect(settings.debug).toBe(false);
+    // The log starts at „Info“, so sign-ins run hidden (#109).
+    expect(settings.logLevel).toBe('info');
     expectShape(settings.github, { required: ['cloneRoot'] }, 'github');
     expect(settings.github.cloneRoot).toBeTypeOf('string');
     expect(AGENTS).toContain(settings.defaultAgent);

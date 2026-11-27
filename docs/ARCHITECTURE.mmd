@@ -30,6 +30,7 @@ flowchart TD
         DesktopProfiles("desktop_profiles.rs sync_profiles, profile_login, cancel_profile_login, detection step, background sync and status watch threads")
         DesktopStartup["desktop_startup.rs Run value adapter"]
         DesktopUpdates["desktop_updates.rs update commands"]
+        DesktopLog["desktop_log.rs open_log_folder, tray Log-Ordner öffnen"]
         TrayPopup["tray_popup.rs and windows.rs Win32"]
         Plugins["plugins: single-instance, dialog, opener, updater"]
     end
@@ -54,10 +55,12 @@ flowchart TD
         StartupRs["startup.rs login-startup rules"]
         PopupRs["popup.rs popup geometry and dismissal"]
         UpdatesRs["updates.rs and installer.rs, feature updates"]
+        AppLogRs["app_log.rs local log, levels, rotation, sanitiser"]
     end
 
     subgraph External["Windows host and outside"]
         StateFile[("APPDATA io.github.fo0.traygent state.json")]
+        LogFile[("APPDATA io.github.fo0.traygent logs traygent.log")]
         LocalStorage[("localStorage theme")]
         Terminal(["wt.exe or a console window"])
         PowerShell(["powershell.exe 5.1 script of literals"])
@@ -117,6 +120,10 @@ flowchart TD
     DesktopAgentUpdates -- "run thread, no lock" --> AgentUpdatesRs
     DesktopRs --> DesktopStartup
     DesktopRs --> DesktopUpdates
+    DesktopRs --> DesktopLog
+    DesktopLog --> AppLogRs
+    ServiceRs --> AppLogRs
+    AppLogRs --> LogFile
     DesktopRs --> TrayPopup
     DesktopRs --> Plugins
     DesktopAgents -- "work, off the UI thread" --> ServiceRs

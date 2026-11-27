@@ -22,7 +22,7 @@ fn sample() -> Persisted {
         shared_window: true,
         quota_refresh_minutes: 5,
         agent_updates: true,
-        debug: true,
+        log_level: crate::app_log::Level::Debug,
         ..AppSettings::default()
     };
     settings.docker.gh_token = true;
@@ -111,7 +111,8 @@ fn save_then_load_round_trips_with_a_version() {
         value["settings"]["quotaReads"],
         json!({ "claude": true, "opencode": false, "codex": false })
     );
-    assert_eq!(value["settings"]["debug"], true);
+    assert_eq!(value["settings"]["logLevel"], "debug");
+    assert!(value["settings"].get("debug").is_none());
     assert_eq!(value["settings"]["docker"]["socket"], true);
     assert_eq!(value["settings"]["docker"]["manageNode"], false);
     assert_eq!(value["recents"][0]["dockerSocket"], true);
@@ -145,13 +146,13 @@ fn an_unknown_or_missing_quota_interval_keeps_the_other_settings() {
     for value in [json!("15"), json!(0), json!(61), Value::Null] {
         dir.write(
             &json!({"version": 1, "settings": {
-                "debug": true, "quotaRefreshMinutes": value
+                "logLevel": "debug", "quotaRefreshMinutes": value
             }})
             .to_string(),
         );
         let loaded = load(&dir.0).state.settings;
         assert_eq!(loaded.quota_refresh_minutes, 15);
-        assert!(loaded.debug);
+        assert_eq!(loaded.log_level, crate::app_log::Level::Debug);
     }
     dir.write(r#"{"version":1,"settings":{}}"#);
     assert_eq!(load(&dir.0).state.settings.quota_refresh_minutes, 15);
@@ -537,6 +538,7 @@ fn the_github_account_loads_leniently_and_is_left_out_without_one() {
     assert!(value.get("github").is_none());
 }
 
+mod log_level;
 mod profiles;
 mod share;
 

@@ -48,7 +48,7 @@ describe('demo profiles', () => {
       ['default', 'Standard', true, 'demo@example.com', 'Beispiel GmbH'],
       ['team', 'Team', false, undefined, undefined],
     ]);
-    expect(snapshot.settings.debug).toBe(false);
+    expect(snapshot.settings.logLevel).toBe('info');
     expect(snapshot.recents.filter((r) => r.profile)).toHaveLength(1);
   });
 
@@ -144,14 +144,14 @@ describe('demo profiles', () => {
     ).toMatchObject({ signedIn: true, organization: 'Beispiel Team' });
   });
 
-  it('with „Debug“ the terminal „opens“ at once and the sign-in follows as an event', async () => {
+  it('at the log level „Debug“ the terminal „opens“ at once and the sign-in follows as an event', async () => {
     const bridge = createDemoBridge(0, 10);
     const pushed: string[] = [];
     await bridge.observe((value) =>
       pushed.push(value.profiles.map((p) => `${p.id}:${p.signedIn}`).join(' ')),
     );
     const { settings } = await bridge.snapshot();
-    settings.debug = true;
+    settings.logLevel = 'debug';
     await bridge.saveSettings(settings);
     const opened = await bridge.profileLogin('claude', 'team');
     expect(opened.profiles[1]?.signedIn).toBe(false);

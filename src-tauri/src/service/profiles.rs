@@ -1,6 +1,7 @@
 //! Agent profiles in the service (#33): the statuses the snapshot shows and the sync runs.
 //! The file system work is a [`SyncPlan`], so the shell can run it without the service lock.
 use super::Service;
+use crate::app_log::{self, FailureLog};
 use crate::detect::{Fs, Host};
 use crate::launch::{HiddenLogin, LaunchPlan};
 use crate::models::{AgentId, LaunchRequest, ProfileStatus};
@@ -35,14 +36,26 @@ pub(super) struct ProfileState {
     /// right only while Claude Code is the one agent with a recipe — revisit (one clock per
     /// agent) when a second recipe arrives.
     last_sync: Option<Instant>,
+    /// The failing profiles the log last reported (#109).
+    failures: SyncFailures,
 }
 
-/// How a profile signs in (#41): hidden unless „Debug“ is on.
+/// [`FailureLog`] of the profile syncs: a profile that keeps failing is logged once, not
+/// every 15 minutes.
+struct SyncFailures(FailureLog);
+
+impl Default for SyncFailures {
+    fn default() -> Self {
+        Self(FailureLog::new("profile sync"))
+    }
+}
+
+/// How a profile signs in (#41): hidden unless the log level is „Debug“ (#109).
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub enum SignIn {
-    /// „Debug“ off: run [`HiddenLogin`] to its end, then read the statuses.
+    /// Level „Info“: run [`HiddenLogin`] to its end, then read the statuses.
     Hidden(HiddenLogin),
-    /// „Debug“ on: spawn the terminal (console `fallback` when wt.exe fails) and watch the
+    /// Level „Debug“: spawn the terminal (console `fallback` when wt.exe fails) and watch the
     /// status ([`crate::profiles::watch`]).
     Visible {
         plan: LaunchPlan,
@@ -67,6 +80,26 @@ fn warning(reports: &[(AgentId, Vec<ProfileReport>)]) -> Option<String> {
     failed.then(|| SYNC_WARNING.to_string())
 }
 
+/// `claude/team`: how a profile appears in the log.
+fn scope(agent: AgentId, id: &str) -> String {
+    format!("{}/{id}", agent.id())
+}
+
+/// One line per sync that created a link or wrote a file; a sync that changed nothing is
+/// silent, so the background schedule writes nothing every 15 minutes.
+fn log_changes(reports: &[(AgentId, Vec<ProfileReport>)]) {
+    let changed: Vec<String> = reports
+        .iter()
+        .flat_map(|(agent, reports)| {
+            let changed = reports.iter().filter(|report| report.changed);
+            changed.map(|report| scope(*agent, &report.id))
+        })
+        .collect();
+    if !changed.is_empty() {
+        app_log::info(&format!("profile sync: changed {}", changed.join(", ")));
+    }
+}
+
 impl Service {
     /// Where profiles live, resolved from the host once at startup.
     pub fn set_profile_homes(&mut self, homes: Option<Homes>) {
@@ -83,7 +116,7 @@ impl Service {
         )
     }
 
-    /// The sign-in of `profile` as the „Debug“ setting asks for it; checks and creates like
+    /// The sign-in of `profile` as the log level asks for it; checks and creates like
     /// [`Service::prepare_login`].
     pub fn prepare_sign_in(
         &self,
@@ -92,7 +125,7 @@ impl Service {
         host: &Host,
         fs: &dyn Fs,
     ) -> Result<SignIn, String> {
-        if self.state.settings.debug {
+        if self.state.settings.log_level == crate::app_log::Level::Debug {
             let (plan, fallback) = self.prepare_login(agent, profile, host, fs)?;
             return Ok(SignIn::Visible { plan, fallback });
         }
@@ -139,7 +172,9 @@ impl Service {
         let state = &mut self.profiles;
         state.facts.extend(outcome.facts);
         let mut text = None;
+        let synced = outcome.reports.is_some();
         if let Some(reports) = &outcome.reports {
+            log_changes(reports);
             // Every sync — at startup, after a save, on demand, before a start, in the
             // background — restarts the background schedule's interval.
             state.last_sync = Some(Instant::now());
@@ -160,6 +195,13 @@ impl Service {
         };
         state.facts.retain(|key, _| listed(key));
         state.errors.retain(|key, _| listed(key));
+        if synced {
+            let failing = state.errors.iter();
+            let current = failing.map(|((agent, id), error)| (scope(*agent, id), error.clone()));
+            for line in state.failures.0.lines(current.collect()) {
+                app_log::info(&line);
+            }
+        }
         self.touch();
         text
     }

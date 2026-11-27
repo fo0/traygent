@@ -427,8 +427,9 @@ pub struct AppSettings {
     /// Extra shared directories and files per agent; empty for an agent whose catalog
     /// entry has `profiles: false`.
     pub profile_share: PerAgent<ProfileShare>,
-    /// „Debug“ (#41): a profile sign-in opens the visible terminal instead of running hidden.
-    pub debug: bool,
+    /// The local log's level (#109). `debug` also opens a profile sign-in in the visible
+    /// terminal instead of running it hidden (#41).
+    pub log_level: crate::app_log::Level,
 }
 
 /// Mirrors `Snapshot` in `src/lib/types.ts`; replaced wholesale on every change.

@@ -1,13 +1,13 @@
 # ADR-0014: Opt-In Subscription Quota Reads
 
-- **Status:** Accepted
+- **Status:** Accepted; partly superseded — the Claude Code read and its tooltip by [ADR-0015](0015-read-the-claude-code-quota-through-the-cli.md)
 - **Date:** 2026-11-22
 - **Deciders:** Owner and implementation agent
 - **Tags:** quota, network, privacy, settings
 
 ## Context
 
-The composer shows the remaining subscription quota per agent (#83). For Claude Code and Codex, Traygent reads it from `api.anthropic.com/api/oauth/usage` and `chatgpt.com/backend-api/wham/usage`. Neither endpoint is documented for third-party use. Traygent queries them with the access token from the CLI's own subscription sign-in (`.credentials.json`, `auth.json`), reused read-only: it never refreshes the token, never stores it and wipes its copy after the request. No statement from either provider permitting this was found. OpenQuota, the reference implementation the reads were modelled on, states none either. An earlier `User-Agent: claude-code/…` override, which made the request look like the CLI's own, was removed in 42b162e.
+The composer shows the remaining subscription quota per agent (#83). For Claude Code and Codex, Traygent reads it from `api.anthropic.com/api/oauth/usage` _(superseded by ADR-0015)_ and `chatgpt.com/backend-api/wham/usage`. Neither endpoint is documented for third-party use. Traygent queries them with the access token from the CLI's own subscription sign-in (`.credentials.json`, `auth.json`), reused read-only: it never refreshes the token, never stores it and wipes its copy after the request. No statement from either provider permitting this was found. OpenQuota, the reference implementation the reads were modelled on, states none either. An earlier `User-Agent: claude-code/…` override, which made the request look like the CLI's own, was removed in 42b162e.
 
 OpenCode Go is different: its usage endpoint is queried with the user's own OpenCode Go API key, read from the OpenCode database.
 
@@ -15,7 +15,7 @@ The owner wants no terms-of-service risk by default.
 
 ## Decision
 
-We will make every quota read opt-in per agent through the setting `quotaReads` (`PerAgent<bool>`). It defaults to off for Claude Code and Codex and on for OpenCode Go. A state file without the field loads these defaults. „Einstellungen → Agenten → Kontingent“ carries the staged switch „Kontingent abfragen“; its tooltip says which sign-in the read uses and, for Claude Code and Codex, that the provider interface is not officially documented. With the switch off, the panel never calls `get_agent_quota` for that agent and drops its cached reading; the composer button shows no figure and no bar. Rust enforces the same: `quota::read` returns an empty result before the credential path is resolved, so no sign-in file or database is opened and no request is built. Requests that do run carry Traygent's own `User-Agent` only, and a scheduled refresh never follows the previous read of the same account by less than 30 seconds (a manual refresh reads at once).
+We will make every quota read opt-in per agent through the setting `quotaReads` (`PerAgent<bool>`). It defaults to off for Claude Code and Codex and on for OpenCode Go. A state file without the field loads these defaults. „Einstellungen → Agenten → Kontingent“ carries the staged switch „Kontingent abfragen“; its tooltip says which sign-in the read uses and, for Claude Code and Codex, that the provider interface is not officially documented _(superseded by ADR-0015 for Claude Code)_. With the switch off, the panel never calls `get_agent_quota` for that agent and drops its cached reading; the composer button shows no figure and no bar. Rust enforces the same: `quota::read` returns an empty result before the credential path is resolved, so no sign-in file or database is opened and no request is built. Requests that do run carry Traygent's own `User-Agent` only, and a scheduled refresh never follows the previous read of the same account by less than 30 seconds (a manual refresh reads at once).
 
 ## Consequences
 

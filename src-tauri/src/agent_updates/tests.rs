@@ -401,3 +401,38 @@ fn the_schedule_waits_for_the_setting_the_start_and_the_interval() {
     assert!(due(true, 5 * hour, Some(4 * hour)));
     assert!(due(true, 9 * hour, Some(5 * hour)));
 }
+
+#[test]
+fn each_step_of_a_run_is_one_log_line_without_the_user_path() {
+    let at = |state| status(AgentId::Claude, state, clock());
+    assert_eq!(
+        log_line(&at(AgentUpdateState::Running)),
+        "agent update: claude started"
+    );
+    let updated = AgentUpdateStatus {
+        version: Some("2.1.1".into()),
+        from: Some("2.1.0".into()),
+        ..at(AgentUpdateState::Updated)
+    };
+    assert_eq!(
+        log_line(&updated),
+        "agent update: claude updated 2.1.0 -> 2.1.1"
+    );
+    let current = AgentUpdateStatus {
+        version: Some("2.1.1".into()),
+        ..at(AgentUpdateState::Current)
+    };
+    assert_eq!(log_line(&current), "agent update: claude current 2.1.1");
+    let held = AgentUpdateStatus {
+        by: Some(r"C:\Users\someone\.local\bin\claude.exe".into()),
+        ..at(AgentUpdateState::InUse)
+    };
+    assert_eq!(
+        log_line(&held),
+        "agent update: claude skipped, in use by claude.exe"
+    );
+    assert_eq!(
+        log_line(&at(AgentUpdateState::Failed)),
+        "agent update: claude failed"
+    );
+}

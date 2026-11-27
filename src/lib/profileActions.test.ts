@@ -2,14 +2,14 @@ import { describe, expect, it, vi } from 'vitest';
 import { demoSnapshot } from './demo';
 import { signedIn } from './demoProfiles';
 import { DEBUG_HINT, ProfileActions } from './profileActions.svelte';
-import type { Snapshot } from './types';
+import type { LogLevel, Snapshot } from './types';
 
 /** A sign-in the test ends by hand, against a labelled stand-in bridge. */
-function setup(debug = false, found = true) {
+function setup(level: LogLevel = 'info', found = true) {
   const shown: Snapshot[] = [];
   const base = (signed: boolean) => {
     const value = demoSnapshot(0);
-    value.settings.debug = debug;
+    value.settings.logLevel = level;
     if (signed) value.profiles = signedIn(value.profiles, 'claude', 'team');
     return value;
   };
@@ -122,7 +122,7 @@ describe('ProfileActions sign-in (#41)', () => {
   });
 
   it('a cancel that found nothing does not hide a later real failure', async () => {
-    const { actions, fail } = setup(false, false);
+    const { actions, fail } = setup('info', false);
     const result = actions.login('claude', 'team');
     await actions.cancel('claude', 'team');
     fail('Anmeldung fehlgeschlagen.');
@@ -130,9 +130,9 @@ describe('ProfileActions sign-in (#41)', () => {
     expect(actions.failure?.text).toBe('Anmeldung fehlgeschlagen.');
   });
 
-  it('with „Debug“ the row waits until the terminal opened: no cancel, no hint', async () => {
+  it('at the log level „Debug“ the row waits until the terminal opened: no cancel, no hint', async () => {
     const { actions, base, finish, fail, profileLogin, cancelProfileLogin } =
-      setup(true);
+      setup('debug');
     const opened = actions.login('claude', 'team');
     expect(actions.running('claude', 'team')).toBe(true);
     // A visible sign-in has no cancel.

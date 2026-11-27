@@ -1,4 +1,4 @@
-//! The sign-in of a profile (#41): hidden unless „Debug“ is on, and the status watch after a
+//! The sign-in of a profile (#41): hidden unless the log level is „Debug“ (#109), and the status watch after a
 //! visible one, run against a service in a mutex as the shell does. Synthetic data only.
 use super::*;
 use crate::launch::tests::decode_command;
@@ -18,7 +18,7 @@ fn serial() -> MutexGuard<'static, ()> {
 }
 
 #[test]
-fn a_sign_in_runs_hidden_unless_debug_is_on() {
+fn a_sign_in_runs_hidden_unless_the_log_level_is_debug() {
     let dir = TempDir::new("service-sign-in-mode");
     let mut service = service(&dir);
     let (host, fs) = (windows_host(), fs());
@@ -47,7 +47,7 @@ fn a_sign_in_runs_hidden_unless_debug_is_on() {
         "Claude Code ist nicht installiert."
     );
     let mut settings = service.settings().clone();
-    settings.debug = true;
+    settings.log_level = crate::app_log::Level::Debug;
     service.save_settings(settings).unwrap();
     let SignIn::Visible { plan, fallback } = service
         .prepare_sign_in(AgentId::Claude, "default", &host, &fs)

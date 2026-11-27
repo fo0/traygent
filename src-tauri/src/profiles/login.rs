@@ -1,4 +1,4 @@
-//! The hidden sign-in of a profile (#41, „Debug“ off): the plan of
+//! The hidden sign-in of a profile (#41, log level „Info“): the plan of
 //! [`crate::launch::hidden_login_plan`] runs without a window, stdin closed, for at most
 //! [`LOGIN_LIMIT`]. One sign-in per profile at a time; a cancel, the limit or the app's exit
 //! ends the whole process tree.
@@ -74,15 +74,27 @@ pub fn run_hidden(
     cancel: &AtomicBool,
     limit: Duration,
 ) -> LoginEnd {
-    if !program.is_absolute() {
+    let Some(mut command) = hidden_command(program, args, cwd) else {
         return LoginEnd::NotStarted;
+    };
+    let Ok(mut child) = command.stdout(Stdio::null()).spawn() else {
+        return LoginEnd::NotStarted;
+    };
+    watch_child(&mut child, cancel, limit)
+}
+
+/// The command of a hidden process, shared with the quota read of the Claude Code CLI
+/// (`quota/claude_cli.rs`): absolute program only (`None` otherwise), no window, stdin
+/// closed, stderr to the null device. The caller chooses stdout.
+pub(crate) fn hidden_command(program: &Path, args: &[String], cwd: &str) -> Option<Command> {
+    if !program.is_absolute() {
+        return None;
     }
     let mut command = Command::new(program);
     command
         .args(args)
         .current_dir(cwd)
         .stdin(Stdio::null())
-        .stdout(Stdio::null())
         .stderr(Stdio::null());
     #[cfg(windows)]
     {
@@ -90,12 +102,15 @@ pub fn run_hidden(
         const CREATE_NO_WINDOW: u32 = 0x0800_0000;
         command.creation_flags(CREATE_NO_WINDOW);
     }
-    let Ok(mut child) = command.spawn() else {
-        return LoginEnd::NotStarted;
-    };
+    Some(command)
+}
+
+/// Waits for a started hidden process: its end, `cancel` or `limit`; the last two end the
+/// process tree ([`stop`]).
+pub(crate) fn watch_child(child: &mut Child, cancel: &AtomicBool, limit: Duration) -> LoginEnd {
     let deadline = Instant::now() + limit;
     let poll = |child: &mut Child| child.try_wait().map(|status| status.map(|s| s.code()));
-    watch(&mut child, poll, stop, cancel, deadline)
+    watch(child, poll, stop, cancel, deadline)
 }
 
 /// The wait loop of [`run_hidden`]: `poll` first — a process that ended in the same tick as

@@ -2,10 +2,10 @@
   import { onDestroy, untrack } from 'svelte';
   import AgentSettings from './AgentSettings.svelte';
   import AgentUpdates from './AgentUpdates.svelte';
-  import DebugSetting from './DebugSetting.svelte';
   import EnvSettings from './EnvSettings.svelte';
   import GithubSettings from './GithubSettings.svelte';
   import Icon from './Icon.svelte';
+  import LogSetting from './LogSetting.svelte';
   import Modal from './Modal.svelte';
   import StartupSettings from './StartupSettings.svelte';
   import ThemeSetting from './ThemeSetting.svelte';
@@ -38,6 +38,7 @@
     onSaveSettings,
     onInstallAgent,
     onUpdateAgents,
+    onOpenLogFolder,
     onInstalled,
     onClose,
   }: {
@@ -67,6 +68,8 @@
     onInstallAgent: (agent: AgentId) => Promise<void>;
     /** An immediate action, not staged: starts an agent CLI update run. */
     onUpdateAgents: () => Promise<void>;
+    /** An immediate action, not staged: shows the log folder. */
+    onOpenLogFolder: () => Promise<void>;
     /** The install flow closed the dialog: the panel says what comes next. */
     onInstalled?: () => void;
     returnFocus?: (() => HTMLElement | null | undefined) | undefined;
@@ -268,7 +271,7 @@
       <ThemeSetting bind:value={theme} />
       <StartupSettings {native} {autostart} />
       <QuotaIntervalSetting {draft} />
-      <DebugSetting {draft} />
+      <LogSetting {draft} {native} onOpenFolder={onOpenLogFolder} />
     {:else}
       <UpdatePanel
         currentVersion={appVersion}

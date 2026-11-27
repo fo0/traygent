@@ -113,9 +113,14 @@ export function shownQuotaProfiles(
 /** The tile's description while the agent's read is off. */
 export const QUOTA_OFF_HINT = 'Kontingentabfrage ausgeschaltet';
 
-/** Where the read's sign-in comes from, for the switch's tooltip. */
+/** Where the read's sign-in comes from, for the switch's tooltip (ADR-0014, ADR-0015). */
 export function quotaReadTip(agent: AgentId): string {
-  return agent === 'opencode'
-    ? 'Nutzt den eigenen OpenCode-Go-Schlüssel aus der OpenCode-Anmeldung'
-    : 'Nutzt die CLI-Anmeldung gegen eine nicht offiziell dokumentierte Schnittstelle des Anbieters';
+  switch (agent) {
+    case 'opencode':
+      return 'Nutzt den eigenen OpenCode-Go-Schlüssel aus der OpenCode-Anmeldung';
+    case 'claude':
+      return 'Startet die Claude-Code-CLI (/usage) mit der Anmeldung dieses Profils';
+    default:
+      return 'Nutzt die CLI-Anmeldung gegen eine nicht offiziell dokumentierte Schnittstelle des Anbieters';
+  }
 }

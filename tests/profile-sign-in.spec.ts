@@ -206,19 +206,22 @@ test('a failed hidden sign-in stays inline, named, with the „Debug“ hint as 
   await expect(alert).toHaveCount(0);
 });
 
-test('„Debug“ is a staged switch under App; with it the sign-in opens a terminal', async ({
+test('the staged „Protokoll“ level „Debug“ under App makes the sign-in open a terminal', async ({
   page,
 }) => {
   await page.goto('/');
   let dialog = await openAgents(page);
   await dialog.getByRole('tab', { name: /^App/ }).click();
-  const debug = dialog.getByRole('checkbox', { name: 'Debug' });
+  const levels = dialog.getByRole('radiogroup', { name: 'Protokoll' });
+  const debug = levels.getByRole('radio', { name: 'Debug', exact: true });
   await expect(debug).not.toBeChecked();
-  await expect(dialog.locator('.debug-setting .switch-row')).toHaveAttribute(
+  await expect(
+    dialog.locator('.log-setting .theme-option', { hasText: 'Debug' }),
+  ).toHaveAttribute(
     'title',
-    'Anmeldung im sichtbaren Terminal, Fehler mit Ausgabe',
+    'Ausführliches Protokoll; Profil-Anmeldung im sichtbaren Terminal',
   );
-  await dialog.getByText('Debug', { exact: true }).click();
+  await debug.check();
   await expect(debug).toBeChecked();
   await dialog.getByRole('button', { name: 'Speichern', exact: true }).click();
   await expect(dialog).toHaveCount(0);
@@ -254,11 +257,11 @@ test('the rest of a double-click or a held Enter never cancels the sign-in it st
   expect(await readCalls(page, 'profile_login')).toHaveLength(1);
 });
 
-test('with „Debug“ the button only waits for the terminal: no cancel', async ({
+test('at the log level „Debug“ the button only waits for the terminal: no cancel', async ({
   page,
 }) => {
   const snapshot = nativeSnapshot();
-  snapshot.settings.debug = true;
+  snapshot.settings.logLevel = 'debug';
   const mock = await heldSignIn(page, true, snapshot);
   await page.goto('/');
   const dialog = await openAgents(page);

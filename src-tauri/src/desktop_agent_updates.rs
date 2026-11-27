@@ -19,8 +19,9 @@ fn emit(app: &AppHandle, snapshot: &Snapshot) {
     }
 }
 
-/// Commits one agent's status under a short lock and emits the snapshot.
+/// Commits one agent's status under a short lock, logs it (#109) and emits the snapshot.
 fn report(app: &AppHandle, status: AgentUpdateStatus) {
+    traygent_core::app_log::info(&agent_updates::log_line(&status));
     let state = app.state::<NativeState>();
     let mut service = state.lock();
     service.set_agent_update(status);
@@ -70,6 +71,7 @@ fn run(app: &AppHandle, targets: &[(AgentId, Candidate)]) {
     let finished = catch_unwind(AssertUnwindSafe(|| update_all(app, targets)));
     if finished.is_err() {
         eprintln!("Traygent: agent update run panicked");
+        traygent_core::app_log::info("agent update: run broke down");
     }
     let state = app.state::<NativeState>();
     let mut service = state.lock();
@@ -109,6 +111,14 @@ fn update_all(app: &AppHandle, targets: &[(AgentId, Candidate)]) {
             app,
             agent_updates::status(*agent, running, chrono::Utc::now()),
         );
+        // `running` refuses new quota reads of Claude Code; one already counted ends within
+        // its limit, so its short-lived CLI process does not make the in-use check skip the
+        // update (ADR-0015).
+        if *agent == AgentId::Claude {
+            traygent_core::quota::wait_for_cli_reads(
+                traygent_core::quota::READ_LIMIT + std::time::Duration::from_secs(5),
+            );
+        }
         let status = agent_updates::run_agent(*agent, cli, &host, &RealFs, &runners, &|| {
             chrono::Utc::now()
         });
