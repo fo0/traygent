@@ -3,6 +3,7 @@
 //! The browser preview serves its own demo snapshot (`src/lib/demo.ts`).
 
 pub mod agent_updates;
+pub mod app_log;
 pub mod catalog;
 pub mod detect;
 pub mod github;
