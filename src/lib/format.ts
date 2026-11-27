@@ -34,6 +34,24 @@ export function clockTime(value: string | number | Date = new Date()) {
   });
 }
 
+/**
+ * A coming moment as „um 09:42“, or „am 28.11. um 09:42“ when it falls on
+ * another calendar day than `now` (de-DE), so a wait of a day or more never
+ * reads like a time later today.
+ */
+export function atTime(
+  value: string | number | Date,
+  now: number = Date.now(),
+) {
+  const time = new Date(value);
+  const sameDay = time.toDateString() === new Date(now).toDateString();
+  const day = time.toLocaleDateString('de-DE', {
+    day: '2-digit',
+    month: '2-digit',
+  });
+  return `${sameDay ? '' : `am ${day} `}um ${clockTime(time)}`;
+}
+
 /** Local date and time as `01.11.2026, 09:42` (de-DE). */
 export function dateTime(value: string | number | Date) {
   return new Date(value).toLocaleString('de-DE', {
