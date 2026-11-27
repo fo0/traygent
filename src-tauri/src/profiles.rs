@@ -213,6 +213,16 @@ pub fn is_valid_id(id: &str) -> bool {
         && id.chars().all(|c| safe(c) || c == '-')
 }
 
+/// A profile id as a log line names it (#109): the id when it is `default` or valid, else
+/// `<invalid>` — an id from IPC is caller-supplied text.
+pub fn log_id(id: &str) -> &str {
+    if id == DEFAULT_PROFILE || is_valid_id(id) {
+        id
+    } else {
+        "<invalid>"
+    }
+}
+
 /// Where profiles live on this host: the user profile, absolute and fully expanded.
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct Homes {

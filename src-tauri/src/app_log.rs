@@ -85,32 +85,54 @@ pub fn url_path(url: &str) -> &str {
     &rest[..rest.find(['?', '#']).unwrap_or(rest.len())]
 }
 
-/// The one point every line passes before it is written: a word that looks like a credential
-/// (or follows `bearer` / `basic`) is replaced, control characters and line breaks go, and
-/// the length is bounded.
+/// Names whose value follows a `:` or `=` (`"access_token": "…"`, `x-api-key: …`,
+/// `Authorization:Bearer …`), matched at the end of the name where a `_`, `-`, `.` or a
+/// capital letter starts them (`apiKey`, not `monkey`).
+const SECRET_NAMES: [&str; 10] = [
+    "token",
+    "secret",
+    "password",
+    "passwd",
+    "key",
+    "apikey",
+    "cookie",
+    "authorization",
+    "credential",
+    "credentials",
+];
+
+/// The one point every line passes before it is written: control and invisible format
+/// characters go first (so no zero-width or bidi mark hides a credential), then a word that
+/// looks like a credential — a mark, an API key, a JWT, the value of a secret name, the word
+/// after `bearer` / `basic` — is replaced, line breaks go, and the length is bounded.
 pub fn sanitise(message: &str) -> String {
     if message.contains("-----BEGIN") {
         return REDACTED.into();
     }
-    let mut out = String::with_capacity(message.len().min(MAX_MESSAGE_CHARS));
-    let mut after_scheme = false;
-    for word in message.split_whitespace() {
+    let visible: String = message.chars().filter(|c| !hidden(*c)).collect();
+    let mut out = String::with_capacity(visible.len().min(MAX_MESSAGE_CHARS));
+    // The word after `bearer` / `basic`, and the value after a secret name's `:` or `=`;
+    // a scheme word between a name and its value stays readable.
+    let (mut after_scheme, mut after_name) = (false, false);
+    for word in visible.split_whitespace() {
         if !out.is_empty() {
             out.push(' ');
         }
         let lower = word.to_ascii_lowercase();
+        let scheme = is_scheme(&lower);
+        let named = named_value(word);
         let secret = after_scheme
+            || (after_name && !scheme)
+            || named.is_some_and(|value| !value.is_empty())
             || SECRET_MARKS.iter().any(|mark| lower.contains(mark))
-            || key_piece(&lower);
-        after_scheme = matches!(
-            lower.trim_matches(|c: char| !c.is_ascii_alphanumeric()),
-            "bearer" | "basic"
-        );
-        if secret {
-            out.push_str(REDACTED);
-        } else {
-            out.extend(word.chars().filter(|c| !c.is_control()));
-        }
+            || key_piece(&lower)
+            || jwt(word);
+        after_name = match named {
+            Some(value) => value.is_empty(),
+            None => after_name && scheme,
+        };
+        after_scheme = scheme || named.is_some_and(is_scheme);
+        out.push_str(if secret { REDACTED } else { word });
     }
     if out.chars().count() > MAX_MESSAGE_CHARS {
         out = out.chars().take(MAX_MESSAGE_CHARS).collect();
@@ -119,11 +141,64 @@ pub fn sanitise(message: &str) -> String {
     out
 }
 
+/// Control characters other than whitespace, and the zero-width and bidirectional format
+/// characters that would make a line read differently from what it holds.
+fn hidden(c: char) -> bool {
+    (c.is_control() && !c.is_whitespace())
+        || matches!(
+            c,
+            '\u{200B}'..='\u{200F}'
+                | '\u{202A}'..='\u{202E}'
+                | '\u{2060}'..='\u{2064}'
+                | '\u{2066}'..='\u{2069}'
+                | '\u{FEFF}'
+        )
+}
+
+fn is_scheme(word: &str) -> bool {
+    let word = word.trim_matches(|c: char| !c.is_ascii_alphanumeric());
+    word.eq_ignore_ascii_case("bearer") || word.eq_ignore_ascii_case("basic")
+}
+
+/// For a word `<secret name>:<value>` or `<secret name>=<value>`: the value, trimmed of
+/// quotes and punctuation (empty when it is the next word).
+fn named_value(word: &str) -> Option<&str> {
+    let at = word.find([':', '='])?;
+    let name = word[..at].trim_matches(|c: char| !c.is_ascii_alphanumeric());
+    secret_name(name).then(|| word[at + 1..].trim_matches(|c: char| !c.is_ascii_alphanumeric()))
+}
+
+fn secret_name(name: &str) -> bool {
+    SECRET_NAMES.iter().any(|secret| {
+        let Some(at) = name.len().checked_sub(secret.len()) else {
+            return false;
+        };
+        if !name.is_char_boundary(at) {
+            return false;
+        }
+        let (head, tail) = name.split_at(at);
+        tail.eq_ignore_ascii_case(secret)
+            && (head.is_empty()
+                || head.ends_with(['_', '-', '.'])
+                || tail.starts_with(|c: char| c.is_ascii_uppercase()))
+    })
+}
+
 /// Whether a piece of `word` (split at anything but letters, digits, `-` and `_`) starts
 /// like an API key (`sk-…`).
 fn key_piece(word: &str) -> bool {
     word.split(|c: char| !(c.is_ascii_alphanumeric() || c == '-' || c == '_'))
         .any(|piece| piece.starts_with("sk-"))
+}
+
+/// Whether a piece of `word` is shaped like a JSON Web Token: `eyJ…` with three non-empty
+/// dot-separated parts.
+fn jwt(word: &str) -> bool {
+    word.split(|c: char| !(c.is_ascii_alphanumeric() || matches!(c, '-' | '_' | '.')))
+        .any(|piece| {
+            piece.starts_with("eyJ")
+                && piece.split('.').filter(|part| !part.is_empty()).count() >= 3
+        })
 }
 
 /// One log directory. The process uses a single instance behind [`init`]; tests build their

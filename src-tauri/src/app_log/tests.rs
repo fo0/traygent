@@ -117,6 +117,58 @@ fn ordinary_words_with_key_like_parts_stay_readable() {
     // `sk-` counts only at the start of a word's piece; ids and German text stay.
     let line = "task-1 desk-2 profile=team agent=claude reason=Anmeldung abgebrochen.";
     assert_eq!(sanitise(line), line);
+    for line in [
+        "profile sync failed: claude/team reason=Der Profilordner ist nicht verfügbar: kein Benutzerordner gefunden.",
+        "hotkey: Alt+Space monkey: 1 keyboard: de passwords are never logged",
+        "quota claude profile=team failed: cli exit=1 reason=Die Claude-Code-CLI meldet einen Fehler.",
+        "version eyJ.only eyJabc.def.",
+    ] {
+        assert_eq!(sanitise(line), line);
+    }
+}
+
+#[test]
+fn the_value_after_a_secret_name_is_redacted() {
+    for (line, expected) in [
+        (
+            r#"{"access_token": "abc", "expires": 3600}"#,
+            r#"[redacted] [redacted] "expires": 3600}"#,
+        ),
+        ("token: abc end", "token: [redacted] end"),
+        ("api_key: abc end", "api_key: [redacted] end"),
+        ("x-api-key: abc end", "x-api-key: [redacted] end"),
+        ("Cookie: session=abc end", "Cookie: [redacted] end"),
+        ("Authorization: abc end", "Authorization: [redacted] end"),
+        ("apiKey: abc end", "apiKey: [redacted] end"),
+        // A value in the same word, and a scheme without a space.
+        ("Cookie:abc end", "[redacted] end"),
+        ("Authorization:Bearer abc end", "[redacted] [redacted] end"),
+        (
+            "Authorization: Basic abc end",
+            "Authorization: Basic [redacted] end",
+        ),
+    ] {
+        assert_eq!(sanitise(line), expected, "{line}");
+    }
+}
+
+#[test]
+fn jwt_shaped_words_are_redacted() {
+    let jwt = "eyJhbGciOiJIUzI1NiJ9.eyJzdWIiOiJmaXh0dXJlIn0.Zml4dHVyZS1zaWduYXR1cmU";
+    assert_eq!(sanitise(&format!("id {jwt} end")), "id [redacted] end");
+    assert_eq!(sanitise(&format!("(\"{jwt}\"),")), "[redacted]");
+}
+
+#[test]
+fn invisible_format_characters_are_dropped_before_the_check() {
+    // A zero-width space would otherwise split the mark `sk-ant-`; bidi marks reorder text.
+    let hidden = "key sk-\u{200B}ant-fixture end";
+    assert_eq!(sanitise(hidden), "key [redacted] end");
+    for c in [
+        '\u{200B}', '\u{200F}', '\u{202A}', '\u{202E}', '\u{2066}', '\u{2069}', '\u{FEFF}',
+    ] {
+        assert_eq!(sanitise(&format!("a{c}b")), "ab", "{:X}", c as u32);
+    }
 }
 
 #[test]

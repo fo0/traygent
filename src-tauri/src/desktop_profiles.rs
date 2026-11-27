@@ -114,7 +114,11 @@ pub async fn profile_login(
     agent: AgentId,
     profile: String,
 ) -> Result<Snapshot, String> {
-    let who = format!("agent={} profile={profile}", agent.id());
+    let who = format!(
+        "agent={} profile={}",
+        agent.id(),
+        traygent_core::profiles::log_id(&profile)
+    );
     // Read under a short lock, never behind blocking work.
     let visible = app.state::<NativeState>().lock().settings().log_level == Level::Debug;
     let mode = if visible { "visible" } else { "hidden" };

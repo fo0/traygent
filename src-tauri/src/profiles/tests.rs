@@ -215,6 +215,16 @@ fn profile_ids_are_safe_directory_name_parts() {
 }
 
 #[test]
+fn a_log_line_names_only_a_valid_profile_id() {
+    for id in ["default", "team", "max-2"] {
+        assert_eq!(log_id(id), id);
+    }
+    for id in ["", "Team", "a b=c", "x\u{202E}y", "token=abc", "../x"] {
+        assert_eq!(log_id(id), "<invalid>", "{id}");
+    }
+}
+
+#[test]
 fn directories_are_built_from_the_user_profile_and_fixed_names() {
     let homes = Homes::new(r"C:\Users\max\", true).unwrap();
     assert_eq!(

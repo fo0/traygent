@@ -111,10 +111,14 @@ pub async fn launch_session(
         "agent={} env={} profile={}",
         request.agent.id(),
         request.env.id(),
-        request
-            .profile
-            .as_deref()
-            .unwrap_or(traygent_core::DEFAULT_PROFILE)
+        traygent_core::profiles::log_id(
+            request
+                .profile
+                .as_deref()
+                .map(str::trim)
+                .filter(|id| !id.is_empty())
+                .unwrap_or(traygent_core::DEFAULT_PROFILE)
+        )
     );
     let outcome = launch(app, request).await;
     match &outcome {
