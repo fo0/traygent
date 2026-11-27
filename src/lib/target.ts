@@ -14,7 +14,7 @@ export type Target =
   | { kind: 'search'; query: string };
 
 /** At most this many suggestions under the field. */
-export const SUGGESTION_LIMIT = 8;
+const SUGGESTION_LIMIT = 8;
 /** A listing older than this is read again when the field gets focus. */
 export const LISTING_MAX_AGE = 15 * 60_000;
 
@@ -27,7 +27,7 @@ const SSH = /^git@github\.com:([^/\s]+)\/([^/\s]+)$/i;
 const BARE = /^([^/\s]+)\/([^/\s]+)$/;
 
 /** A valid repository, the name without its `.git` suffix; null otherwise. */
-export function repoRef(owner: string, rawName: string): RepoRef | null {
+function repoRef(owner: string, rawName: string): RepoRef | null {
   const name = rawName.replace(/\.git$/, '');
   if (!OWNER.test(owner) || !NAME.test(name)) return null;
   if (name === '.' || name === '..') return null;
