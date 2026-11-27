@@ -14,12 +14,12 @@
 
 export const MAX_PORTS = 20;
 /** The bind address of every entry typed without an IP: never the LAN. */
-export const LOOPBACK = '127.0.0.1';
+const LOOPBACK = '127.0.0.1';
 export const TOO_MANY = `Höchstens ${MAX_PORTS} Port-Angaben erlaubt.`;
 export const DOCKER_ONLY =
   'Ports lassen sich nur für Docker-Sessions freigeben.';
 /** A range covers at most this many ports. */
-export const MAX_SPAN = 100;
+const MAX_SPAN = 100;
 /** Longer input is never a valid spec. */
 const MAX_SPEC_CHARS = 64;
 /** How much of a refused spec the error repeats. */
@@ -47,14 +47,14 @@ const UNPRINTABLE = /[^\x20-\x7e]/gu;
  */
 const EDGE_SPACE =
   /^[\t\n\v\f\r \u0085\u00a0\u1680\u2000-\u200a\u2028\u2029\u202f\u205f\u3000]+|[\t\n\v\f\r \u0085\u00a0\u1680\u2000-\u200a\u2028\u2029\u202f\u205f\u3000]+$/g;
-export const trimPort = (text: string) => text.replace(EDGE_SPACE, '');
+const trimPort = (text: string) => text.replace(EDGE_SPACE, '');
 
 /** The input for an error message: printable ASCII only, at most 32 characters. */
 function shown(spec: string) {
   const clean = spec.replace(UNPRINTABLE, '');
   return clean.length > SHOWN_CHARS ? `${clean.slice(0, SHOWN_CHARS)}…` : clean;
 }
-export const invalidPort = (spec: string) =>
+const invalidPort = (spec: string) =>
   `Port „${shown(trimPort(spec))}“ ist ungültig.`;
 
 class PortError extends Error {}
@@ -131,7 +131,7 @@ export function parsePort(
 const rangeText = (value: PortRange) =>
   value.from === value.to ? `${value.from}` : `${value.from}-${value.to}`;
 
-export function formatPort(spec: PortSpec): string {
+function formatPort(spec: PortSpec): string {
   const suffix = spec.udp ? '/udp' : '';
   return `${spec.ip}:${rangeText(spec.host)}:${rangeText(spec.container)}${suffix}`;
 }

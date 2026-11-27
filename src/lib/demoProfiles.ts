@@ -33,10 +33,10 @@ export function demoProfileShare(): Record<AgentId, ProfileShare> {
 }
 
 /** The invented account every demo sign-in reports. */
-export const DEMO_PROFILE_ACCOUNT = 'demo@example.com';
+const DEMO_PROFILE_ACCOUNT = 'demo@example.com';
 
 /** The invented organization a demo sign-in of a profile reports. */
-export const demoOrganization = (id: string, label: string) =>
+const demoOrganization = (id: string, label: string) =>
   id === DEFAULT_PROFILE ? 'Beispiel GmbH' : `Beispiel ${label}`;
 
 /**
