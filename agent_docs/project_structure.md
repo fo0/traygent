@@ -5,6 +5,7 @@ Moved from `CLAUDE.md` (context budget). Top-level directories are listed there 
 ```
 src/        Svelte panel, lib/ = components, controllers (panel, composer, settings draft, GitHub and profile actions),
             target.ts (folder field classification), profiles.ts (profile rules), profileShare.ts (extra shared names),
+            jsonValues.ts (structural compare and rebase of staged settings),
             IPC map, demo (demoGithub.ts = synthetic account, demoProfiles.ts); styles/ = ordered CSS
 src-tauri/  Rust core crate (traygent_core: catalog, settings/ (profiles, share), recents, store, detect/, launch/, spawn,
             ports, repo, github/ (api, http, gh, discover, process, vault, secret), profiles/ (sync, foreign, marker,

@@ -1,5 +1,6 @@
 import { catalogEntry, nextPermission, sentOptions } from './agents';
 import { shownEnv, shownEnvs } from './environments';
+import { same } from './jsonValues';
 import {
   DEFAULT_PROFILE,
   agentProfiles,
@@ -26,9 +27,6 @@ const FALLBACK: LaunchOptions = {
   permission: 'auto',
   extraArgs: '',
 };
-
-const same = (a: unknown, b: unknown) =>
-  JSON.stringify(a) === JSON.stringify(b);
 
 /** The field text that starts a recent again: its repository, else its folder. */
 export const recentTarget = (recent: RecentSession | undefined) =>
