@@ -51,8 +51,9 @@ Brand top left: icon + „Traygent“. Window ~480×760, frameless, tray popup l
      A read the provider limits (HTTP 429, #100; `get_agent_quota` answers no windows, the
      detail and `retryAfterSecs`, its `Retry-After` in seconds, at most a day, `0` without one)
      keeps the last figures with their „Stand“ until their own reset; the tooltip names the
-     next attempt („Zu viele Abfragen. Nächster Versuch um hh:mm.“). Reads of one provider run
-     one at a time, at least 5 s apart (plus up to 2 s jitter); a limited account waits 5, 10,
+     next attempt („Zu viele Abfragen. Nächster Versuch um hh:mm.“, „am TT.MM. um hh:mm“ when
+     it is not today). Reads of one provider run one at a time, at least 5 s apart (plus up
+     to 2 s jitter); a limited account waits 5, 10,
      20, 40, then 60 minutes or its `Retry-After`, whichever is longer, also on a manual refresh,
      while the automatic read still waits for its regular interval.
      The line never wraps: the profile name ellipsizes first. The tooltip and accessible

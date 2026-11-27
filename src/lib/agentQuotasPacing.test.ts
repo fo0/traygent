@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { AgentQuotas } from './agentQuotas.svelte';
-import { clockTime } from './format';
+import { atTime } from './format';
 import { quotaView } from './quotaDisplay';
 import type { AgentQuota } from './quotaTypes';
 
@@ -99,7 +99,7 @@ describe('paced quota reads', () => {
     expect(get).toHaveBeenCalledTimes(1);
     // The regular 15-minute read comes after the 5-minute backoff: it is named.
     expect(quotas.read('claude')?.detail).toBe(
-      `Zu viele Abfragen. Nächster Versuch um ${clockTime(t0 + 15 * MINUTE)}.`,
+      `Zu viele Abfragen. Nächster Versuch ${atTime(t0 + 15 * MINUTE, t0)}.`,
     );
     await at(t0 + 5 * MINUTE - 1, 1);
     await at(t0 + 5 * MINUTE, 2);
@@ -131,6 +131,17 @@ describe('paced quota reads', () => {
     await flush();
     expect(get).toHaveBeenCalledTimes(2);
     expect(quotas.read('claude')).toEqual(usage(5));
+  });
+
+  it('names the day of a next attempt that is not today', async () => {
+    vi.useFakeTimers({ now: new Date(2026, 5, 17, 12, 0) });
+    const get = vi.fn().mockResolvedValue(limited(20 * 3_600));
+    const quotas = new AgentQuotas(get, () => 0);
+    quotas.follow([standard]);
+    await flush();
+    expect(quotas.read('claude')?.detail).toBe(
+      'Zu viele Abfragen. Nächster Versuch am 18.06. um 08:00.',
+    );
   });
 
   it('keeps the last figures through 429s until their own reset, not a quarter of an hour', async () => {
@@ -171,7 +182,9 @@ describe('paced quota reads', () => {
     };
     const view = quotaView([reading], ['week'], t0 + 20 * MINUTE);
     expect(view.week.used).toBe(40);
-    expect(view.hint).toMatch(/Zu viele Abfragen\. Nächster Versuch um/);
+    expect(view.hint).toMatch(
+      /Zu viele Abfragen\. Nächster Versuch (am .+ )?um/,
+    );
     expect(
       quotaView([reading], ['week'], t0 + 2 * 60 * MINUTE).week.used,
     ).toBeNull();

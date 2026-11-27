@@ -66,21 +66,69 @@ export function rowStep(
   }
 }
 
+/** How long typed letters keep adding to one type-ahead search. */
+export const TYPEAHEAD_RESET = 700;
+
+/**
+ * The row whose name starts with the typed `query` (case-insensitive), or
+ * null: the search runs from row `current` itself, so a longer prefix keeps a
+ * row that still matches, and wraps at the end. One letter typed again and
+ * again („t“, „tt“, …) steps through the rows starting with it instead.
+ */
+export function typeaheadRow(
+  names: readonly string[],
+  current: number,
+  query: string,
+): number | null {
+  const typed = query.toLocaleLowerCase('de-DE');
+  if (!typed || !names.length) return null;
+  const repeated = [...typed].every((char) => char === typed[0]);
+  const prefix = repeated ? typed[0]! : typed;
+  const from = Math.max(current, 0) + (repeated ? 1 : 0);
+  for (let step = 0; step < names.length; step++) {
+    const index = (from + step) % names.length;
+    if (names[index]!.toLocaleLowerCase('de-DE').startsWith(prefix))
+      return index;
+  }
+  return null;
+}
+
 /**
  * Svelte action for the „Workspaces“ list: on a row's start, ↑ / ↓, Home and
- * End move focus to another row's start instead of scrolling. Keys with a
- * modifier pass, and „⋯“ keeps its own arrow keys (they open its menu).
+ * End move focus to another row's start instead of scrolling, and typed
+ * letters move it to the next row whose folder name starts with them (a
+ * Space in the middle of such a search belongs to it and never starts the
+ * row). Keys with a modifier pass, and „⋯“ keeps its own keys (its arrow
+ * keys open its menu).
  */
 export function rowKeys(node: HTMLElement) {
+  let typed = '';
+  let typedAt = -Infinity;
   const onKey = (event: KeyboardEvent) => {
     if (event.defaultPrevented || event.isComposing) return;
-    if (event.ctrlKey || event.metaKey || event.altKey || event.shiftKey)
-      return;
+    // Shift only types capitals into the search; Shift with ↑ / ↓ still passes.
+    if (event.ctrlKey || event.metaKey || event.altKey) return;
     const target = event.target;
     if (!(target instanceof HTMLElement) || !target.matches('.recent-start'))
       return;
     const starts = [...node.querySelectorAll<HTMLElement>('.recent-start')];
-    const next = rowStep(event.key, starts.indexOf(target), starts.length);
+    const current = starts.indexOf(target);
+    const now = Date.now();
+    const searching = now - typedAt < TYPEAHEAD_RESET;
+    if (event.key.length === 1 && (event.key !== ' ' || (searching && typed))) {
+      event.preventDefault();
+      typed = (searching ? typed : '') + event.key;
+      typedAt = now;
+      const names = starts.map(
+        (start) =>
+          start.closest('li')?.querySelector('.recent-name')?.textContent ?? '',
+      );
+      const next = typeaheadRow(names, current, typed);
+      if (next !== null) starts[next]?.focus();
+      return;
+    }
+    if (event.shiftKey) return;
+    const next = rowStep(event.key, current, starts.length);
     if (next === null) return;
     event.preventDefault();
     starts[next]?.focus();

@@ -5,6 +5,7 @@ import {
   repeatClick,
   repeatKey,
   rowStep,
+  typeaheadRow,
 } from './rowStart';
 
 /** A start the test settles by hand. */
@@ -83,5 +84,26 @@ describe('arrow keys between rows', () => {
     expect(rowStep('ArrowLeft', 1, 3)).toBeNull();
     expect(rowStep('ArrowDown', -1, 3)).toBeNull();
     expect(rowStep('ArrowDown', 0, 0)).toBeNull();
+  });
+});
+
+describe('type-ahead between rows', () => {
+  const names = ['traygent', 'repo-watch', 'Terraform-Module', 'Notizen'];
+  it('one letter moves to the next row starting with it and wraps', () => {
+    expect(typeaheadRow(names, 0, 't')).toBe(2);
+    expect(typeaheadRow(names, 2, 't')).toBe(0);
+    expect(typeaheadRow(names, 0, 'N')).toBe(3);
+    // The same letter again steps on instead of searching for „tt“.
+    expect(typeaheadRow(names, 2, 'tt')).toBe(0);
+  });
+  it('a longer prefix keeps a row that still matches', () => {
+    expect(typeaheadRow(names, 2, 'te')).toBe(2);
+    expect(typeaheadRow(names, 0, 'te')).toBe(2);
+    expect(typeaheadRow(names, 0, 'tr')).toBe(0);
+  });
+  it('finds nothing for an unknown prefix or an empty list', () => {
+    expect(typeaheadRow(names, 0, 'x')).toBeNull();
+    expect(typeaheadRow(names, 0, '')).toBeNull();
+    expect(typeaheadRow([], -1, 't')).toBeNull();
   });
 });
