@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { tick } from 'svelte';
   import QuotaTile from './QuotaTile.svelte';
   import type { AgentQuotas } from './agentQuotas.svelte';
   import { quotaView } from './quotaDisplay';
@@ -61,7 +62,11 @@
     );
   }
 
-  function move(metric: QuotaMetric, direction: -1 | 1) {
+  async function move(
+    metric: QuotaMetric,
+    direction: -1 | 1,
+    button: HTMLButtonElement,
+  ) {
     const next = [...enabled];
     const index = next.indexOf(metric);
     const target = index + direction;
@@ -70,6 +75,14 @@
     next[target] = metric;
     next[index] = other;
     draft.setQuotaBars(agent, next);
+    // The row moves, and at the end of the list the pressed arrow turns off:
+    // the focus stays with the row, on the arrow that still works.
+    await tick();
+    const row = button.parentElement;
+    const keep = button.disabled
+      ? row?.querySelector<HTMLButtonElement>('button:not(:disabled)')
+      : button;
+    if (keep && document.activeElement !== keep) keep.focus();
   }
 </script>
 
@@ -113,7 +126,8 @@
           disabled={!reading || index === 0}
           title={label + ' nach oben'}
           aria-label={label + ' nach oben'}
-          onclick={() => move(metric, -1)}>↑</button
+          onclick={(event) => void move(metric, -1, event.currentTarget)}
+          >↑</button
         >
         <button
           type="button"
@@ -121,7 +135,8 @@
           disabled={!reading || index === enabled.length - 1}
           title={label + ' nach unten'}
           aria-label={label + ' nach unten'}
-          onclick={() => move(metric, 1)}>↓</button
+          onclick={(event) => void move(metric, 1, event.currentTarget)}
+          >↓</button
         >
       {/if}
     </div>
