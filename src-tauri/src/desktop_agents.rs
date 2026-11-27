@@ -2,6 +2,7 @@
 //! Names and arguments are the contract with `src/lib/ipc.ts` (docs/SPEC.md → IPC contract).
 use crate::desktop::{work, NativeState};
 use tauri::{AppHandle, Emitter, Manager};
+use traygent_core::app_log;
 use traygent_core::detect::{self, Host, RealFs, SystemRunner};
 use traygent_core::launch::{self, LaunchPlan};
 use traygent_core::service::{self, DetectionEnd, Service};
@@ -99,11 +100,31 @@ pub async fn save_settings(
     .await
 }
 
+/// Starts a session; its outcome is one log line (#109): agent, environment, profile and
+/// `ok` or the German error — never the folder or the command.
 #[tauri::command]
 pub async fn launch_session(
     app: AppHandle,
     request: LaunchRequest,
 ) -> Result<LaunchOutcome, String> {
+    let who = format!(
+        "agent={} env={} profile={}",
+        request.agent.id(),
+        request.env.id(),
+        request
+            .profile
+            .as_deref()
+            .unwrap_or(traygent_core::DEFAULT_PROFILE)
+    );
+    let outcome = launch(app, request).await;
+    match &outcome {
+        Ok(_) => app_log::info(&format!("session start: {who} -> ok")),
+        Err(error) => app_log::info(&format!("session start: {who} -> failed reason={error}")),
+    }
+    outcome
+}
+
+async fn launch(app: AppHandle, request: LaunchRequest) -> Result<LaunchOutcome, String> {
     let (prepared, plan) = work(app.clone(), move |service| {
         let host = Host::current();
         let prepared = service.prepare_launch(&request, &host, &RealFs, &service::nonce())?;
@@ -138,7 +159,7 @@ pub async fn launch_session(
     .await?;
     // The new terminal should get the focus, not the popup.
     if let Err(error) = crate::tray_popup::hide(&app) {
-        eprintln!("Traygent popup: {error}");
+        crate::desktop_log::popup_failed(&error);
     }
     Ok(outcome)
 }

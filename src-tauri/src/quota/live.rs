@@ -1,4 +1,4 @@
-use super::{opencode, windows, AgentQuota};
+use super::{opencode, read_log::Exchange, windows, AgentQuota};
 use crate::github::http::read_within;
 use crate::{
     github::secret::{wipe, SecretToken},
@@ -32,7 +32,12 @@ struct Login {
     account_id: Option<String>,
 }
 
-pub(super) fn fetch(agent: AgentId, path: &Path) -> Result<AgentQuota, &'static str> {
+/// `exchange` records what the provider answered, for the log only.
+pub(super) fn fetch(
+    agent: AgentId,
+    path: &Path,
+    exchange: &mut Exchange,
+) -> Result<AgentQuota, &'static str> {
     let client = Client::builder()
         .https_only(true)
         .redirect(reqwest::redirect::Policy::none())
@@ -42,11 +47,14 @@ pub(super) fn fetch(agent: AgentId, path: &Path) -> Result<AgentQuota, &'static 
         .build()
         .map_err(|_| UNREACHABLE)?;
     let request = usage_request(&client, agent, login(agent, path)?)?;
+    exchange.requested = true;
     let response = request.send().map_err(|_| UNREACHABLE)?;
     let headers = response.headers();
     let retry_after = headers
         .get(RETRY_AFTER)
         .and_then(|value| value.to_str().ok());
+    exchange.status = Some(response.status().as_u16());
+    exchange.retry_after = retry_after.map(str::to_string);
     if let Some(refusal) = refusal(agent, response.status().as_u16(), retry_after, Utc::now()) {
         return refusal;
     }
@@ -351,10 +359,15 @@ mod tests {
         let file = temp.0.join("auth.json");
         fs::write(&file, br#"{"OPENAI_API_KEY":"unused"}"#).unwrap();
         for agent in [AgentId::Claude, AgentId::Codex] {
-            assert_eq!(super::fetch(agent, &file), Err(login_required(agent)));
+            let mut exchange = Exchange::default();
+            let result = super::fetch(agent, &file, &mut exchange);
+            assert_eq!(result, Err(login_required(agent)));
+            // No request was sent: the log keeps the read at the debug level.
+            assert_eq!(exchange, Exchange::default());
         }
         fs::write(&file, b"private material").unwrap();
-        assert_eq!(super::fetch(AgentId::Codex, &file), Err(UNREADABLE));
+        let fetched = super::fetch(AgentId::Codex, &file, &mut Exchange::default());
+        assert_eq!(fetched, Err(UNREADABLE));
         fs::File::create(&file)
             .unwrap()
             .set_len(MAX_AUTH_BYTES + 1)

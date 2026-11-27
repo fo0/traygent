@@ -62,7 +62,7 @@ fn a_switched_off_read_resolves_no_path_reads_no_file_and_builds_no_request() {
         assert_eq!((resolved.get(), fetched.get()), (0, 0), "{agent:?}");
         // The production entry point with the real fetch: a request would have
         // ended in a provider detail, never in the empty `off` result.
-        let quota = read(agent, &settings, || Ok(path.clone()));
+        let quota = read(agent, None, &settings, || Ok(path.clone()));
         assert_eq!(quota, AgentQuota::off(), "{agent:?}");
     }
 }

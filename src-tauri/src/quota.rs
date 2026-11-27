@@ -10,6 +10,8 @@ mod live;
 #[cfg(feature = "updates")]
 mod opencode;
 #[cfg(feature = "updates")]
+mod read_log;
+#[cfg(feature = "updates")]
 mod windows;
 
 #[derive(Clone, Debug, PartialEq, Serialize)]
@@ -63,13 +65,18 @@ impl AgentQuota {
 
 /// One account's read, gated by the agent's `quotaReads` switch (ADR-0014). With the
 /// switch off it returns before `credentials` runs: no path is resolved, no sign-in file
-/// or database is opened and no request is built.
+/// or database is opened, no request is built and nothing is logged. `profile` (`None` =
+/// `default`) only names the read in the log.
 pub fn read(
     agent: AgentId,
+    profile: Option<&str>,
     settings: &AppSettings,
     credentials: impl FnOnce() -> Result<PathBuf, &'static str>,
 ) -> AgentQuota {
-    read_with(agent, settings, credentials, fetch)
+    let profile = profile.unwrap_or(crate::models::DEFAULT_PROFILE);
+    read_with(agent, settings, credentials, |agent, path| {
+        fetch(agent, profile, path)
+    })
 }
 
 fn read_with(
@@ -87,13 +94,23 @@ fn read_with(
     }
 }
 
+/// One provider request, logged (#109): a debug line for every read, an info line when the
+/// provider refused or limited it or could not be reached.
 #[cfg(feature = "updates")]
-pub fn fetch(agent: AgentId, credentials_path: &Path) -> AgentQuota {
-    live::fetch(agent, credentials_path).unwrap_or_else(AgentQuota::unavailable)
+fn fetch(agent: AgentId, profile: &str, credentials_path: &Path) -> AgentQuota {
+    let started = std::time::Instant::now();
+    let mut exchange = read_log::Exchange::default();
+    let result = live::fetch(agent, credentials_path, &mut exchange);
+    let (debug, info) = read_log::lines(agent, profile, &exchange, &result, started.elapsed());
+    crate::app_log::debug(|| debug);
+    if let Some(info) = info {
+        crate::app_log::info(&info);
+    }
+    result.unwrap_or_else(AgentQuota::unavailable)
 }
 
 #[cfg(not(feature = "updates"))]
-pub fn fetch(_: AgentId, _: &Path) -> AgentQuota {
+fn fetch(_: AgentId, _: &str, _: &Path) -> AgentQuota {
     AgentQuota::unavailable("Dieses Build unterstützt keine Kontingentabfragen.")
 }
 

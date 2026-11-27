@@ -19,8 +19,9 @@ fn emit(app: &AppHandle, snapshot: &Snapshot) {
     }
 }
 
-/// Commits one agent's status under a short lock and emits the snapshot.
+/// Commits one agent's status under a short lock, logs it (#109) and emits the snapshot.
 fn report(app: &AppHandle, status: AgentUpdateStatus) {
+    traygent_core::app_log::info(&agent_updates::log_line(&status));
     let state = app.state::<NativeState>();
     let mut service = state.lock();
     service.set_agent_update(status);
@@ -70,6 +71,7 @@ fn run(app: &AppHandle, targets: &[(AgentId, Candidate)]) {
     let finished = catch_unwind(AssertUnwindSafe(|| update_all(app, targets)));
     if finished.is_err() {
         eprintln!("Traygent: agent update run panicked");
+        traygent_core::app_log::info("agent update: run broke down");
     }
     let state = app.state::<NativeState>();
     let mut service = state.lock();

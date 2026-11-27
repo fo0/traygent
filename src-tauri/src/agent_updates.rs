@@ -213,6 +213,30 @@ pub fn status(agent: AgentId, state: AgentUpdateState, now: DateTime<Utc>) -> Ag
     }
 }
 
+/// The log line of one agent's step in a run (#109). An in-use process is named by its file
+/// name only: a full path would carry the Windows user name.
+pub fn log_line(status: &AgentUpdateStatus) -> String {
+    let agent = status.agent.id();
+    let version = |value: &Option<String>| value.clone().unwrap_or_else(|| "?".into());
+    match status.state {
+        AgentUpdateState::Running => format!("agent update: {agent} started"),
+        AgentUpdateState::Updated => format!(
+            "agent update: {agent} updated {} -> {}",
+            version(&status.from),
+            version(&status.version)
+        ),
+        AgentUpdateState::Current => {
+            format!("agent update: {agent} current {}", version(&status.version))
+        }
+        AgentUpdateState::InUse => {
+            let by = status.by.as_deref().unwrap_or("?");
+            let name = by.rsplit(['\\', '/']).next().unwrap_or(by);
+            format!("agent update: {agent} skipped, in use by {name}")
+        }
+        AgentUpdateState::Failed => format!("agent update: {agent} failed"),
+    }
+}
+
 /// The runners of one run: the process list, the `--version` probes and the update command
 /// each get their own timeout from the shell.
 pub struct Runners<'a> {

@@ -13,6 +13,7 @@ use std::{
 };
 use tauri::{ipc::Channel, Manager};
 use tauri_plugin_updater::{Update, UpdaterExt};
+use traygent_core::app_log;
 use traygent_core::updates::{self, installer, Installer, UpdateInfo, CHECK_FAILED};
 
 /// What the last successful check found; `install_update` installs only this.
@@ -78,8 +79,19 @@ fn supported() -> Result<(), String> {
     }
 }
 
+/// The check, with its result in the log (#109): current, the newer version or the reason.
 #[tauri::command]
 pub async fn check_update(app: tauri::AppHandle) -> Result<Option<UpdateInfo>, String> {
+    let checked = check(app).await;
+    app_log::info(&match &checked {
+        Ok(None) => format!("update check: current {}", env!("CARGO_PKG_VERSION")),
+        Ok(Some(info)) => format!("update check: newer version {}", info.version),
+        Err(error) => format!("update check failed: reason={error}"),
+    });
+    checked
+}
+
+async fn check(app: tauri::AppHandle) -> Result<Option<UpdateInfo>, String> {
     supported()?;
     let state = app.state::<UpdateState>();
     let _busy = state.begin()?;
@@ -154,8 +166,21 @@ async fn check_signed(
 
 /// Downloads and verifies the checked update, starts its installer and exits Traygent so
 /// the installer can replace the EXE; the installer relaunches the app.
+/// Logs the start and a failure (#109); a success ends in the installer, which restarts
+/// Traygent, so its line is written right before the installer starts.
 #[tauri::command]
 pub async fn install_update(
+    app: tauri::AppHandle,
+    on_progress: Channel<DownloadProgress>,
+) -> Result<(), String> {
+    let installed = install(app, on_progress).await;
+    if let Err(error) = &installed {
+        app_log::info(&format!("update install failed: reason={error}"));
+    }
+    installed
+}
+
+async fn install(
     app: tauri::AppHandle,
     on_progress: Channel<DownloadProgress>,
 ) -> Result<(), String> {
@@ -169,8 +194,14 @@ pub async fn install_update(
         .clone()
         .ok_or("Prüfe zuerst auf Updates.")?;
     match candidate {
-        Candidate::Release(asset) => install_release(&app, asset, on_progress).await,
-        Candidate::Signed(update) => install_signed(*update, on_progress).await,
+        Candidate::Release(asset) => {
+            app_log::info(&format!("update install: start version {}", asset.version));
+            install_release(&app, asset, on_progress).await
+        }
+        Candidate::Signed(update) => {
+            app_log::info(&format!("update install: start version {}", update.version));
+            install_signed(*update, on_progress).await
+        }
     }
 }
 
@@ -195,6 +226,7 @@ async fn install_release(
         // Only verified bytes reach the disk.
         let _ = on_progress.send(DownloadProgress::stage("installing"));
         let path = installer::stage(&std::env::temp_dir(), &asset, &bytes)?;
+        app_log::info("update install: verified, starting the installer");
         // Per-user NSIS install (`installMode: currentUser`): no elevation needed.
         Command::new(path)
             .args(installer::NSIS_UPDATE_ARGS)
@@ -243,6 +275,7 @@ async fn install_signed(
         })?;
     // download() verifies the complete package before returning installable bytes.
     let _ = on_progress.send(DownloadProgress::stage("installing"));
+    app_log::info("update install: verified, starting the installer");
     // On Windows the plugin starts the installer and exits the process itself.
     tauri::async_runtime::spawn_blocking(move || update.install(bytes))
         .await
