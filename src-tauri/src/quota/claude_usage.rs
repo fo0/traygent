@@ -8,8 +8,8 @@ use super::{AgentQuota, QuotaWindow};
 use crate::models::QuotaMetric;
 use crate::profiles::files::without_bom;
 use chrono::{
-    DateTime, Datelike, Days, NaiveDate, NaiveDateTime, NaiveTime, SecondsFormat, TimeDelta,
-    TimeZone, Utc,
+    DateTime, Datelike, Days, LocalResult, NaiveDate, NaiveDateTime, NaiveTime, SecondsFormat,
+    TimeDelta, TimeZone, Utc,
 };
 use serde::Deserialize;
 use std::collections::BTreeMap;
@@ -27,10 +27,14 @@ struct Printed {
     #[serde(default)]
     is_error: bool,
     result: Option<String>,
+    /// `usage` when the CLI answered `/usage` itself; without it the text came from
+    /// somewhere else (a model turn), whatever it says.
+    local_command: Option<String>,
 }
 
 /// The `result` text of the printed JSON object. A line of other output before it is
-/// skipped; an error the CLI reports never passes its text on.
+/// skipped; an error the CLI reports never passes its text on, and only the answer of the
+/// local `/usage` command counts.
 pub(super) fn result_text(stdout: &[u8]) -> Result<String, &'static str> {
     let text = String::from_utf8_lossy(without_bom(stdout));
     let printed = serde_json::from_str::<Printed>(text.trim())
@@ -44,12 +48,22 @@ pub(super) fn result_text(stdout: &[u8]) -> Result<String, &'static str> {
     if printed.is_error {
         return Err(CLI_ERROR);
     }
+    if printed.local_command.as_deref() != Some("usage") {
+        return Err(UNREADABLE);
+    }
     printed.result.ok_or(UNREADABLE)
 }
 
 /// The windows of a `/usage` text. `now` carries the local zone: the CLI prints its reset
-/// times in the machine's zone, so the zone it names in parentheses is taken to be that.
+/// times in the machine's zone, so the zone it names in parentheses is taken to be that
+/// ([`reset_at`]).
 pub(super) fn parse<Tz: TimeZone>(text: &str, now: &DateTime<Tz>) -> AgentQuota {
+    let zone = now.timezone();
+    let resolve = |at: NaiveDateTime| {
+        zone.from_local_datetime(&at)
+            .map(|at| at.with_timezone(&Utc))
+    };
+    let (utc, local) = (now.with_timezone(&Utc), now.naive_local());
     let mut windows = BTreeMap::new();
     let mut usage_lines = 0;
     for line in text.lines() {
@@ -61,7 +75,7 @@ pub(super) fn parse<Tz: TimeZone>(text: &str, now: &DateTime<Tz>) -> AgentQuota 
             continue;
         };
         let reset_at = when
-            .and_then(|when| reset_at(when, now))
+            .and_then(|when| reset_at(when, utc, local, resolve))
             .map(|at| at.to_rfc3339_opts(SecondsFormat::AutoSi, true));
         windows.entry(metric).or_insert(QuotaWindow {
             used: used.min(100.0),
@@ -135,37 +149,50 @@ fn metric(label: &str) -> Option<QuotaMetric> {
 }
 
 /// `Nov 29, 7:59am (Europe/Berlin)`, `Nov 29, 8am (…)` or a time alone, `3pm (…)`, in the
-/// zone of `now`. No year is printed: a date is the first one at or after `now` − 1 day; a
-/// time alone is today's while it is at most an hour past, else tomorrow's.
-fn reset_at<Tz: TimeZone>(when: &str, now: &DateTime<Tz>) -> Option<DateTime<Utc>> {
+/// local zone that `resolve` applies (`now`, and `local`: now in that zone). No year is printed: a date is the
+/// first one at or after now − 1 day; a time alone is today's while it is at most an hour
+/// past, else tomorrow's. A chosen time the zone skips (a clock change) gives no reset: the
+/// next candidate would be a year or a day off.
+///
+/// The zone printed in parentheses is not compared with the machine's: Windows names its
+/// zones differently (`W. Europe Standard Time`) and the mapping would need a new dependency,
+/// so the CLI is taken to print in the machine's zone, as it does.
+fn reset_at(
+    when: &str,
+    now: DateTime<Utc>,
+    local: NaiveDateTime,
+    resolve: impl Fn(NaiveDateTime) -> LocalResult<DateTime<Utc>> + Copy,
+) -> Option<DateTime<Utc>> {
     let when = when.rfind('(').map_or(when, |at| &when[..at]).trim();
-    let local = now.naive_local();
-    let zone = now.timezone();
-    let utc = now.with_timezone(&Utc);
-    let to_utc = |at: NaiveDateTime| {
-        let local = zone.from_local_datetime(&at);
-        local.earliest().map(|at| at.with_timezone(&Utc))
-    };
-    match when.split_once(',') {
+    let (candidates, back): (Vec<NaiveDateTime>, TimeDelta) = match when.split_once(',') {
         Some((date, time)) => {
             let (month, day) = month_day(date)?;
             let time = clock(time)?;
-            let floor = utc - TimeDelta::days(1);
-            (local.year() - 1..=local.year() + 1)
+            let dates = (local.year() - 1..=local.year() + 1)
                 .filter_map(|year| NaiveDate::from_ymd_opt(year, month, day))
-                .filter_map(|date| to_utc(date.and_time(time)))
-                .find(|at| *at >= floor)
+                .map(|date| date.and_time(time));
+            (dates.collect(), TimeDelta::days(1))
         }
         None => {
             let time = clock(when)?;
-            let floor = utc - TimeDelta::hours(1);
-            [Days::new(0), Days::new(1)]
+            let dates = [Days::new(0), Days::new(1)]
                 .into_iter()
                 .filter_map(|days| local.date().checked_add_days(days))
-                .filter_map(|date| to_utc(date.and_time(time)))
-                .find(|at| *at >= floor)
+                .map(|date| date.and_time(time));
+            (dates.collect(), TimeDelta::hours(1))
+        }
+    };
+    let (floor, floor_local) = (now - back, local - back);
+    for at in candidates {
+        match resolve(at).earliest() {
+            Some(utc) if utc >= floor => return Some(utc),
+            Some(_) => {}
+            // The zone skips this time: when it is the one meant, there is no reset.
+            None if at >= floor_local => return None,
+            None => {}
         }
     }
+    None
 }
 
 /// `Nov 29` as month and day; the month by its first three letters.

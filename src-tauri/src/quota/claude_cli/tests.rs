@@ -43,9 +43,12 @@ fn now() -> DateTime<FixedOffset> {
 }
 
 fn printed(result: &str) -> Vec<u8> {
-    json!({"type": "result", "is_error": false, "num_turns": 0, "result": result})
-        .to_string()
-        .into_bytes()
+    json!({
+        "type": "result", "is_error": false, "num_turns": 0, "result": result,
+        "local_command": "usage"
+    })
+    .to_string()
+    .into_bytes()
 }
 
 fn exited(code: i32, stdout: Vec<u8>) -> CliEnd {
@@ -150,6 +153,18 @@ fn the_log_names_the_exit_the_windows_and_never_the_output() {
             ))
         );
     }
+    // No subscription is a lasting state: the debug line names it, the info level stays quiet.
+    let api_key = exited(0, printed("Estimated cost: $0.0000"));
+    let quota = answer(&api_key, &now());
+    let (debug, info) = lines("default", &api_key, &quota, took);
+    assert_eq!(
+        debug,
+        format!(
+            "quota claude profile=default -> cli exit=0 1500ms windows=0 reason={}",
+            claude_usage::NO_SUBSCRIPTION
+        )
+    );
+    assert_eq!(info, None);
     let private = exited(0, printed("Top skills: /private-skill 1%"));
     let quota = answer(&private, &now());
     let (debug, info) = lines("default", &private, &quota, took);
@@ -197,6 +212,20 @@ fn the_process_runner_captures_stdout_caps_it_and_ends_a_late_one() {
     let end = ProcessCliRunner.run(&shell("sleep 5"), Duration::from_millis(200));
     assert_eq!(end, CliEnd::TimedOut);
     assert!(started.elapsed() < Duration::from_secs(4));
+    // A grandchild that keeps the pipe open after the shell exited: what came counts.
+    let started = Instant::now();
+    let end = ProcessCliRunner.run(
+        &shell("printf '{\"result\":\"ok\"}'; (sleep 3) & exit 0"),
+        READ_LIMIT,
+    );
+    assert_eq!(
+        end,
+        CliEnd::Exited {
+            code: Some(0),
+            stdout: br#"{"result":"ok"}"#.to_vec()
+        }
+    );
+    assert!(started.elapsed() < Duration::from_millis(2500));
     let relative = HiddenLogin {
         program: "sh".into(),
         ..shell("true")
@@ -213,4 +242,26 @@ fn the_process_runner_captures_stdout_caps_it_and_ends_a_late_one() {
         ProcessCliRunner.run(&missing, READ_LIMIT),
         CliEnd::NotStarted
     );
+}
+
+#[cfg(unix)]
+#[test]
+fn the_apps_exit_ends_a_running_read_and_starts_none() {
+    let plan = HiddenLogin {
+        program: "/bin/sh".into(),
+        args: vec!["-c".into(), "sleep 5".into()],
+        cwd: "/".into(),
+    };
+    let exiting = AtomicBool::new(false);
+    let started = Instant::now();
+    let end = std::thread::scope(|scope| {
+        let run = scope.spawn(|| run_process(&plan, &exiting, READ_LIMIT));
+        std::thread::sleep(Duration::from_millis(200));
+        exiting.store(true, Ordering::SeqCst);
+        run.join().unwrap()
+    });
+    assert_eq!(end, CliEnd::TimedOut);
+    assert!(started.elapsed() < Duration::from_secs(4));
+    // Once the app exits nothing starts.
+    assert_eq!(run_process(&plan, &exiting, READ_LIMIT), CliEnd::NotStarted);
 }

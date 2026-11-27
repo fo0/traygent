@@ -92,6 +92,50 @@ fn a_date_without_a_year_rolls_over_into_the_next_one() {
     );
 }
 
+/// Berlin's spring clock change: 2:00–2:59 on Mar 29, 2026 does not exist; UTC+1 before,
+/// UTC+2 after.
+fn spring_berlin(at: NaiveDateTime) -> LocalResult<DateTime<Utc>> {
+    let change = NaiveDate::from_ymd_opt(2026, 3, 29).unwrap();
+    let (gap_start, gap_end) = (
+        change.and_hms_opt(2, 0, 0).unwrap(),
+        change.and_hms_opt(3, 0, 0).unwrap(),
+    );
+    let hours = match at {
+        at if at < gap_start => 1,
+        at if at < gap_end => return LocalResult::None,
+        _ => 2,
+    };
+    LocalResult::Single((at - TimeDelta::hours(hours)).and_utc())
+}
+
+#[test]
+fn a_reset_at_a_skipped_local_time_gives_no_reset() {
+    let local = NaiveDateTime::parse_from_str("2026-03-28 13:00", "%Y-%m-%d %H:%M").unwrap();
+    let now = (local - TimeDelta::hours(1)).and_utc();
+    let at = |when: &str| reset_at(when, now, local, spring_berlin);
+    // Never next year's Mar 29 nor tomorrow's 2:30: no reset.
+    assert_eq!(at("Mar 29, 2:30am (Europe/Berlin)"), None);
+    let local = NaiveDateTime::parse_from_str("2026-03-29 01:30", "%Y-%m-%d %H:%M").unwrap();
+    let now = (local - TimeDelta::hours(1)).and_utc();
+    assert_eq!(reset_at("2:30am", now, local, spring_berlin), None);
+    // Around the gap the zone's own offsets apply.
+    assert_eq!(
+        at("Mar 29, 3am (Europe/Berlin)").map(|at| at.to_rfc3339()),
+        Some("2026-03-29T01:00:00+00:00".into())
+    );
+    assert_eq!(
+        at("Mar 29, 1:59am (Europe/Berlin)").map(|at| at.to_rfc3339()),
+        Some("2026-03-29T00:59:00+00:00".into())
+    );
+    // A skipped time before the floor is passed over as any past one: next year's counts.
+    let local = NaiveDateTime::parse_from_str("2026-03-31 12:00", "%Y-%m-%d %H:%M").unwrap();
+    let now = (local - TimeDelta::hours(2)).and_utc();
+    assert_eq!(
+        reset_at("Mar 29, 2:30am", now, local, spring_berlin).map(|at| at.to_rfc3339()),
+        Some("2027-03-29T00:30:00+00:00".into())
+    );
+}
+
 #[test]
 fn labels_map_to_metrics_and_unknown_ones_are_skipped() {
     let text = "\
@@ -148,7 +192,9 @@ fn text_without_a_known_window_is_unreadable_or_has_no_subscription() {
 #[test]
 fn the_printed_object_must_be_a_successful_result() {
     let printed = |value: serde_json::Value| value.to_string().into_bytes();
-    let ok = printed(json!({"is_error": false, "result": "text", "num_turns": 0}));
+    let ok = printed(json!({
+        "is_error": false, "result": "text", "num_turns": 0, "local_command": "usage"
+    }));
     assert_eq!(result_text(&ok).as_deref(), Ok("text"));
     // A byte order mark and a line before the object are tolerated.
     let mut noisy = b"\xEF\xBB\xBFupdate available\r\n".to_vec();
@@ -160,7 +206,19 @@ fn the_printed_object_must_be_a_successful_result() {
             printed(json!({"is_error": true, "result": "private material"})),
             CLI_ERROR,
         ),
-        (printed(json!({"is_error": false})), UNREADABLE),
+        (
+            printed(json!({"is_error": false, "local_command": "usage"})),
+            UNREADABLE,
+        ),
+        // Only the local command's answer: a model turn's text is never parsed.
+        (
+            printed(json!({"is_error": false, "result": "Current week: 1% used", "num_turns": 1})),
+            UNREADABLE,
+        ),
+        (
+            printed(json!({"result": "Current week: 1% used", "local_command": "cost"})),
+            UNREADABLE,
+        ),
         (printed(json!({"result": 42})), UNREADABLE),
         (printed(json!(["result"])), UNREADABLE),
         (b"{\"result\": \"cut".to_vec(), UNREADABLE),

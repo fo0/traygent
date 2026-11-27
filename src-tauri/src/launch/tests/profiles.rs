@@ -316,7 +316,10 @@ fn the_hidden_usage_read_runs_the_print_call_in_the_profile_without_other_sign_i
     expected.extend(removed.iter().cloned());
     expected.extend([
         r"$env:CLAUDE_CONFIG_DIR='C:\Users\Max O''Neil\.claude-team'".to_string(),
-        format!("& '{CLAUDE}' '-p' '/usage' '--output-format' 'json' '--no-session-persistence'"),
+        format!(
+            "& '{CLAUDE}' '-p' '/usage' '--output-format' 'json' '--no-session-persistence' \
+             '--setting-sources' 'user'"
+        ),
         "if ($null -eq $LASTEXITCODE) { exit 1 }".into(),
         "exit $LASTEXITCODE".into(),
     ]);

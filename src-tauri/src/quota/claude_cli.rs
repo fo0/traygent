@@ -3,7 +3,7 @@
 //! [`crate::launch::hidden_usage_plan`], started like the hidden sign-in
 //! ([`crate::profiles::login::hidden_command`]): no window, stdin closed, stderr to the null
 //! device, stdout capped at [`MAX_OUTPUT`], ended with its whole process tree after
-//! [`READ_LIMIT`].
+//! [`READ_LIMIT`] or at the app's exit ([`end_cli_reads`]).
 //!
 //! `/usage` prints no sign-in material, so its stdout is read — but never logged: it lists
 //! the user's skills, subagents and MCP servers. The log gets the exit, the duration, the
@@ -13,10 +13,11 @@ use crate::launch::HiddenLogin;
 use crate::models::QuotaMetric;
 use crate::profiles::login::{hidden_command, watch_child, LoginEnd};
 use chrono::{DateTime, TimeZone};
+use std::io::Read;
 use std::path::Path;
 use std::process::Stdio;
 use std::sync::atomic::{AtomicBool, AtomicUsize, Ordering};
-use std::sync::mpsc;
+use std::sync::{mpsc, Arc, Mutex, MutexGuard, PoisonError};
 use std::time::{Duration, Instant};
 
 /// stdout beyond this is no `/usage` answer: the read fails.
@@ -49,30 +50,83 @@ pub struct ProcessCliRunner;
 
 impl CliRunner for ProcessCliRunner {
     fn run(&self, plan: &HiddenLogin, limit: Duration) -> CliEnd {
-        let Some(mut command) = hidden_command(Path::new(&plan.program), &plan.args, &plan.cwd)
-        else {
-            return CliEnd::NotStarted;
-        };
-        let Ok(mut child) = command.stdout(Stdio::piped()).spawn() else {
-            return CliEnd::NotStarted;
-        };
-        let stdout = child.stdout.take();
-        let (sender, receiver) = mpsc::channel();
-        std::thread::spawn(move || {
-            let _ = sender.send(crate::detect::runner::read_capped(stdout, MAX_OUTPUT + 1));
-        });
-        match watch_child(&mut child, &AtomicBool::new(false), limit) {
-            // A grandchild (npm shim → node) may hold the pipe a moment after the shell exited.
-            LoginEnd::Exited(code) => CliEnd::Exited {
-                code,
-                stdout: receiver
-                    .recv_timeout(Duration::from_millis(500))
-                    .unwrap_or_default(),
-            },
-            LoginEnd::NotStarted => CliEnd::NotStarted,
-            LoginEnd::TimedOut | LoginEnd::Cancelled => CliEnd::TimedOut,
+        run_process(plan, &EXITING, limit)
+    }
+}
+
+/// Set once by [`end_cli_reads`]: the app exits, a running read ends its process tree and no
+/// new one starts.
+static EXITING: AtomicBool = AtomicBool::new(false);
+
+/// How long the read's stdout may stay open after the shell exited.
+const PIPE_WAIT: Duration = Duration::from_millis(500);
+
+/// One run of the plan, ended with its process tree on `cancel` or after `limit`.
+fn run_process(plan: &HiddenLogin, cancel: &AtomicBool, limit: Duration) -> CliEnd {
+    if cancel.load(Ordering::SeqCst) {
+        return CliEnd::NotStarted;
+    }
+    let Some(mut command) = hidden_command(Path::new(&plan.program), &plan.args, &plan.cwd) else {
+        return CliEnd::NotStarted;
+    };
+    let Ok(mut child) = command.stdout(Stdio::piped()).spawn() else {
+        return CliEnd::NotStarted;
+    };
+    let stdout = child.stdout.take();
+    let kept = Arc::new(Mutex::new(Vec::new()));
+    let (sender, closed) = mpsc::channel();
+    let shared = Arc::clone(&kept);
+    std::thread::spawn(move || {
+        read_shared(stdout, &shared, MAX_OUTPUT + 1);
+        let _ = sender.send(());
+    });
+    match watch_child(&mut child, cancel, limit) {
+        LoginEnd::Exited(code) => {
+            // A grandchild (npm shim → node, or one the CLI left behind) may hold the pipe
+            // after the shell exited: what it printed so far counts, and what is left of the
+            // tree is ended so such processes cannot pile up.
+            if closed.recv_timeout(PIPE_WAIT).is_err() {
+                #[cfg(windows)]
+                crate::detect::runner::kill_tree(child.id());
+            }
+            let stdout = std::mem::take(&mut *lock(&kept));
+            CliEnd::Exited { code, stdout }
+        }
+        LoginEnd::NotStarted => CliEnd::NotStarted,
+        // Cancelled only by the app's exit, where the answer is no longer shown.
+        LoginEnd::TimedOut | LoginEnd::Cancelled => CliEnd::TimedOut,
+    }
+}
+
+/// Appends the first `cap` bytes of `reader` to `kept` as they come and drains the rest, so
+/// the child never blocks on a full pipe and the caller can take what came at any time.
+fn read_shared(reader: Option<impl Read>, kept: &Mutex<Vec<u8>>, cap: usize) {
+    let Some(mut reader) = reader else {
+        return;
+    };
+    let mut buffer = [0u8; 8192];
+    loop {
+        match reader.read(&mut buffer) {
+            Ok(0) | Err(_) => return,
+            Ok(read) => {
+                let mut kept = lock(kept);
+                let room = cap.saturating_sub(kept.len());
+                kept.extend_from_slice(&buffer[..read.min(room)]);
+            }
         }
     }
+}
+
+fn lock<T>(mutex: &Mutex<T>) -> MutexGuard<'_, T> {
+    mutex.lock().unwrap_or_else(PoisonError::into_inner)
+}
+
+/// The app exits (`RunEvent::Exit`, like [`crate::profiles::login::end_all`]): every running
+/// read ends its process tree, none starts any more, and this waits at most `wait` for the
+/// counted reads to end. True when none is left.
+pub fn end_cli_reads(wait: Duration) -> bool {
+    EXITING.store(true, Ordering::SeqCst);
+    wait_for_cli_reads(wait)
 }
 
 static IN_FLIGHT: AtomicUsize = AtomicUsize::new(0);
@@ -119,7 +173,8 @@ pub fn wait_for_cli_reads(wait: Duration) -> bool {
     }
 }
 
-/// One read, logged (#109): a debug line for every read, an info line when it failed.
+/// One read, logged (#109): a debug line for every read, an info line when it failed (not
+/// for a sign-in without a subscription).
 /// `now` carries the local zone the CLI prints its reset times in.
 pub(super) fn read<Tz: TimeZone>(
     runner: &dyn CliRunner,
@@ -182,10 +237,16 @@ fn lines(
     for (metric, window) in &quota.windows {
         debug.push_str(&format!(" {}={}", metric_name(*metric), window.used));
     }
+    // A sign-in without a subscription is a lasting state, not a failure: like Codex's
+    // signed-out read (`read_log.rs`) it stays at the debug level, with its reason.
+    let lasting = quota.detail.as_deref() == Some(claude_usage::NO_SUBSCRIPTION);
+    if lasting {
+        debug.push_str(&format!(" reason={}", claude_usage::NO_SUBSCRIPTION));
+    }
     let info = quota
         .detail
         .as_ref()
-        .filter(|_| quota.windows.is_empty())
+        .filter(|_| quota.windows.is_empty() && !lasting)
         .map(|reason| format!("{who} failed: cli exit={exit} reason={reason}"));
     (debug, info)
 }

@@ -52,13 +52,17 @@ pub fn hidden_login_plan(
 }
 
 /// Claude Code's own quota read (#110): `/usage` in print mode, as JSON, without a session
-/// file. No `--bare`: it may change which sign-in the CLI uses.
-pub const USAGE_ARGS: [&str; 5] = [
+/// file, with the user-scope settings only (no project or local settings of whatever folder
+/// it runs in; CLI 2.1.332 answers the same with it). No `--bare`: it may change which
+/// sign-in the CLI uses.
+pub const USAGE_ARGS: [&str; 7] = [
     "-p",
     "/usage",
     "--output-format",
     "json",
     "--no-session-persistence",
+    "--setting-sources",
+    "user",
 ];
 
 /// The variables that replace Claude Code's stored sign-in. The quota read of a local

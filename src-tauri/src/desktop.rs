@@ -173,10 +173,13 @@ pub fn run() {
         .build(tauri::generate_context!())
         .expect("Traygent konnte nicht gestartet werden")
         .run(|_, event| {
-            // Every exit („Traygent beenden“, the updater's `app.exit`) passes here: a hidden
-            // sign-in must not outlive the app (best effort, bounded).
+            // Every exit („Traygent beenden“, the updater's `app.exit`) passes here: neither a
+            // hidden sign-in nor a quota read of the Claude Code CLI may outlive the app (best
+            // effort, bounded; a read ends within a poll, so it goes first).
             if let tauri::RunEvent::Exit = event {
-                traygent_core::profiles::login::end_all(traygent_core::profiles::login::EXIT_WAIT);
+                use traygent_core::profiles::login;
+                traygent_core::quota::end_cli_reads(login::EXIT_WAIT);
+                login::end_all(login::EXIT_WAIT);
             }
         });
 }

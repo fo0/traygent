@@ -6,7 +6,7 @@ use serde::Serialize;
 use std::collections::BTreeMap;
 use std::path::{Path, PathBuf};
 
-pub use claude_cli::{wait_for_cli_reads, CliRead, READ_LIMIT};
+pub use claude_cli::{end_cli_reads, wait_for_cli_reads, CliRead, READ_LIMIT};
 use claude_cli::{CliRunner, ProcessCliRunner};
 
 mod claude_cli;
@@ -88,7 +88,7 @@ pub fn read(
     settings: &AppSettings,
     source: impl FnOnce() -> Result<Source, String>,
 ) -> AgentQuota {
-    let profile = profile.unwrap_or(crate::models::DEFAULT_PROFILE);
+    let profile = crate::profiles::log_id(profile.unwrap_or(crate::models::DEFAULT_PROFILE));
     read_with(agent, settings, source, |agent, source| {
         fetch(agent, profile, source, &ProcessCliRunner)
     })

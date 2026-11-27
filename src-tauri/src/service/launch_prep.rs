@@ -18,6 +18,8 @@ const CLONE_ROOT_FAILED: &str = "Der Klon-Ordner konnte nicht angelegt werden.";
 pub const PROFILE_MISSING: &str = "Profil nicht gefunden.";
 const NO_PROFILE_HOME: &str = "Der Profilordner ist nicht verfügbar: kein Benutzerordner gefunden.";
 const PROFILE_DIR_FAILED: &str = "Der Profilordner konnte nicht angelegt werden.";
+const PROFILE_SIGNED_OUT: &str = "Dieses Profil ist noch nicht angemeldet.";
+const NO_APP_DIR: &str = "Das Kontingent wird nicht gelesen: kein App-Datenordner verfügbar.";
 
 /// A launch ready to spawn; `fallback` is the console plan when wt.exe fails to start.
 #[derive(Clone, Debug, PartialEq, Eq)]
@@ -230,8 +232,11 @@ impl Service {
     /// directory `quota_paths` chose (`None`: the default one). Always the host's CLI — also
     /// for a Docker session, whose container uses the same host profile. It runs in Traygent's
     /// app data dir, a folder that is no project, so no repository's settings, hooks or MCP
-    /// servers load; without one (read-only state) in the user profile, as a sign-in does.
-    /// Refused while an update replaces the CLI. Creates nothing.
+    /// servers load; without one (read-only state) it is refused — the user profile or `C:\`
+    /// could be a project. The CLI writes its state file into the profile's directory, so a
+    /// directory that is someone else's is refused as a sign-in refuses it, and one that does
+    /// not exist yet is a profile never signed in. Refused while an update replaces the CLI.
+    /// Creates nothing.
     pub fn prepare_quota_read(
         &self,
         agent: AgentId,
@@ -250,17 +255,40 @@ impl Service {
         if resolved.cli.is_none() {
             return Err(format!("{name} ist nicht installiert."));
         }
+        if let Some(dir) = &profile_dir {
+            if !fs.is_dir(dir) {
+                return Err(PROFILE_SIGNED_OUT.into());
+            }
+            self.refuse_foreign(agent, dir, host, fs)?;
+        }
         resolved.profile_dir = profile_dir;
         let profiled = !self.state.settings.profiles.get(agent).is_empty();
-        let app_dir = self
+        let cwd = self
             .dir
             .to_str()
-            .filter(|dir| !dir.is_empty() && fs.is_dir(dir));
-        let cwd = match app_dir {
-            Some(dir) => dir.to_string(),
-            None => user_home(host, fs),
-        };
-        launch::hidden_usage_plan(&resolved, &cwd, profiled)
+            .filter(|dir| !dir.is_empty() && fs.is_dir(dir))
+            .ok_or(NO_APP_DIR)?;
+        launch::hidden_usage_plan(&resolved, cwd, profiled)
+    }
+
+    /// A sign-in or a quota read writes into the profile's directory: never into one that is
+    /// someone else's (it would look like the agent's own from then on and be adopted).
+    fn refuse_foreign(
+        &self,
+        agent: AgentId,
+        dir: &str,
+        host: &Host,
+        fs: &dyn Fs,
+    ) -> Result<(), String> {
+        let default_dir = profile_dir(agent, Some(DEFAULT_PROFILE), host)?.unwrap_or_default();
+        let share = self.state.settings.profile_share.get(agent);
+        if fs.refuses_sign_in(agent, dir, &default_dir, share) {
+            return Err(format!(
+                "Der {}.",
+                crate::profiles::sync::foreign_dir(agent)
+            ));
+        }
+        Ok(())
     }
 
     /// What both sign-ins check and resolve: the profile's label, the CLI and the profile's
@@ -291,17 +319,8 @@ impl Service {
         }
         let id = (profile != DEFAULT_PROFILE).then_some(profile);
         resolved.profile_dir = profile_dir(agent, id, host)?;
-        // A sign-in writes the credentials: never into a directory that is someone else's
-        // (it would look like the agent's own from then on and be adopted).
         if let Some(dir) = &resolved.profile_dir {
-            let default_dir = profile_dir(agent, Some(DEFAULT_PROFILE), host)?.unwrap_or_default();
-            let share = self.state.settings.profile_share.get(agent);
-            if fs.refuses_sign_in(agent, dir, &default_dir, share) {
-                return Err(format!(
-                    "Der {}.",
-                    crate::profiles::sync::foreign_dir(agent)
-                ));
-            }
+            self.refuse_foreign(agent, dir, host, fs)?;
         }
         Ok((label, resolved, user_home(host, fs)))
     }
@@ -376,8 +395,7 @@ impl Service {
     }
 }
 
-/// Where a sign-in, an install terminal and (without an app data dir) a quota read start:
-/// the user profile, else `C:\`.
+/// Where a sign-in and an install terminal start: the user profile, else `C:\`.
 fn user_home(host: &Host, fs: &dyn Fs) -> String {
     host.user_profile
         .clone()
