@@ -24,6 +24,10 @@ test('weekly quota stays enabled and per-agent bar choices are staged until save
   await fable.check();
   await group.getByRole('button', { name: 'Woche nach unten' }).click();
   await expect(bars.first()).toHaveAttribute('data-metric', 'fable');
+  // At the end of the list the pressed arrow turns off; the focus stays in the row.
+  await expect(
+    group.getByRole('button', { name: 'Woche nach oben' }),
+  ).toBeFocused();
   await dialog.getByRole('button', { name: 'Abbrechen' }).click();
 
   await settings.click();
@@ -32,6 +36,9 @@ test('weekly quota stays enabled and per-agent bar choices are staged until save
   await expect(save).toHaveAttribute('aria-disabled', 'true');
   await fable.check();
   await group.getByRole('button', { name: 'Fable nach oben' }).click();
+  await expect(
+    group.getByRole('button', { name: 'Fable nach unten' }),
+  ).toBeFocused();
   await agent.getByRole('radio', { name: 'OpenCode' }).check();
   await expect(fable).toHaveCount(0);
   await group.getByRole('checkbox', { name: 'Monat' }).check();
