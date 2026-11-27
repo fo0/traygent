@@ -1,5 +1,6 @@
 import type { Bridge } from './bridgeTypes';
 import { errorMessage } from './format';
+import { visibleSignIn } from './logLevel';
 import type { AgentId, AppSettings, Snapshot } from './types';
 
 export interface ProfileDeps {
@@ -8,7 +9,7 @@ export interface ProfileDeps {
   accept: (snapshot: Snapshot) => boolean;
   /** `Panel.saveSettings`: saves and shows the answer. */
   saveSettings: (settings: AppSettings) => Promise<Snapshot>;
-  /** The shown snapshot: its saved „Debug“ decides how a sign-in runs. */
+  /** The shown snapshot: its saved log level decides how a sign-in runs. */
   current: () => Snapshot | null;
 }
 
@@ -20,11 +21,14 @@ export interface LoginFailure {
   agent: AgentId;
   profile: string;
   text: string;
-  /** Hidden („Debug“ off) and not cancelled: the tooltip suggests „Debug“. */
+  /** Hidden (level „Info“) and not cancelled: the tooltip suggests „Debug“. */
   hint: boolean;
 }
 
-/** The tooltip of a failed hidden sign-in (#41); never visible prose. */
+/**
+ * The tooltip of a failed hidden sign-in (#41); never visible prose. It names
+ * the level „Debug“ of Settings → App → „Protokoll“ (#109).
+ */
 export const DEBUG_HINT = 'Mit Debug erneut versuchen';
 /** Natively too: exit code 0 without a sign-in on disk. */
 const LOGIN_FAILED = 'Anmeldung fehlgeschlagen.';
@@ -43,7 +47,7 @@ export class ProfileActions {
   syncing = $state(false);
   /**
    * Profiles whose sign-in is pending, as `agent:id`: hidden until it ended,
-   * with „Debug“ until the terminal opened. A second click waits for it.
+   * at the level „Debug“ until the terminal opened. A second click waits for it.
    */
   signingIn = $state<string[]>([]);
   /** The pending sign-ins that run hidden: only those can be cancelled. */
@@ -92,15 +96,15 @@ export class ProfileActions {
     (await this.#deps.saveSettings(settings)).settings;
 
   /**
-   * Signs `profile` in. Hidden („Debug“ off) it waits for the end and shows
-   * the statuses read anew: only a profile that reads signed in counts. With
+   * Signs `profile` in. Hidden (level „Info“) it waits for the end and shows
+   * the statuses read anew: only a profile that reads signed in counts. At
    * „Debug“ the terminal opened and the status follows as an event. A
    * failure lands in `failure`, never a rejection.
    */
   async login(agent: AgentId, profile: string): Promise<LoginResult> {
     const key = keyOf(agent, profile);
     if (this.signingIn.includes(key)) return 'failed';
-    const hidden = !this.#deps.current()?.settings.debug;
+    const hidden = !visibleSignIn(this.#deps.current()?.settings);
     if (this.failure?.agent === agent && this.failure.profile === profile)
       this.failure = null;
     this.#cancelled.delete(key);
@@ -135,7 +139,7 @@ export class ProfileActions {
    */
   async cancel(agent: AgentId, profile: string) {
     const key = keyOf(agent, profile);
-    // A visible sign-in („Debug“) has no cancel: it only waits for the terminal.
+    // A visible sign-in (level „Debug“) has no cancel: it only waits for the terminal.
     if (!this.hiddenRuns.includes(key)) return;
     this.#cancelled.add(key);
     try {

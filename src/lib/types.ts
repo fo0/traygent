@@ -252,9 +252,15 @@ export interface AppSettings {
   agentProfile: Record<AgentId, string>;
   /** Extra shared names per agent; empty lists by default. */
   profileShare: Record<AgentId, ProfileShare>;
-  /** „Debug“ (#41): a profile sign-in opens the visible terminal. */
-  debug: boolean;
+  /**
+   * The local log's level (#109, „Protokoll“); `debug` also opens a profile
+   * sign-in in the visible terminal (#41).
+   */
+  logLevel: LogLevel;
 }
+
+/** Mirrors `Level` in src-tauri/src/app_log.rs. */
+export type LogLevel = 'info' | 'debug';
 
 /** Mirrors `Snapshot` in src-tauri/src/models.rs; replaced wholesale on every change. */
 export interface Snapshot {

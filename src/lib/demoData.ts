@@ -195,7 +195,7 @@ export function demoSettings(): AppSettings {
     quotaProfiles: { claude: [], opencode: [], codex: [] },
     github: { cloneRoot: '' },
     agentUpdates: false,
-    debug: false,
+    logLevel: 'info',
     profiles: demoProfileSettings(),
     agentProfile: { claude: 'default', opencode: 'default', codex: 'default' },
     profileShare: demoProfileShare(),

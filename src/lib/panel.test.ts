@@ -43,6 +43,7 @@ function bridgeWith(overrides: Partial<Bridge> = {}): Bridge {
     syncProfiles: async () => snapshot(),
     profileLogin: async () => snapshot(),
     cancelProfileLogin: async () => false,
+    openLogFolder: async () => {},
     ...overrides,
   };
 }

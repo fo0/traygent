@@ -39,6 +39,7 @@ const nativeBridge: Bridge = {
   profileLogin: (agent, profile) => call('profile_login', { agent, profile }),
   cancelProfileLogin: (agent, profile) =>
     call('cancel_profile_login', { agent, profile }),
+  openLogFolder: () => call('open_log_folder'),
 };
 
 /** Snapshots the native shell pushes (`traygent:snapshot`). */

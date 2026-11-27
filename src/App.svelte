@@ -152,6 +152,7 @@
     onSaveSettings={(settings) => panel.saveSettings(settings)}
     onInstallAgent={(agent) => panel.installAgent(agent)}
     onUpdateAgents={() => panel.updateAgents()}
+    onOpenLogFolder={() => bridge.openLogFolder()}
     onInstalled={() => panel.announceInstall()}
     onClose={modals.close}
   />

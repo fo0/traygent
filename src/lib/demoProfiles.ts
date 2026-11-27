@@ -119,8 +119,8 @@ export function signedIn(
 export interface DemoSignInHost {
   /** The current statuses. */
   profiles: () => readonly ProfileStatus[];
-  /** The saved „Debug“ setting. */
-  debug: () => boolean;
+  /** Whether a sign-in opens the terminal: the saved log level „Debug“. */
+  visible: () => boolean;
   /** Applies new statuses under the next revision. */
   commit: (profiles: ProfileStatus[]) => void;
   /** A copy of the current snapshot. */
@@ -131,7 +131,7 @@ export interface DemoSignInHost {
 
 /**
  * The demo's sign-ins (#41), as natively but without a CLI: hidden, one per
- * profile ends after `wait` ms signed in and can be cancelled; with „Debug“
+ * profile ends after `wait` ms signed in and can be cancelled; at „Debug“
  * the terminal „opens“ at once and the status follows as an event.
  */
 export function demoSignIns(host: DemoSignInHost, wait: number) {
@@ -145,7 +145,7 @@ export function demoSignIns(host: DemoSignInHost, wait: number) {
       const key = `${agent}:${id}`;
       if (running.has(key))
         return Promise.reject(new Error('Die Anmeldung läuft bereits.'));
-      if (host.debug()) {
+      if (host.visible()) {
         setTimeout(() => {
           finish(agent, id);
           host.emit();

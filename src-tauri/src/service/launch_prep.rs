@@ -184,7 +184,7 @@ impl Service {
     }
 
     /// The terminal that signs the agent's profile in (`<cli> auth login`), with its console
-    /// fallback („Debug“ on, #41). The profile's directory is created, so the CLI finds its
+    /// fallback (log level „Debug“, #41). The profile's directory is created, so the CLI finds its
     /// home.
     pub fn prepare_login(
         &self,
@@ -212,7 +212,7 @@ impl Service {
         Ok((plan, fallback))
     }
 
-    /// The same sign-in without a window („Debug“ off, #41); the directory is created too.
+    /// The same sign-in without a window (log level „Info“, #41); the directory is created too.
     pub fn prepare_hidden_login(
         &self,
         agent: AgentId,

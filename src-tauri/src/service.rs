@@ -87,6 +87,8 @@ impl Service {
     }
 
     fn with(dir: PathBuf, state: Persisted, read_only: Option<String>) -> Self {
+        // The stored level applies from the first line on (#109).
+        crate::app_log::set_level(state.settings.log_level);
         Self {
             dir,
             read_only,
@@ -215,6 +217,11 @@ impl Service {
             ..self.state.clone()
         };
         self.persist(&next)?;
+        let level = next.settings.log_level;
+        if level != self.state.settings.log_level {
+            crate::app_log::set_level(level);
+            crate::app_log::info(&format!("settings: log level={}", level.label()));
+        }
         let images_changed = next.settings.docker.images != self.state.settings.docker.images;
         let profiles_changed = next.settings.profiles != self.state.settings.profiles
             || next.settings.profile_share != self.state.settings.profile_share;

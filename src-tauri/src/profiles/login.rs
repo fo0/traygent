@@ -1,4 +1,4 @@
-//! The hidden sign-in of a profile (#41, „Debug“ off): the plan of
+//! The hidden sign-in of a profile (#41, log level „Info“): the plan of
 //! [`crate::launch::hidden_login_plan`] runs without a window, stdin closed, for at most
 //! [`LOGIN_LIMIT`]. One sign-in per profile at a time; a cancel, the limit or the app's exit
 //! ends the whole process tree.

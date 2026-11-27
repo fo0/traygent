@@ -92,13 +92,13 @@ export interface Commands {
    */
   sync_profiles: { args: undefined; result: Snapshot };
   /**
-   * Signs the profile in (`default` included, #41). „Debug“ off: hidden;
+   * Signs the profile in (`default` included, #41). Log level „Info“: hidden;
    * resolves when the sign-in ended with exit code 0, with the statuses read
    * anew, or rejects with „Anmeldung fehlgeschlagen.“ (also after exit
    * code 0 when the profile still reads signed out), „Anmeldung
    * abgelaufen.“ (5 minutes) or „Anmeldung abgebrochen.“ (see
    * `cancel_profile_login`); a second one for the same profile is refused
-   * while one runs. „Debug“ on: resolves with the current snapshot once the
+   * while one runs. Log level „Debug“: resolves with the current snapshot once the
    * visible terminal opened; a changed sign-in follows as the
    * `traygent:snapshot` event (watched for up to 10 minutes).
    */
@@ -108,7 +108,7 @@ export interface Commands {
   };
   /**
    * Ends the profile's running hidden sign-in — the only kind with a cancel;
-   * a visible one („Debug“) has none. False when none is registered (it
+   * a visible one (log level „Debug“) has none. False when none is registered (it
    * already ended, has not reached Rust yet, or is visible).
    */
   cancel_profile_login: {
@@ -125,6 +125,11 @@ export interface Commands {
     args: { onProgress: Channel<DownloadProgress> };
     result: void;
   };
+  /**
+   * Creates the local log's folder if missing and shows it in Explorer
+   * (#109); rejects with „Log-Ordner konnte nicht geöffnet werden.“
+   */
+  open_log_folder: { args: undefined; result: void };
   /** Registered for the shell; the panel itself never hides the window. */
   hide_panel: { args: undefined; result: void };
 }
@@ -159,6 +164,7 @@ const REGISTERED: Record<Command, true> = {
   open_startup_settings: true,
   check_update: true,
   install_update: true,
+  open_log_folder: true,
   hide_panel: true,
 };
 export const COMMAND_NAMES: readonly string[] = Object.keys(REGISTERED);

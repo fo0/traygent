@@ -78,7 +78,7 @@ fn a_loaded_list_is_sanitized_and_cut_to_the_cap() {
     std::fs::write(
         store::path(&dir.0),
         json!({"version": 1, "settings": {
-            "debug": true,
+            "logLevel": "debug",
             "profiles": {"claude": profiles},
             "quotaProfiles": {
                 "claude": ["side", 7, "../x", "side", "team", "default", "work"],
@@ -90,7 +90,7 @@ fn a_loaded_list_is_sanitized_and_cut_to_the_cap() {
     )
     .unwrap();
     let loaded = store::load(&dir.0).state.settings;
-    assert!(loaded.debug);
+    assert_eq!(loaded.log_level, crate::app_log::Level::Debug);
     assert_eq!(
         loaded.quota_profiles.claude,
         shown(&["side", "team", "default"])

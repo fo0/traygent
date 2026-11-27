@@ -1,6 +1,7 @@
 //! The desktop shell: tray icon, popup window, IPC commands and the plugins they use.
 use std::sync::{Mutex, MutexGuard, PoisonError};
 use tauri::{menu::Menu, menu::MenuItem, tray::TrayIconBuilder, Manager};
+use traygent_core::app_log;
 use traygent_core::service::Service;
 use traygent_core::Snapshot;
 
@@ -64,7 +65,7 @@ pub fn run() {
             // A duplicate login launch must neither show nor hide the existing panel.
             if traygent_core::startup::show_on_launch(args) {
                 if let Err(error) = crate::tray_popup::show(app) {
-                    eprintln!("Traygent popup: {error}");
+                    crate::desktop_log::popup_failed(&error);
                 }
             }
         }))
@@ -75,10 +76,19 @@ pub fn run() {
         .plugin(tauri_plugin_updater::Builder::new().build())
         .manage(crate::desktop_updates::UpdateState::default())
         .setup(move |app| {
+            // The log starts before the service, which applies the stored level (#109).
             let mut service = match app.path().app_data_dir() {
-                Ok(dir) => Service::open(dir),
+                Ok(dir) => {
+                    app_log::init(&dir.join(app_log::DIR_NAME));
+                    Service::open(dir)
+                }
                 Err(_) => Service::read_only(traygent_core::store::NO_APP_DATA),
             };
+            app_log::info(&format!(
+                "traygent {} started, log level={}",
+                app.package_info().version,
+                app_log::level().label()
+            ));
             let host = traygent_core::detect::Host::current();
             service.set_default_clone_root(traygent_core::repo::default_clone_root(&host));
             service.set_profile_homes(traygent_core::profiles::Homes::of(&host));
@@ -100,8 +110,10 @@ pub fn run() {
                 true,
                 None::<&str>,
             )?;
+            let log_folder =
+                MenuItem::with_id(app, "log-folder", "Log-Ordner öffnen", true, None::<&str>)?;
             let quit = MenuItem::with_id(app, "quit", "Traygent beenden", true, None::<&str>)?;
-            let menu = Menu::with_items(app, &[&show, &quit])?;
+            let menu = Menu::with_items(app, &[&show, &log_folder, &quit])?;
             TrayIconBuilder::with_id("traygent")
                 .icon(tauri::image::Image::from_bytes(include_bytes!(
                     "../icons/32x32.png"
@@ -112,6 +124,10 @@ pub fn run() {
                 .on_menu_event(move |app, event| match event.id.as_ref() {
                     "toggle" => crate::tray_popup::toggle(app),
                     "quit" => app.exit(0),
+                    // The tray has no surface of its own: a failure is logged only.
+                    "log-folder" => {
+                        let _ = crate::desktop_log::open_folder(app);
+                    }
                     _ => {}
                 })
                 .on_tray_icon_event(|tray, event| {
@@ -151,6 +167,7 @@ pub fn run() {
             crate::desktop_startup::open_startup_settings,
             crate::desktop_updates::check_update,
             crate::desktop_updates::install_update,
+            crate::desktop_log::open_log_folder,
             hide_panel
         ])
         .build(tauri::generate_context!())

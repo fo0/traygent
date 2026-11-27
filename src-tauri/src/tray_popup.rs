@@ -144,7 +144,7 @@ fn toggle_at(app: &tauri::AppHandle, icon: Option<Rect>) {
         show_at(app, icon)
     };
     if let Err(error) = result {
-        eprintln!("Traygent popup: {error}");
+        crate::desktop_log::popup_failed(&error);
     }
 }
 
@@ -187,7 +187,7 @@ pub fn tray_event(app: &tauri::AppHandle, event: TrayIconEvent) {
         // Explorer takes focus for the second click too. Keep the first click's
         // open state and restore focus instead of immediately dismissing it.
         if let Err(error) = show_at(app, clicked_anchor) {
-            eprintln!("Traygent popup: {error}");
+            crate::desktop_log::popup_failed(&error);
         }
     } else {
         schedule_dismiss(app);
@@ -235,7 +235,9 @@ fn check_later(app: tauri::AppHandle, token: u64) {
                 // main may not emit another blur when focus leaves that dialog.
                 DismissAction::Defer => check_later(handle, token),
                 DismissAction::Hide => {
-                    let _ = hide(&handle);
+                    if let Err(error) = hide(&handle) {
+                        crate::desktop_log::popup_failed(&error);
+                    }
                 }
                 DismissAction::Focused => {}
             }
@@ -276,7 +278,9 @@ pub fn window_event(window: &tauri::Window, event: &WindowEvent) {
         WindowEvent::Focused(false) => schedule_dismiss(window.app_handle()),
         WindowEvent::CloseRequested { api, .. } => {
             api.prevent_close();
-            let _ = hide(window.app_handle());
+            if let Err(error) = hide(window.app_handle()) {
+                crate::desktop_log::popup_failed(&error);
+            }
         }
         _ => {}
     }

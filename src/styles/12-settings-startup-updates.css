@@ -180,12 +180,22 @@
 .theme-setting {
   margin-bottom: 18px;
 }
-/* „Fehlersuche“ (#41): the one „Debug“ switch, below „Autostart“. */
-.debug-setting {
+/* „Protokoll“: Info / Debug tiles and „Ordner öffnen“ in one row,
+   below „Autostart“. */
+.log-setting {
   margin-top: 18px;
 }
-.debug-setting h3 {
+.log-setting h3 {
   margin: 0 0 10px;
+}
+.log-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.log-row .theme-options {
+  flex: 1;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
 }
 .theme-setting h3 {
   margin: 0 0 10px;

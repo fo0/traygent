@@ -73,12 +73,17 @@ export interface Bridge {
   /** Syncs every profile now; rejects with a German message. */
   syncProfiles(): Promise<Snapshot>;
   /**
-   * Signs one profile in: hidden it resolves when done, with „Debug“ once
-   * the terminal opened; rejects with a German message.
+   * Signs one profile in: hidden it resolves when done, at the log level
+   * „Debug“ once the terminal opened; rejects with a German message.
    */
   profileLogin(agent: AgentId, profile: string): Promise<Snapshot>;
   /** Ends the profile's running hidden sign-in; false when none ran. */
   cancelProfileLogin(agent: AgentId, profile: string): Promise<boolean>;
+  /**
+   * Shows the local log's folder (#109); the browser demo writes no log and
+   * resolves without a window.
+   */
+  openLogFolder(): Promise<void>;
 }
 
 /** Pushed snapshots, e.g. a finished detection; resolves to the unsubscribe. */

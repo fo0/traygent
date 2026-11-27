@@ -9,7 +9,7 @@ use crate::models::{
     AgentId, AgentProfile, AppSettings, GithubAccount, LaunchOptions, RecentSession,
     DEFAULT_PROFILE,
 };
-use crate::{github, recents, settings};
+use crate::{app_log::Level, github, recents, settings};
 use serde::de::DeserializeOwned;
 use serde_json::{Map, Value};
 use std::path::{Path, PathBuf};
@@ -158,7 +158,7 @@ fn parse_settings(object: &Map<String, Value>) -> AppSettings {
             "quotaRefreshMinutes",
             defaults.quota_refresh_minutes,
         ),
-        debug: field(object, "debug", defaults.debug),
+        log_level: log_level(object),
         ..defaults.clone()
     };
     for agent in AgentId::ALL {
@@ -207,6 +207,16 @@ fn parse_settings(object: &Map<String, Value>) -> AppSettings {
         settings.github.clone_root = field(github, "cloneRoot", String::new());
     }
     settings
+}
+
+/// `logLevel` (#109); a file from before it keeps a stored „Debug“ (`debug: true`, #41) as
+/// `debug`. An unknown value (a newer build's level) reads as `info`.
+fn log_level(object: &Map<String, Value>) -> Level {
+    match object.get("logLevel") {
+        Some(value) => serde_json::from_value(value.clone()).unwrap_or_default(),
+        None if object.get("debug") == Some(&Value::Bool(true)) => Level::Debug,
+        None => Level::Info,
+    }
 }
 
 /// The strings of a list; anything else in it is dropped. [`settings::sanitize`] validates.

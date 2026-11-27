@@ -1,4 +1,4 @@
-//! The status watch after a visible sign-in (#41, „Debug“ on): the terminal stays open and
+//! The status watch after a visible sign-in (#41, log level „Debug“): the terminal stays open and
 //! reports nothing back, so the profile's status is read again every [`WATCH_TICK`] until
 //! its sign-in facts change or [`WATCH_LIMIT`] passes. Only a cheap read ([`SyncPlan::read`]),
 //! never a sync; the host runs it without the service lock and commits only a change.
