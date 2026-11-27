@@ -20,7 +20,10 @@ pub mod quote;
 
 pub(crate) use folder::is_windows_absolute;
 pub use folder::{is_network_path, normalize_folder};
-pub use login::{hidden_login_plan, login_plan, HiddenLogin};
+pub use login::{
+    hidden_login_plan, hidden_usage_plan, login_plan, HiddenLogin, CLAUDE_LOGIN_OVERRIDES,
+    USAGE_ARGS,
+};
 
 use quote::{encode_command, invoke, ps_literal, set_env_base64};
 

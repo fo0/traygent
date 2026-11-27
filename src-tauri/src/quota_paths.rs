@@ -1,6 +1,7 @@
-//! Selects the credential file for the requested session account before a quota read.
+//! Selects what a quota read uses for the requested session account: the credential file
+//! (Codex, OpenCode Go) or, for Claude Code, the profile directory its CLI reads with (#110).
 use crate::detect::{host::is_search_dir, Fs, Host, RealFs};
-use crate::launch::{docker::AgentHome, is_network_path, normalize_folder};
+use crate::launch::{docker::AgentHome, is_network_path, normalize_folder, CLAUDE_LOGIN_OVERRIDES};
 use crate::models::{AgentId, AppSettings, EnvId, DEFAULT_PROFILE};
 use crate::{profiles, service::PROFILE_MISSING};
 use std::path::PathBuf;
@@ -12,16 +13,26 @@ const WSL: &str = "Für WSL ist keine Kontingentabfrage verfügbar.";
 const ENV_LOGIN: &str =
     "Für die Anmeldung aus dieser Umgebung ist keine Kontingentabfrage verfügbar.";
 
+/// What a quota read of the account uses.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub enum QuotaSource {
+    /// The sign-in file or database the provider request reads its key from.
+    File(PathBuf),
+    /// Claude Code's own CLI (`/usage`, ADR-0015) in this profile directory, checked like a
+    /// start's; `None` = the default profile, which sets no `CLAUDE_CONFIG_DIR`.
+    ClaudeCli { profile_dir: Option<String> },
+}
+
 /// A saved profile ID is the only caller-supplied component that can enter a path.
 /// Run this on the quota worker: a named profile's directory is checked for links.
-pub fn credentials_path(
+pub fn quota_source(
     agent: AgentId,
     profile: Option<&str>,
     env: EnvId,
     settings: &AppSettings,
     host: &Host,
-) -> Result<PathBuf, &'static str> {
-    choose_path(agent, profile, env, settings, host, |name| {
+) -> Result<QuotaSource, &'static str> {
+    choose_source(agent, profile, env, settings, host, |name| {
         std::env::var_os(name).is_some_and(|value| {
             if name.starts_with("CLAUDE_CODE_USE_") {
                 matches!(value.to_str(), Some("1")) || value.eq_ignore_ascii_case("true")
@@ -32,14 +43,14 @@ pub fn credentials_path(
     })
 }
 
-fn choose_path(
+fn choose_source(
     agent: AgentId,
     profile: Option<&str>,
     env: EnvId,
     settings: &AppSettings,
     host: &Host,
     configured: impl Fn(&str) -> bool,
-) -> Result<PathBuf, &'static str> {
+) -> Result<QuotaSource, &'static str> {
     if env == EnvId::Wsl {
         return Err(WSL);
     }
@@ -55,17 +66,10 @@ fn choose_path(
         return Err(PROFILE_MISSING);
     }
     // Local sessions inherit credentials. Managed Claude containers clear them;
-    // unmanaged ones forward only these two variables (launch/docker.rs).
+    // unmanaged ones forward only these two variables (launch/docker.rs). With such a
+    // sign-in the CLI would report no subscription either.
     let overrides: &[&str] = match (agent, env) {
-        (AgentId::Claude, EnvId::Local) => &[
-            "ANTHROPIC_API_KEY",
-            "ANTHROPIC_AUTH_TOKEN",
-            "CLAUDE_CODE_OAUTH_TOKEN",
-            "CLAUDE_CODE_CUSTOM_OAUTH_URL",
-            "CLAUDE_CODE_USE_BEDROCK",
-            "CLAUDE_CODE_USE_VERTEX",
-            "CLAUDE_CODE_USE_FOUNDRY",
-        ],
+        (AgentId::Claude, EnvId::Local) => &CLAUDE_LOGIN_OVERRIDES,
         (AgentId::Claude, EnvId::Docker) if settings.profiles.claude.is_empty() => {
             &["ANTHROPIC_API_KEY", "CLAUDE_CODE_OAUTH_TOKEN"]
         }
@@ -79,8 +83,12 @@ fn choose_path(
     }
 
     if agent == AgentId::Opencode {
-        return local_path(opencode_database(host).ok_or(NO_HOME)?, host.windows)
-            .map(PathBuf::from);
+        let database = local_path(opencode_database(host).ok_or(NO_HOME)?, host.windows)?;
+        return Ok(QuotaSource::File(PathBuf::from(database)));
+    }
+    if agent == AgentId::Claude && id == DEFAULT_PROFILE {
+        // The CLI finds its own default home, as a start does.
+        return Ok(QuotaSource::ClaudeCli { profile_dir: None });
     }
     let home = AgentHome::from_host(agent, host, settings, Some(id))
         .map_err(|_| NO_HOME)?
@@ -89,8 +97,15 @@ fn choose_path(
     if id != DEFAULT_PROFILE && RealFs.is_link(&directory) {
         return Err("Der Profilordner darf keine Verknüpfung sein.");
     }
+    if agent == AgentId::Claude {
+        return Ok(QuotaSource::ClaudeCli {
+            profile_dir: Some(directory),
+        });
+    }
     let file = profiles::recipe(agent).map_or("auth.json", |recipe| recipe.credentials);
-    Ok(PathBuf::from(host.join(&directory, &[file])))
+    Ok(QuotaSource::File(PathBuf::from(
+        host.join(&directory, &[file]),
+    )))
 }
 
 fn local_path(path: String, windows: bool) -> Result<String, &'static str> {

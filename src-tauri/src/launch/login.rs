@@ -6,6 +6,7 @@ use super::{
     is_windows_absolute, profile_env, tab, wrap, LaunchPlan, Resolved, COMMAND_TOO_LONG,
     MAX_ENCODED_CHARS,
 };
+use crate::detect::Candidate;
 use crate::models::{AgentId, AppSettings};
 
 /// Opens a terminal in `home` that signs the agent's profile in: the CLI by absolute path
@@ -31,8 +32,9 @@ pub fn login_plan(
     )
 }
 
-/// A sign-in without a window (#41, „Debug“ off): the same call as [`login_plan`] in a
-/// hidden `powershell.exe -NoProfile -NonInteractive -EncodedCommand`, whose exit code is
+/// A hidden call of the CLI: the sign-in without a window (#41, „Debug“ off) and the quota
+/// read of Claude Code (#110). The call runs in a hidden
+/// `powershell.exe -NoLogo -NoProfile -NonInteractive -EncodedCommand`, whose exit code is
 /// the CLI's — 1 when the CLI could not run at all (`$LASTEXITCODE` unset).
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct HiddenLogin {
@@ -46,11 +48,67 @@ pub fn hidden_login_plan(
     resolved: &Resolved,
     home: &str,
 ) -> Result<HiddenLogin, String> {
+    hidden(resolved, home, || login_call(agent, resolved))
+}
+
+/// Claude Code's own quota read (#110): `/usage` in print mode, as JSON, without a session
+/// file. No `--bare`: it may change which sign-in the CLI uses.
+pub const USAGE_ARGS: [&str; 5] = [
+    "-p",
+    "/usage",
+    "--output-format",
+    "json",
+    "--no-session-persistence",
+];
+
+/// The variables that replace Claude Code's stored sign-in. The quota read of a local
+/// session refuses them beforehand (`quota_paths.rs`); the read itself always removes them,
+/// so a Docker session's read on the host never answers for them.
+pub const CLAUDE_LOGIN_OVERRIDES: [&str; 7] = [
+    "ANTHROPIC_API_KEY",
+    "ANTHROPIC_AUTH_TOKEN",
+    "CLAUDE_CODE_OAUTH_TOKEN",
+    "CLAUDE_CODE_CUSTOM_OAUTH_URL",
+    "CLAUDE_CODE_USE_BEDROCK",
+    "CLAUDE_CODE_USE_VERTEX",
+    "CLAUDE_CODE_USE_FOUNDRY",
+];
+
+/// The hidden `/usage` read of Claude Code in `cwd` (#110): the CLI by absolute path with
+/// [`USAGE_ARGS`], in the profile's environment as a local start sets it (`profiled`: the
+/// agent has extra profiles, so the default one removes an inherited `CLAUDE_CONFIG_DIR`).
+/// stdout is UTF-8, so the JSON reaches the caller unchanged also when PowerShell relays it.
+pub fn hidden_usage_plan(
+    resolved: &Resolved,
+    cwd: &str,
+    profiled: bool,
+) -> Result<HiddenLogin, String> {
+    hidden(resolved, cwd, || {
+        let agent = AgentId::Claude;
+        let cli = cli_path(agent, resolved)?;
+        // No character an npm `.cmd` shim would interpret (`settings::check_shim_args`).
+        let args = USAGE_ARGS.map(String::from);
+        let mut script = vec!["[Console]::OutputEncoding=[Text.UTF8Encoding]::new($false)".into()];
+        script.extend(
+            CLAUDE_LOGIN_OVERRIDES
+                .map(|name| format!("Remove-Item Env:{name} -ErrorAction SilentlyContinue")),
+        );
+        script.extend(profile_env(agent, resolved, profiled)?);
+        script.push(invoke(&cli.path, &args));
+        Ok(script)
+    })
+}
+
+fn hidden(
+    resolved: &Resolved,
+    cwd: &str,
+    call: impl FnOnce() -> Result<Vec<String>, String>,
+) -> Result<HiddenLogin, String> {
     if !is_windows_absolute(&resolved.powershell) {
         return Err("Der Pfad zu PowerShell ist kein absoluter Windows-Pfad.".into());
     }
     let mut script = vec!["$LASTEXITCODE=$null".to_string()];
-    script.extend(login_call(agent, resolved)?);
+    script.extend(call()?);
     script.push("if ($null -eq $LASTEXITCODE) { exit 1 }".into());
     script.push("exit $LASTEXITCODE".into());
     let encoded = encode_command(&script.join("; "));
@@ -70,15 +128,13 @@ pub fn hidden_login_plan(
             .map(String::from)
             .chain([encoded])
             .collect(),
-        cwd: home.into(),
+        cwd: cwd.into(),
     })
 }
 
-/// The profile's environment and the CLI's login call, shared by both sign-ins.
-fn login_call(agent: AgentId, resolved: &Resolved) -> Result<Vec<String>, String> {
+/// The agent's CLI by absolute Windows path, for both hidden calls and the visible sign-in.
+fn cli_path(agent: AgentId, resolved: &Resolved) -> Result<&Candidate, String> {
     let label = agent.label();
-    let recipe = crate::profiles::recipe(agent)
-        .ok_or_else(|| format!("{label} unterstützt keine Profile."))?;
     let cli = resolved
         .cli
         .as_ref()
@@ -88,6 +144,15 @@ fn login_call(agent: AgentId, resolved: &Resolved) -> Result<Vec<String>, String
             "Der Pfad zu {label} ist kein absoluter Windows-Pfad."
         ));
     }
+    Ok(cli)
+}
+
+/// The profile's environment and the CLI's login call, shared by both sign-ins.
+fn login_call(agent: AgentId, resolved: &Resolved) -> Result<Vec<String>, String> {
+    let label = agent.label();
+    let recipe = crate::profiles::recipe(agent)
+        .ok_or_else(|| format!("{label} unterstützt keine Profile."))?;
+    let cli = cli_path(agent, resolved)?;
     let args: Vec<String> = recipe
         .login_args
         .iter()

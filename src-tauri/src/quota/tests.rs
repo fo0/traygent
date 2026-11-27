@@ -13,34 +13,6 @@ fn parse(agent: AgentId, body: Value) -> Value {
 }
 
 #[test]
-fn claude_reports_real_zero_and_only_the_model_windows_present() {
-    let quota = parse(
-        AgentId::Claude,
-        json!({
-            "seven_day": {"utilization": 0, "resets_at": RESET},
-            "five_hour": {"utilization": "15.5", "resets_at": "invalid"},
-            "seven_day_sonnet": {"utilization": 27},
-            "limits": [
-                {"kind": "weekly_scoped", "scope": {"model": {"display_name": "Other"}}, "percent": 70},
-                {"kind": "weekly_scoped", "scope": {"model": {"display_name": "Fable"}}, "percent": 60}
-            ]
-        }),
-    );
-    assert_eq!(
-        quota,
-        json!({"windows":{
-        "week": {"used": 0.0, "resetAt": RESET},
-        "session": {"used": 15.5, "resetAt": null},
-        "sonnet": {"used": 27.0, "resetAt": null},
-        "fable": {"used": 60.0, "resetAt": null}
-    }, "detail": null})
-    );
-    let partial = parse(AgentId::Claude, json!({"five_hour":{"utilization": 5}}));
-    assert_eq!(partial["windows"].as_object().unwrap().len(), 1);
-    assert!(partial["windows"].get("week").is_none());
-}
-
-#[test]
 fn codex_weekly_only_and_spark_limits_use_the_period_and_normalize_resets() {
     let quota = parse(
         AgentId::Codex,

@@ -286,3 +286,70 @@ fn the_hidden_login_runs_the_same_call_and_exits_with_the_clis_code() {
         "Der Pfad zu PowerShell ist kein absoluter Windows-Pfad."
     );
 }
+
+#[test]
+fn the_hidden_usage_read_runs_the_print_call_in_the_profile_without_other_sign_ins() {
+    let cwd = r"C:\Users\max\AppData\Roaming\io.github.fo0.traygent";
+    let hidden = hidden_usage_plan(&in_profile(TEAM_DIR), cwd, true).unwrap();
+    assert_eq!(hidden.program, PS);
+    assert_eq!(hidden.cwd, cwd);
+    assert_eq!(
+        hidden.args[..4],
+        [
+            "-NoLogo",
+            "-NoProfile",
+            "-NonInteractive",
+            "-EncodedCommand"
+        ]
+    );
+    assert!(hidden
+        .args
+        .iter()
+        .all(|arg| !arg.is_empty() && !arg.contains('"')));
+    let script = decode_command(&hidden.args[4]);
+    let removed = CLAUDE_LOGIN_OVERRIDES
+        .map(|name| format!("Remove-Item Env:{name} -ErrorAction SilentlyContinue"));
+    let mut expected = vec![
+        "$LASTEXITCODE=$null".to_string(),
+        "[Console]::OutputEncoding=[Text.UTF8Encoding]::new($false)".into(),
+    ];
+    expected.extend(removed.iter().cloned());
+    expected.extend([
+        r"$env:CLAUDE_CONFIG_DIR='C:\Users\Max O''Neil\.claude-team'".to_string(),
+        format!("& '{CLAUDE}' '-p' '/usage' '--output-format' 'json' '--no-session-persistence'"),
+        "if ($null -eq $LASTEXITCODE) { exit 1 }".into(),
+        "exit $LASTEXITCODE".into(),
+    ]);
+    assert_eq!(script.split("; ").collect::<Vec<_>>(), expected);
+    // Never `--bare`: it may change which sign-in the CLI uses.
+    assert!(!USAGE_ARGS.contains(&"--bare"));
+
+    // The default profile: a stray variable is removed only while extra profiles exist, as
+    // for a local start; an npm shim is called the same way.
+    let shim = r"C:\Users\max\AppData\Roaming\npm\claude.cmd";
+    let default = resolved(Some((shim, true)));
+    let call = format!("& '{shim}' '-p' '/usage'");
+    let script = decode_command(&hidden_usage_plan(&default, cwd, true).unwrap().args[4]);
+    assert!(script.contains(&format!("; {CLEAR}; {call}")));
+    let script = decode_command(&hidden_usage_plan(&default, cwd, false).unwrap().args[4]);
+    assert!(!script.contains("CLAUDE_CONFIG_DIR"));
+    assert!(script.contains(&format!("{}; {call}", removed.last().unwrap())));
+
+    let refused = |resolved: &Resolved| hidden_usage_plan(resolved, cwd, true).unwrap_err();
+    assert_eq!(
+        refused(&resolved(None)),
+        "Claude Code ist nicht installiert."
+    );
+    assert_eq!(
+        refused(&resolved(Some(("claude.exe", false)))),
+        "Der Pfad zu Claude Code ist kein absoluter Windows-Pfad."
+    );
+    let relative = Resolved {
+        powershell: "powershell.exe".into(),
+        ..in_profile(TEAM_DIR)
+    };
+    assert_eq!(
+        refused(&relative),
+        "Der Pfad zu PowerShell ist kein absoluter Windows-Pfad."
+    );
+}

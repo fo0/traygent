@@ -226,6 +226,43 @@ impl Service {
         Ok(plan)
     }
 
+    /// The hidden `/usage` read of Claude Code's quota (#110) for the profile whose checked
+    /// directory `quota_paths` chose (`None`: the default one). Always the host's CLI — also
+    /// for a Docker session, whose container uses the same host profile. It runs in Traygent's
+    /// app data dir, a folder that is no project, so no repository's settings, hooks or MCP
+    /// servers load; without one (read-only state) in the user profile, as a sign-in does.
+    /// Refused while an update replaces the CLI. Creates nothing.
+    pub fn prepare_quota_read(
+        &self,
+        agent: AgentId,
+        profile_dir: Option<String>,
+        host: &Host,
+        fs: &dyn Fs,
+    ) -> Result<HiddenLogin, String> {
+        let name = agent.label();
+        if agent != AgentId::Claude {
+            return Err(format!("{name} liest sein Kontingent nicht über die CLI."));
+        }
+        if self.agent_updating(agent) {
+            return Err(format!("{name} wird gerade aktualisiert."));
+        }
+        let mut resolved = self.resolve(agent, EnvId::Local, false, host, fs, "");
+        if resolved.cli.is_none() {
+            return Err(format!("{name} ist nicht installiert."));
+        }
+        resolved.profile_dir = profile_dir;
+        let profiled = !self.state.settings.profiles.get(agent).is_empty();
+        let app_dir = self
+            .dir
+            .to_str()
+            .filter(|dir| !dir.is_empty() && fs.is_dir(dir));
+        let cwd = match app_dir {
+            Some(dir) => dir.to_string(),
+            None => user_home(host, fs),
+        };
+        launch::hidden_usage_plan(&resolved, &cwd, profiled)
+    }
+
     /// What both sign-ins check and resolve: the profile's label, the CLI and the profile's
     /// directory, and the user profile the process starts in. Creates nothing.
     fn sign_in_target(
@@ -266,12 +303,7 @@ impl Service {
                 ));
             }
         }
-        let home = host
-            .user_profile
-            .clone()
-            .filter(|dir| fs.is_dir(dir))
-            .unwrap_or_else(|| "C:\\".into());
-        Ok((label, resolved, home))
+        Ok((label, resolved, user_home(host, fs)))
     }
 
     /// The install terminal for `agent`, with its console fallback.
@@ -282,11 +314,7 @@ impl Service {
         fs: &dyn Fs,
     ) -> Result<(LaunchPlan, Option<LaunchPlan>), String> {
         let resolved = self.resolve(agent, EnvId::Local, false, host, fs, "");
-        let home = host
-            .user_profile
-            .clone()
-            .filter(|dir| fs.is_dir(dir))
-            .unwrap_or_else(|| "C:\\".into());
+        let home = user_home(host, fs);
         let settings = &self.state.settings;
         let plan = launch::install_plan(agent, settings, &resolved, &home)?;
         let fallback = (plan.terminal == TerminalId::WindowsTerminal)
@@ -346,6 +374,15 @@ impl Service {
             profile_dir: None,
         }
     }
+}
+
+/// Where a sign-in, an install terminal and (without an app data dir) a quota read start:
+/// the user profile, else `C:\`.
+fn user_home(host: &Host, fs: &dyn Fs) -> String {
+    host.user_profile
+        .clone()
+        .filter(|dir| fs.is_dir(dir))
+        .unwrap_or_else(|| "C:\\".into())
 }
 
 /// The directory of an extra profile (`None`: the default one, the CLI's own home).

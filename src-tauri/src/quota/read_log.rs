@@ -1,5 +1,6 @@
-//! The log lines of one quota read (#109): a debug line for every read, an info line for a
-//! provider that refused it, limited it or could not be reached. Only the agent, the profile
+//! The log lines of one provider request for a quota read (#109; Codex and OpenCode Go, the
+//! Claude Code CLI read logs in `claude_cli.rs`): a debug line for every read, an info line
+//! for a provider that refused it, limited it or could not be reached. Only the agent, the profile
 //! id, the HTTP status, the raw `Retry-After` value, the duration and the panel's German
 //! detail are written — never the token, a header, the body or the sign-in file's path.
 use super::AgentQuota;
@@ -69,8 +70,8 @@ mod tests {
     #[test]
     fn a_good_read_writes_the_debug_line_only() {
         let ok = Ok(AgentQuota::off());
-        let (debug, info) = lines(AgentId::Claude, "default", &answered(200, None), &ok, MS);
-        assert_eq!(debug, "quota claude profile=default -> 200 42ms");
+        let (debug, info) = lines(AgentId::Codex, "default", &answered(200, None), &ok, MS);
+        assert_eq!(debug, "quota codex profile=default -> 200 42ms");
         assert_eq!(info, None);
     }
 
@@ -92,7 +93,7 @@ mod tests {
     fn refusals_and_unreachable_providers_reach_the_info_level() {
         let refused = Err("Anmeldung abgelaufen oder ungültig. Bitte im CLI erneut anmelden.");
         let (_, info) = lines(
-            AgentId::Claude,
+            AgentId::Codex,
             "default",
             &answered(401, None),
             &refused,
@@ -100,7 +101,7 @@ mod tests {
         );
         assert_eq!(
             info.as_deref(),
-            Some("quota claude profile=default refused: status=401 reason=Anmeldung abgelaufen oder ungültig. Bitte im CLI erneut anmelden.")
+            Some("quota codex profile=default refused: status=401 reason=Anmeldung abgelaufen oder ungültig. Bitte im CLI erneut anmelden.")
         );
         let invalid = Err("Die Kontingentdaten des Anbieters sind ungültig.");
         let (_, info) = lines(
@@ -118,28 +119,30 @@ mod tests {
             requested: true,
             ..Exchange::default()
         };
-        let (debug, info) = lines(AgentId::Claude, "default", &sent, &unreachable, MS);
+        let (debug, info) = lines(AgentId::Codex, "default", &sent, &unreachable, MS);
         assert_eq!(
             debug,
-            "quota claude profile=default -> no-response 42ms reason=Der Anbieter ist nicht erreichbar."
+            "quota codex profile=default -> no-response 42ms reason=Der Anbieter ist nicht erreichbar."
         );
         assert_eq!(
             info.as_deref(),
-            Some("quota claude profile=default failed: no-response reason=Der Anbieter ist nicht erreichbar.")
+            Some("quota codex profile=default failed: no-response reason=Der Anbieter ist nicht erreichbar.")
         );
     }
 
     #[test]
     fn a_read_without_a_request_stays_at_the_debug_level() {
-        let signed_out = Err("Bitte in Claude Code anmelden.");
+        let signed_out = Err("Bitte in Codex mit einem ChatGPT-Konto anmelden.");
         let (debug, info) = lines(
-            AgentId::Claude,
+            AgentId::Codex,
             "default",
             &Exchange::default(),
             &signed_out,
             MS,
         );
-        assert!(debug.ends_with("-> no-response 42ms reason=Bitte in Claude Code anmelden."));
+        assert!(debug.ends_with(
+            "-> no-response 42ms reason=Bitte in Codex mit einem ChatGPT-Konto anmelden."
+        ));
         assert_eq!(info, None);
     }
 }

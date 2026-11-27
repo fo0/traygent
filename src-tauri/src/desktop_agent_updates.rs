@@ -111,6 +111,14 @@ fn update_all(app: &AppHandle, targets: &[(AgentId, Candidate)]) {
             app,
             agent_updates::status(*agent, running, chrono::Utc::now()),
         );
+        // `running` refuses new quota reads of Claude Code; one already counted ends within
+        // its limit, so its short-lived CLI process does not make the in-use check skip the
+        // update (ADR-0015).
+        if *agent == AgentId::Claude {
+            traygent_core::quota::wait_for_cli_reads(
+                traygent_core::quota::READ_LIMIT + std::time::Duration::from_secs(5),
+            );
+        }
         let status = agent_updates::run_agent(*agent, cli, &host, &RealFs, &runners, &|| {
             chrono::Utc::now()
         });
