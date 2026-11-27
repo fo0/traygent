@@ -8,10 +8,11 @@ src/        Svelte panel, lib/ = components, controllers (panel, composer, setti
             jsonValues.ts (structural compare and rebase of staged settings),
             IPC map, demo (demoGithub.ts = synthetic account, demoProfiles.ts); styles/ = ordered CSS
 src-tauri/  Rust core crate (traygent_core: catalog, settings/ (profiles, share), recents, store, detect/, launch/, spawn,
-            ports, repo, github/ (api, http, gh, discover, process, vault, secret), profiles/ (sync, foreign, marker,
+            ports, repo, app_log (local log), github/ (api, http, gh, discover, process, vault, secret), profiles/ (sync, foreign, marker,
             share, links, files, history, settings, state, json, merge, node, pair, status), service/ (launch_prep,
             github, profiles), models/ (github, profiles))
-            + desktop bin (desktop*.rs incl. desktop_github.rs, desktop_agent_updates.rs, desktop_profiles.rs, tray_popup/),
+            + desktop bin (desktop*.rs incl. desktop_github.rs, desktop_agent_updates.rs, desktop_profiles.rs,
+            desktop_log.rs, tray_popup/),
             Tauri config, capabilities, icons
 fixtures/   snapshot.default.json — golden native snapshot (written by a Rust test, checked by Vitest);
             profile-share-names.json — extra-name lists (written by a Rust test, checked by Vitest);
