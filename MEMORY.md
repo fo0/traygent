@@ -39,7 +39,7 @@ Stable project knowledge. **Read at session start.**
 ### Subscription quota reads are opt-in per agent
 
 - **Date:** 2026-11-22
-- **Decision:** `settings.quotaReads` (owner, #83): off by default for Claude and Codex (undocumented endpoints, CLI sign-in), on for OpenCode Go; `quota::read` returns before any path, file or request when off; Traygent's own User-Agent only, ≥ 30 s between scheduled reads. Detail: [ADR-0014](docs/adr/0014-opt-in-subscription-quota-reads.md).
+- **Decision:** `settings.quotaReads` (owner, #83): off by default for Claude and Codex, on for OpenCode Go; `quota::read` returns before any path, file, request or process when off; ≥ 30 s between scheduled reads. Codex and OpenCode Go: the provider endpoint with the CLI's own key, Traygent's own User-Agent only ([ADR-0014](docs/adr/0014-opt-in-subscription-quota-reads.md)). Claude Code (owner, #110): the host CLI's `-p /usage --output-format json --no-session-persistence`, hidden like the sign-in, in the app data dir, profile env as a local start, 64 KiB / 20 s — never the OAuth endpoint or `.credentials.json` ([ADR-0015](docs/adr/0015-read-the-claude-code-quota-through-the-cli.md)).
 
 ## Gotchas & Pitfalls
 
@@ -66,6 +66,8 @@ Stable project knowledge. **Read at session start.**
 - **A hidden child that starts the CLI through PowerShell is ended with `detect/runner.rs → kill_tree`** (absolute `taskkill /T /F`, bounded wait), then `Child::kill`: `Child::kill` alone ends only `powershell.exe` and leaves `claude.exe` / `node.exe` running. The hidden sign-in's stdout and stderr go to the null device — its output can hold a sign-in URL or code and must never sit in memory, a log or the panel (`profiles/login.rs`). (2026-11-14)
 
 - **Local log: `app_log::sanitise` is the single write point** (#109) — every line passes it (credential-looking words → `[redacted]`, control characters out, length capped). Never log tokens, headers, bodies, file contents, the CLI's sign-in output, account e-mails, folders or commands; ids, statuses, durations, versions and the panel's German text only. A repeating job's failure goes through `FailureLog` (once per new reason). `#` plus three digits in a CSS/Svelte comment reads as a hex colour to `tokens.test.ts`. (2026-11-27)
+
+- **The `/usage` text is no contract** (#110) — `quota/claude_usage.rs` counts only `Current <label>: <N>% used[ · resets <when>]` lines and skips everything else; the shapes are pinned by `fixtures/claude-usage/` (verbatim owner sample, names replaced). A changed CLI wording needs a new fixture first, then the parser. Never log the output: it lists skills, subagents and MCP servers. (2026-11-27)
 
 - **`store.rs → parse_settings` reads settings field by field** — a new `AppSettings` field needs its line there (plus `sanitize` when it reaches a path) or a saved value is dropped on load. (2026-11-10)
 
