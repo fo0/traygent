@@ -251,3 +251,40 @@ test('↑ / ↓, Home and End move between the rows’ starts', async ({ page })
   await expect(page.getByRole('menu')).toBeVisible();
   expect(await launches(page)).toEqual([]);
 });
+
+test('typed letters move to the row whose folder name starts with them', async ({
+  page,
+}) => {
+  await page.clock.install();
+  await serve(page);
+  await page.goto('/');
+  const start = (name: string) => row(page, name).locator('.recent-start');
+  await start('kunden-portal').focus();
+  // One letter: the next row starting with it, wrapping at the end.
+  await page.keyboard.press('t');
+  const first = page.locator('.recent-start:focus');
+  await expect(first).toHaveCount(1);
+  const firstName = await first
+    .locator('xpath=ancestor::li')
+    .locator('.recent-name')
+    .textContent();
+  expect(firstName?.startsWith('t')).toBe(true);
+  await page.keyboard.press('t');
+  await expect(
+    start(firstName === 'traygent' ? 'terraform-module' : 'traygent'),
+  ).toBeFocused();
+  // A typed prefix finds the row, and a Space inside the search never starts.
+  await page.clock.fastForward(800);
+  await page.keyboard.type('Noti');
+  await expect(start('Notizen')).toBeFocused();
+  await page.keyboard.press(' ');
+  await expect(start('Notizen')).toBeFocused();
+  await page.clock.fastForward(800);
+  await page.keyboard.type('ag');
+  await expect(start('agent-tools')).toBeFocused();
+  expect(await launches(page)).toEqual([]);
+  // Once the search has lapsed, Space starts the focused row as before.
+  await page.clock.fastForward(800);
+  await page.keyboard.press(' ');
+  await expect.poll(() => launches(page)).toHaveLength(1);
+});

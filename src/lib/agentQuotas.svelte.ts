@@ -1,6 +1,6 @@
 import type { Bridge } from './bridgeTypes';
 import { MINUTE, minuteClock } from './clock';
-import { clockTime } from './format';
+import { atTime } from './format';
 import type { QuotaContext } from './quotaContexts';
 import { Backoff, ProviderQueue, rateLimited } from './quotaSchedule';
 import { DEFAULT_QUOTA_REFRESH_MINUTES, type AgentQuota } from './quotaTypes';
@@ -267,7 +267,7 @@ export class AgentQuotas {
     if (rateLimited(entry.result))
       entry.result = {
         ...entry.result,
-        detail: `Zu viele Abfragen. Nächster Versuch um ${clockTime(entry.nextRead)}.`,
+        detail: `Zu viele Abfragen. Nächster Versuch ${atTime(entry.nextRead)}.`,
       };
   }
 

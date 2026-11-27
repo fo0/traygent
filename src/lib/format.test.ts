@@ -11,6 +11,7 @@ import {
 import { get } from 'svelte/store';
 import { minuteClock } from './clock';
 import {
+  atTime,
   clockTime,
   dateTime,
   errorMessage,
@@ -66,6 +67,21 @@ describe('clockTime', () => {
   });
   it('defaults to the current time', () => {
     expect(clockTime()).toMatch(/^\d{2}:\d{2}$/);
+  });
+});
+
+describe('atTime', () => {
+  const noon = new Date(2026, 5, 17, 12, 0).getTime();
+  it('names only the time later the same day', () => {
+    expect(atTime(new Date(2026, 5, 17, 23, 59), noon)).toBe('um 23:59');
+  });
+  it('adds the date for another day', () => {
+    expect(atTime(new Date(2026, 5, 18, 0, 5), noon)).toBe(
+      'am 18.06. um 00:05',
+    );
+    expect(atTime(new Date(2026, 6, 2, 9, 30).toISOString(), noon)).toBe(
+      'am 02.07. um 09:30',
+    );
   });
 });
 
