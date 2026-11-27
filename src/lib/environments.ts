@@ -11,7 +11,7 @@ const ORDER: readonly EnvId[] = ENVIRONMENTS.map((env) => env.id);
 export const NO_ENVIRONMENT = 'Mindestens eine Umgebung muss aktiv sein.';
 
 /** Lokal and Docker start sessions; WSL is listed but not available yet. */
-export const canStart = (env: EnvId) => env !== 'wsl';
+const canStart = (env: EnvId) => env !== 'wsl';
 
 /** Each environment once, in canonical order. */
 export const normalizeEnvs = (list: readonly EnvId[]): EnvId[] =>

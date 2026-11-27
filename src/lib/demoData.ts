@@ -142,7 +142,7 @@ export const DEMO_CATALOG: AgentCatalogEntry[] = [
 const IMAGE = 'node:22-trixie';
 
 /** docs/SPEC.md → Ports: the common dev-server ports, as Rust sends them. */
-export const DEMO_PORT_PRESETS: PortPreset[] = [
+const DEMO_PORT_PRESETS: PortPreset[] = [
   { port: 3000, label: 'Next.js · Node' },
   { port: 5173, label: 'Vite' },
   { port: 4200, label: 'Angular' },
