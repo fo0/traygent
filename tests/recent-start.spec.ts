@@ -249,6 +249,10 @@ test('↑ / ↓, Home and End move between the rows’ starts', async ({ page })
     .focus();
   await page.keyboard.press('ArrowDown');
   await expect(page.getByRole('menu')).toBeVisible();
+  // The focused item shows the app's ring, not only the faint hover tint.
+  const first = page.getByRole('menuitem').first();
+  await expect(first).toBeFocused();
+  await expect(first).toHaveCSS('outline-style', 'solid');
   expect(await launches(page)).toEqual([]);
 });
 
