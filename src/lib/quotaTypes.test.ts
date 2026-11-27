@@ -1,5 +1,9 @@
 import { describe, expect, it } from 'vitest';
-import { MAX_QUOTA_PROFILES, shownQuotaProfiles } from './quotaTypes';
+import {
+  MAX_QUOTA_PROFILES,
+  quotaReadTip,
+  shownQuotaProfiles,
+} from './quotaTypes';
 import type { AppSettings } from './types';
 
 const known = ['default', 'team', 'work', 'side'];
@@ -66,5 +70,17 @@ describe('shownQuotaProfiles', () => {
     expect(
       shownQuotaProfiles(choice(['team']), 'claude', 'new', known),
     ).toEqual(['new', 'team']);
+  });
+});
+
+describe('quotaReadTip', () => {
+  it('names what each read uses', () => {
+    expect(quotaReadTip('claude')).toBe(
+      'Startet die Claude-Code-CLI (/usage) mit der Anmeldung dieses Profils',
+    );
+    expect(quotaReadTip('codex')).toMatch(
+      /CLI-Anmeldung.*nicht offiziell dokumentierte Schnittstelle/,
+    );
+    expect(quotaReadTip('opencode')).toMatch(/OpenCode-Go-Schlüssel/);
   });
 });

@@ -90,7 +90,7 @@ test('the quota read switch is staged until saved and locks the bar choices whil
   await expect(group.getByText('Weitere Balken')).toHaveCount(0);
   await expect(group.locator('label.switch-row')).toHaveAttribute(
     'title',
-    /CLI-Anmeldung.*nicht offiziell dokumentierte Schnittstelle/,
+    'Startet die Claude-Code-CLI (/usage) mit der Anmeldung dieses Profils',
   );
   await expect(read).toBeChecked();
   await expect(fable).toBeEnabled();
