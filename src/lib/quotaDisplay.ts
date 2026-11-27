@@ -12,9 +12,9 @@ const DAY = 24 * HOUR;
 const percent = new Intl.NumberFormat('de-DE', { maximumFractionDigits: 1 });
 
 /** From this share used on, a figure and its bar end show the warning state. */
-export const QUOTA_WARNING = 70;
+const QUOTA_WARNING = 70;
 /** From this share used on, the critical state. */
-export const QUOTA_CRITICAL = 90;
+const QUOTA_CRITICAL = 90;
 
 function resetCountdown(milliseconds: number) {
   if (milliseconds >= DAY)

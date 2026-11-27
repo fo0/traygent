@@ -67,7 +67,7 @@ export function rowStep(
 }
 
 /** How long typed letters keep adding to one type-ahead search. */
-export const TYPEAHEAD_RESET = 700;
+const TYPEAHEAD_RESET = 700;
 
 /**
  * The row whose name starts with the typed `query` (case-insensitive), or
