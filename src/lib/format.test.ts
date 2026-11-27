@@ -49,14 +49,15 @@ describe('ipcErrorMessage', () => {
 });
 
 describe('plural', () => {
-  it('uses the singular only for exactly one', () => {
-    expect(plural(1, 'Agent', 'Agenten')).toBe('1 Agent');
-    expect(plural(1, 'Ordner', 'Ordner')).toBe('1 Ordner');
-  });
-  it('uses the plural for zero and several', () => {
-    expect(plural(0, 'Agent', 'Agenten')).toBe('0 Agenten');
-    expect(plural(2, 'Agent', 'Agenten')).toBe('2 Agenten');
-    expect(plural(12, 'Session', 'Sessions')).toBe('12 Sessions');
+  // The singular only for exactly one, the plural for zero and several.
+  it.each([
+    [1, 'Agent', 'Agenten', '1 Agent'],
+    [1, 'Ordner', 'Ordner', '1 Ordner'],
+    [0, 'Agent', 'Agenten', '0 Agenten'],
+    [2, 'Agent', 'Agenten', '2 Agenten'],
+    [12, 'Session', 'Sessions', '12 Sessions'],
+  ])('plural(%i, %s, %s) is „%s“', (count, one, many, expected) => {
+    expect(plural(count, one, many)).toBe(expected);
   });
 });
 
