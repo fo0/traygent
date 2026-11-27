@@ -12,7 +12,7 @@ ADR-0014 reads Claude Code's subscription quota from `api.anthropic.com/api/oaut
 
 ## Decision
 
-We will read Claude Code's quota per profile by running the host's CLI, `<claude> -p /usage --output-format json --no-session-persistence`, through the hidden PowerShell call of the profile sign-in (`launch/login.rs → hidden_usage_plan`), with the profile's `CLAUDE_CONFIG_DIR` set as a local start sets it, the sign-in override variables removed, Traygent's app data dir as the working directory, stdin closed, stderr to the null device, stdout capped at 64 KiB and the process tree ended after 20 s. The `Current <label>: <N>% used · resets <when>` lines of `result` become the windows; Traygent never requests the OAuth usage endpoint and never opens `.credentials.json` for the quota.
+We will read Claude Code's quota per profile by running the host's CLI, `<claude> -p /usage --output-format json --no-session-persistence --setting-sources user`, through the hidden PowerShell call of the profile sign-in (`launch/login.rs → hidden_usage_plan`), with the profile's `CLAUDE_CONFIG_DIR` set as a local start sets it, the sign-in override variables removed, Traygent's app data dir as the working directory (no read without one), stdin closed, stderr to the null device, stdout capped at 64 KiB and the process tree ended after 20 s or at the app's exit. A named profile's directory must exist and be Claude Code's, as for a sign-in. Only a printed object with `local_command: "usage"` is parsed; its `Current <label>: <N>% used · resets <when>` lines of `result` become the windows. Traygent never requests the OAuth usage endpoint and never opens `.credentials.json` for the quota.
 
 ## Consequences
 
@@ -25,10 +25,12 @@ We will read Claude Code's quota per profile by running the host's CLI, `<claude
 ### Negative / Trade-offs
 
 - The `/usage` text is no contract. The parser is tolerant (unknown lines and labels are skipped, an unreadable reset time drops only the time) and pinned by `fixtures/claude-usage/`; a reworded line ends in „Die Ausgabe der Claude-Code-CLI ist nicht lesbar.“
-- No year is printed; a date is the first at or after now − 1 day, in the machine's zone.
+- No year is printed; a date is the first at or after now − 1 day, in the machine's zone. A time the zone skips (a clock change) gives no reset. The zone the CLI names in parentheses is not compared with the machine's: Windows has no IANA zone name without a new dependency.
 - A read is a `claude` process for about 1.5 s. An agent update waits for running reads after marking Claude Code as updating, which refuses new ones.
 - `/usage` prints the same cost summary for an API-key sign-in and for a profile without any sign-in, so both read as „kein Abo-Kontingent“; the profile row's sign-in dot tells them apart.
-- The CLI writes its own state into the profile (`.claude.json`, a `projects` entry for the app data dir), as any session does.
+- The CLI writes its own state into the profile (`.claude.json`, a `projects` entry for the app data dir), as any session does — so a directory that is someone else's is refused („Der Profilordner gehört nicht zu Claude Code.“), and one that does not exist yet reads as not signed in without a process.
+- The child inherits Traygent's environment except the removed override variables (and `CLAUDE_CONFIG_DIR`, set or removed per profile), and each read loads the profile's user-scope settings (`settings.json`, its hooks and MCP servers included); project and local settings never load (`--setting-sources user`, which CLI 2.1.332 answers the same with).
+- A shell that exited while a grandchild still holds stdout gives what was printed so far after 500 ms; on Windows the remaining tree is then ended through `taskkill /T` on the exited shell's id. Whether that reaches processes whose parent already exited is unverified; a Job Object would, but needs more of `windows-sys` in the core (BACKLOG).
 
 ### Neutral
 
@@ -40,7 +42,7 @@ We will read Claude Code's quota per profile by running the host's CLI, `<claude
 
 - **Keep the HTTP read** — rejected by the owner: undocumented endpoint, token out of the CLI's file.
 - **`--bare`** — rejected: it may change which sign-in the CLI uses.
-- **The user profile as working directory** — rejected (it stays the fallback without an app data dir only): there `.claude\settings.json` would load as project settings of a named profile.
+- **The user profile (or `C:\`) as working directory** — rejected, also as a fallback without an app data dir: there `.claude\settings.json` would load as project settings of a named profile, and any folder could be a project with its own hooks.
 
 ## References
 

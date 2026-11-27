@@ -49,8 +49,9 @@ Brand top left: icon + „Traygent“. Window ~480×760, frameless, tray popup l
      90 % `--fail` and bold, and the bar ends in a short cap of that colour. No data, a
      signed-out profile or a failed read: `–` and a dashed track, the detail in the tooltip.
      Claude Code's figures come from its own CLI, `claude -p /usage --output-format json
---no-session-persistence` run hidden on the host with the profile's sign-in (also for a
-     Docker session; [ADR-0015](adr/0015-read-the-claude-code-quota-through-the-cli.md)); Codex
+--no-session-persistence --setting-sources user` run hidden on the host with the profile's
+     sign-in (also for a Docker session; never in a profile directory that is missing or not
+     Claude Code's; [ADR-0015](adr/0015-read-the-claude-code-quota-through-the-cli.md)); Codex
      and OpenCode Go are read from the provider (ADR-0014).
      A read the provider limits (HTTP 429, #100; `get_agent_quota` answers no windows, the
      detail and `retryAfterSecs`, its `Retry-After` in seconds, at most a day, `0` without one)

@@ -39,7 +39,7 @@ Stable project knowledge. **Read at session start.**
 ### Subscription quota reads are opt-in per agent
 
 - **Date:** 2026-11-22
-- **Decision:** `settings.quotaReads` (owner, #83): off by default for Claude and Codex, on for OpenCode Go; `quota::read` returns before any path, file, request or process when off; ≥ 30 s between scheduled reads. Codex and OpenCode Go: the provider endpoint with the CLI's own key, Traygent's own User-Agent only ([ADR-0014](docs/adr/0014-opt-in-subscription-quota-reads.md)). Claude Code (owner, #110): the host CLI's `-p /usage --output-format json --no-session-persistence`, hidden like the sign-in, in the app data dir, profile env as a local start, 64 KiB / 20 s — never the OAuth endpoint or `.credentials.json` ([ADR-0015](docs/adr/0015-read-the-claude-code-quota-through-the-cli.md)).
+- **Decision:** `settings.quotaReads` (owner, #83): off by default for Claude and Codex, on for OpenCode Go; `quota::read` returns before any path, file, request or process when off; ≥ 30 s between scheduled reads. Codex and OpenCode Go: the provider endpoint with the CLI's own key, Traygent's own User-Agent only ([ADR-0014](docs/adr/0014-opt-in-subscription-quota-reads.md)). Claude Code (owner, #110): the host CLI's `-p /usage --output-format json --no-session-persistence --setting-sources user`, hidden like the sign-in, in the app data dir (no fallback), never in a missing or foreign profile dir, profile env as a local start, 64 KiB / 20 s — never the OAuth endpoint or `.credentials.json` ([ADR-0015](docs/adr/0015-read-the-claude-code-quota-through-the-cli.md)).
 
 ## Gotchas & Pitfalls
 
