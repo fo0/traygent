@@ -40,7 +40,7 @@ One composer, no prose:
 - A click anywhere on the row (or **▶**) starts that session again with exactly those settings — once per press, so a double-click never starts it twice.
 - **Ctrl+1** … **Ctrl+9** start the first nine rows the same way from anywhere in the panel, the folder field included; a held key starts once, and the row's tooltip names its key.
 - A row whose profile was removed in the settings shows a **?** on the agent tile (**Profil entfernt**) and does not start — it never falls back to another profile; pick one under **Bearbeiten …**.
-- With the keyboard on a row's **▶**, **↑** / **↓** move to the row above or below, **Home** / **End** to the first or last row.
+- With the keyboard on a row's **▶**, **↑** / **↓** move to the row above or below, **Home** / **End** to the first or last row; typing the start of a folder name moves to the next row whose name starts with it (the same letter again steps through them).
 - The **⋯** menu offers **In Composer übernehmen** (copy into the composer), **Bearbeiten …** (edit the model, thinking level, permission, extra arguments, Docker ports, **Docker-Socket durchreichen** and — for an agent with profiles — the **Profil** the row starts with, without starting it; a profile removed meanwhile shows as **Standard**; **Modell & Denken**: **Traygent** sets the stored model and thinking level on every start, **Agent** passes neither so the agent keeps what it last used, e.g. after `/model`), **Ordner öffnen** (open the folder in Explorer), **Pfad kopieren** (copy the folder path) and **Entfernen** (remove) with **Rückgängig** (undo) for 8 seconds.
 
 ## Status and refresh
