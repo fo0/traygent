@@ -149,7 +149,7 @@ test('a press that closes the folder suggestions starts no row', async ({
     .locator('form.composer')
     .getByRole('combobox', { name: 'Ordner oder Repo' });
   await field.fill('demo tray');
-  const list = page.getByRole('listbox', { name: 'Repositories' });
+  const list = page.getByRole('listbox', { name: 'Vorschläge' });
   await expect(list.getByRole('option')).not.toHaveCount(0);
   // The list closes on blur, not on the press (FolderField → pressClosedPopup).
   const last = rows(page).last();

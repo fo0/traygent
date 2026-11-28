@@ -322,8 +322,9 @@ Commands (Rust `#[tauri::command]`, German `Err` strings; panel calls only via `
 - Search: every whitespace-separated word must occur (case-insensitive) in `owner/name`; at most
   8 suggestions from `github.repos`, newest push first, in a listbox under the field (↑/↓, Enter
   picks, Esc closes). A picked suggestion becomes `owner/name`. Without an account the list
-  holds one entry „GitHub verbinden …“ (Settings → GitHub). A repository typed or pasted needs
-  no account.
+  holds one entry „GitHub verbinden …“ (Settings → GitHub) in their place. Up to 3 recent
+  folders whose folder name (last segment) holds every word follow, newest first; a picked one
+  becomes its full path. A repository typed or pasted needs no account.
 - Start: `repo` set, `folder` `''` (composer) or the recent's folder (▶ on a „Workspaces“ row). A
   given folder (validated like any folder) that exists is started as is, without a clone, so a
   recent keeps its clone after the clone root changed (#40). Otherwise Rust derives

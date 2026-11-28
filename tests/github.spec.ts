@@ -13,7 +13,7 @@ const composer = (page: Page) => page.locator('form.composer');
 const field = (page: Page) =>
   composer(page).getByRole('combobox', { name: 'Ordner oder Repo' });
 const suggestions = (page: Page) =>
-  page.getByRole('listbox', { name: 'Repositories' });
+  page.getByRole('listbox', { name: 'Vorschläge' });
 const start = (page: Page) =>
   composer(page).getByRole('button', { name: 'Starten' });
 const settingsDialog = (page: Page) =>
@@ -154,6 +154,33 @@ test('a pasted URL is a repository; a recent from one adopts as owner/name', asy
   await expect(input).toHaveValue('demo-user/repo-watch');
 });
 
+test('search text also suggests matching recent folders after the repositories', async ({
+  page,
+}) => {
+  await page.goto('/');
+  const input = field(page);
+  await input.fill('module');
+  const list = suggestions(page);
+  await expect(list.getByRole('option')).toHaveCount(1);
+  await expect(list.getByRole('option')).toHaveAccessibleName(
+    'D:\\Arbeit\\infra\\terraform-module',
+  );
+  await input.press('ArrowDown');
+  await input.press('Enter');
+  await expect(input).toHaveValue('D:\\Arbeit\\infra\\terraform-module');
+  await expect(list).toHaveCount(0);
+  // Repositories first, the folder after them; a click picks it too.
+  await input.fill('tray');
+  const options = list.getByRole('option');
+  await expect(options.last()).toHaveAccessibleName(
+    'C:\\Users\\demo\\Projekte\\traygent',
+  );
+  await expect(options.first()).toHaveAccessibleName('demo-user/traygent');
+  await options.last().click();
+  await expect(input).toHaveValue('C:\\Users\\demo\\Projekte\\traygent');
+  await expect(input).toBeFocused();
+});
+
 test('without an account search text offers „GitHub verbinden …“', async ({
   page,
 }) => {
@@ -163,8 +190,10 @@ test('without an account search text offers „GitHub verbinden …“', async (
   await expect(dialog).toHaveCount(0);
   const input = field(page);
   await input.fill('tray');
+  // The matching recent folder follows the way to the account.
   await expect(suggestions(page).getByRole('option')).toHaveText([
     'GitHub verbinden …',
+    /^traygent/,
   ]);
   await input.press('Enter');
   await expect(

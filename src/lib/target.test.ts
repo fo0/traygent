@@ -5,6 +5,7 @@ import {
   LISTING_MAX_AGE,
   classifyTarget,
   listingStale,
+  matchFolders,
   matchRepos,
   repoLabel,
   targetProblem,
@@ -75,6 +76,29 @@ const repo = (owner: string, name: string): RepoSummary => ({
   owner,
   name,
   private: false,
+});
+
+describe('matchFolders', () => {
+  const folders = [
+    'C:\\Users\\demo\\Projekte\\traygent',
+    'D:\\Arbeit\\kunden-portal',
+    'C:\\Users\\demo\\Projekte\\agent-tools',
+    'D:\\Tray\\notes',
+  ];
+
+  it('needs every word in the folder name, case-insensitive, in order', () => {
+    expect(matchFolders(folders, 'TRAY')).toEqual([folders[0]]);
+    expect(matchFolders(folders, 'kunden  portal')).toEqual([folders[1]]);
+    // The parent path does not count: „demo“ and „Tray“ are only parents.
+    expect(matchFolders(folders, 'demo')).toEqual([]);
+    expect(matchFolders(folders, 'notes tray')).toEqual([]);
+    expect(matchFolders(folders, 't')).toEqual(folders.slice(0, 3));
+    expect(matchFolders(folders, '  ')).toEqual([]);
+  });
+
+  it('keeps at most the limit', () => {
+    expect(matchFolders(folders, 'e', 2)).toEqual(folders.slice(0, 2));
+  });
 });
 
 describe('matchRepos', () => {

@@ -3,12 +3,17 @@
   import RepoSuggestions from './RepoSuggestions.svelte';
   import { folderName, parentPath } from './agents';
   import { menu, openingFocus, pressClosedPopup, type MenuFocus } from './menu';
-  import { classifyTarget, matchRepos, repoLabel } from './target';
+  import {
+    classifyTarget,
+    matchFolders,
+    matchRepos,
+    repoLabel,
+  } from './target';
   import type { RepoSummary } from './types';
 
   /** The empty field's tooltip: every kind of text it takes. */
   const FIELD_HINT =
-    'Lokaler Ordner, GitHub-URL, owner/name oder Suchtext über die eigenen Repos';
+    'Lokaler Ordner, GitHub-URL, owner/name oder Suchtext über die eigenen Repos und letzten Ordner';
 
   // The composer's target: a folder (typed, picked in the native dialog or
   // chosen from the recent folders) or a GitHub repository (pasted, typed as
@@ -55,7 +60,12 @@
   );
   /** Search text without an account offers „GitHub verbinden …“. */
   const connect = $derived(target.kind === 'search' && !connected);
-  const count = $derived(connect ? 1 : matches.length);
+  /** Recent folders whose name matches, after the repositories. */
+  const folderMatches = $derived(
+    target.kind === 'search' ? matchFolders(recents, target.query) : [],
+  );
+  const head = $derived(connect ? 1 : matches.length);
+  const count = $derived(head + folderMatches.length);
   const expanded = $derived(suggest && count > 0);
   const current = $derived(Math.min(active, count - 1));
 
@@ -90,6 +100,11 @@
   }
   function pick(index: number) {
     suggest = false;
+    if (index >= head) {
+      const folder = folderMatches[index - head];
+      if (folder) value = folder;
+      return;
+    }
     if (connect) return onConnect();
     const repo = matches[index];
     if (repo) value = repoLabel(repo);
@@ -188,6 +203,7 @@
       id={LIST}
       repos={matches}
       {connect}
+      folders={folderMatches}
       active={current}
       onPick={pick}
       onHover={(index) => (active = index)}
