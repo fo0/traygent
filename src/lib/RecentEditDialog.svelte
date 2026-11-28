@@ -16,6 +16,7 @@
   import { errorMessage } from './format';
   import { normalizePorts } from './ports';
   import { DEFAULT_PROFILE, recentProfileItems } from './profiles';
+  import { isSaveShortcut } from './shortcuts';
   import type { LaunchOptions, RecentSession, Snapshot } from './types';
   import {
     argsProblem,
@@ -140,7 +141,15 @@
       if (alive) saving = false;
     }
   }
+  /** Ctrl+S saves like „Speichern“; never the webview's own save. */
+  function saveKey(event: KeyboardEvent) {
+    if (!isSaveShortcut(event) || event.isComposing) return;
+    event.preventDefault();
+    if (!event.repeat) void save();
+  }
 </script>
+
+<svelte:window onkeydown={saveKey} />
 
 <Modal
   title={folderName(recent.folder)}
@@ -226,10 +235,11 @@
         type="submit"
         class="primary-button"
         aria-disabled={blocked ? 'true' : undefined}
+        aria-keyshortcuts="Control+S"
         title={invalid
           ? 'Ungültige Eingabe'
           : dirty || saving
-            ? undefined
+            ? 'Speichern (Strg+S)'
             : 'Keine Änderungen'}
         >{saving ? 'Wird gespeichert …' : 'Speichern'}</button
       >

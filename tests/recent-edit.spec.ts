@@ -45,6 +45,23 @@ test('edits a local row: Bypass by default, saved without a start', async ({
   ).toBeFocused();
 });
 
+test('Ctrl+S saves the row like „Speichern“; an invalid entry stays blocked', async ({
+  page,
+}) => {
+  await page.goto('/');
+  const target = row(page, 'Notizen');
+  const dialog = await openEdit(page, 'Notizen');
+  await dialog.getByRole('radio', { name: 'Bypass' }).check();
+  const args = dialog.getByLabel('Extra-Argumente');
+  await args.fill('"x"');
+  await args.press('Control+s');
+  await expect(dialog).toBeVisible();
+  await args.fill('');
+  await args.press('Control+s');
+  await expect(dialog).toBeHidden();
+  await expect(target.getByLabel('Freigabe: Bypass')).toBeVisible();
+});
+
 test('an invalid entry blocks „Speichern“; „Abbrechen“ keeps the row', async ({
   page,
 }) => {

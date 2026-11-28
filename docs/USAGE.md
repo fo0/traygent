@@ -51,7 +51,7 @@ One composer, no prose:
 
 ## Settings — „Einstellungen“
 
-Nothing applies until **Speichern** (save); **Abbrechen** (cancel) drops it. The one exception: adding a profile ([below](#several-accounts--profile)) saves it at once.
+Nothing applies until **Speichern** (save, also **Ctrl+S**, as in **Bearbeiten …**); **Abbrechen** (cancel) drops it. The one exception: adding a profile ([below](#several-accounts--profile)) saves it at once.
 
 - **Agenten** (agents) — per agent the local status (version or why not) and the Docker readiness, the recommended install command with a copy button and **Installieren** (install; opens a terminal running it; refresh detection afterwards), the update command, and the defaults: model, effort, permission and extra CLI arguments (validated). Claude Code also has **Profile** ([below](#several-accounts--profile)).
 - **Umgebung** (environment) — the environments the composer shows (**Umgebungen** = environments; recents of a hidden one still restart unchanged), default environment and agent, terminal (Windows Terminal or Konsole = classic console) with **Ein Fenster für alle Sessions** (one window for all sessions; Windows Terminal only, off by default: every session opens as a new tab of one shared window), the Docker image per agent, **GitHub-Token weitergeben** (forward the GitHub token; off by default) and **Docker-Socket durchreichen** (pass the host Docker socket; off by default, [below](#docker-sessions)).

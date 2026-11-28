@@ -1,6 +1,7 @@
 import { describe, expect, it, vi } from 'vitest';
 import {
   createShortcuts,
+  isSaveShortcut,
   shortcutFor,
   type ShortcutActions,
 } from './shortcuts';
@@ -13,6 +14,30 @@ const press = (key: string, extra: Partial<KeyboardEvent> = {}) => ({
   altKey: false,
   shiftKey: false,
   ...extra,
+});
+
+describe('isSaveShortcut', () => {
+  it('takes Ctrl+S and ⌘S in any case and layout, never with Alt or Shift', () => {
+    expect(isSaveShortcut(press('s', { ctrlKey: true }))).toBe(true);
+    expect(isSaveShortcut(press('S', { metaKey: true }))).toBe(true);
+    // Cyrillic layout: the physical S key; Dvorak: the key labelled S.
+    expect(isSaveShortcut(press('ы', { ctrlKey: true, code: 'KeyS' }))).toBe(
+      true,
+    );
+    expect(isSaveShortcut(press('o', { ctrlKey: true, code: 'KeyS' }))).toBe(
+      false,
+    );
+    expect(isSaveShortcut(press('s'))).toBe(false);
+    expect(isSaveShortcut(press('s', { ctrlKey: true, altKey: true }))).toBe(
+      false,
+    );
+    expect(isSaveShortcut(press('S', { ctrlKey: true, shiftKey: true }))).toBe(
+      false,
+    );
+  });
+  it('is no panel shortcut, so it never reaches the panel handler', () => {
+    expect(shortcutFor(press('s', { ctrlKey: true }))).toBeNull();
+  });
 });
 
 describe('shortcutFor', () => {

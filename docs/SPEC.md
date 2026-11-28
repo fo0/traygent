@@ -126,7 +126,7 @@ Brand top left: icon + „Traygent“. Window ~480×760, frameless, tray popup l
    (#3) opens a staged dialog with the row's model, thinking level, permission, extra
    arguments, (Docker) ports and (an agent with at least one extra profile or an entry
    that still stores one, #37) „Profil“ — „Standard“ and the agent's profiles; a stored profile
-   removed since shows as „Standard“, and saving stores that. „Speichern“ stores them on the entry without a start
+   removed since shows as „Standard“, and saving stores that. „Speichern“ (or Ctrl+S) stores them on the entry without a start
    (`update_recent`, validated like a start; the dialog also applies the npm-shim argument rule) — place, start time and count stay, the next ▶
    sends them. The profile follows the start rule (_Profiles_): absent, blank or `default`
    store none; local and Docker entries retain a chosen profile. An id the agent does not list is refused („Profil nicht
@@ -154,6 +154,9 @@ Brand top left: icon + „Traygent“. Window ~480×760, frameless, tray popup l
    shown) · „Stand hh:mm“.
 
 ## Settings dialog (staged: „Speichern“ + „Abbrechen“; tabs)
+
+Ctrl+S runs „Speichern“ from anywhere in the dialog (a blocked „Speichern“ stays blocked); the
+button's tooltip names the key. The same holds for „Bearbeiten …“ of a „Workspaces“ row.
 
 - **Agenten**: per agent a section, opening with „Kontingent“: the staged switch „Kontingent
   abfragen“ (`settings.quotaReads`, default off for Claude Code and Codex, on for OpenCode;
