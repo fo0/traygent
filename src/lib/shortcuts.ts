@@ -47,6 +47,19 @@ function digit(event: KeyPress) {
   return match ? Number(match) : null;
 }
 
+/**
+ * Ctrl+S (⌘S on a Mac keyboard), any layout: „Speichern“ of a staged dialog
+ * (Einstellungen, „Bearbeiten …“). Never with Alt (AltGr types) or Shift.
+ */
+export function isSaveShortcut(event: KeyPress) {
+  return (
+    (event.ctrlKey || event.metaKey) &&
+    !event.altKey &&
+    !event.shiftKey &&
+    isLetter(event, 's')
+  );
+}
+
 /** Maps a key press to a panel shortcut, independent of focus and state. */
 export function shortcutFor(event: KeyPress): Shortcut | null {
   const command = event.ctrlKey || event.metaKey;

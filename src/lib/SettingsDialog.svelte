@@ -18,6 +18,7 @@
   import type { ProfileActions } from './profileActions.svelte';
   import { SettingsDraft } from './settingsDraft.svelte';
   import { SETTINGS_TABS, type SettingsTab } from './settingsTabs';
+  import { isSaveShortcut } from './shortcuts';
   import { appliedTheme, applyTheme, rememberTheme } from './theme';
   import type { AgentId, AppSettings, Snapshot } from './types';
   import type { Updater } from './updater.svelte';
@@ -188,6 +189,13 @@
     return true;
   }
 
+  /** Ctrl+S saves like „Speichern“; never the webview's own save. */
+  function saveKey(event: KeyboardEvent) {
+    if (!isSaveShortcut(event) || event.isComposing) return;
+    event.preventDefault();
+    if (!event.repeat) void save();
+  }
+
   function tabKey(event: KeyboardEvent & { currentTarget: HTMLElement }) {
     const direction =
       event.key === 'ArrowRight' ? 1 : event.key === 'ArrowLeft' ? -1 : 0;
@@ -209,6 +217,8 @@
       [next]?.focus();
   }
 </script>
+
+<svelte:window onkeydown={saveKey} />
 
 <Modal
   title="Einstellungen"
@@ -300,12 +310,13 @@
       type="button"
       class="primary-button"
       aria-disabled={saveBlocked ? 'true' : undefined}
+      aria-keyshortcuts="Control+S"
       title={draft.invalid
         ? 'Ungültige Eingabe'
         : draft.adding
           ? 'Profil wird hinzugefügt …'
           : dirty || saving
-            ? undefined
+            ? 'Speichern (Strg+S)'
             : 'Keine Änderungen'}
       onclick={() => void save()}
       >{saving ? 'Wird gespeichert …' : 'Speichern'}</button

@@ -76,6 +76,32 @@ test('Agenten: staged defaults apply with „Speichern“ and reach the composer
   ).toBeChecked();
 });
 
+test('Ctrl+S saves the staged settings from any field, only when there is something to save', async ({
+  page,
+}) => {
+  await page.goto('/');
+  const dialog = await openSettings(page);
+  await expect(saveButton(page)).toHaveAttribute(
+    'aria-keyshortcuts',
+    'Control+S',
+  );
+  // Nothing staged: Ctrl+S keeps the dialog open.
+  await dialog.getByRole('radio', { name: 'Codex' }).focus();
+  await page.keyboard.press('Control+s');
+  await expect(dialog).toBeVisible();
+  await dialog.getByRole('radio', { name: 'Codex' }).check();
+  const args = dialog.getByRole('textbox', { name: 'Extra-Argumente' });
+  await args.fill('--search');
+  await expect(saveButton(page)).toHaveAttribute('title', 'Speichern (Strg+S)');
+  await args.press('Control+s');
+  await expect(dialog).toHaveCount(0);
+  const reopened = await openSettings(page);
+  await reopened.getByRole('radio', { name: 'Codex' }).check();
+  await expect(
+    reopened.getByRole('textbox', { name: 'Extra-Argumente' }),
+  ).toHaveValue('--search');
+});
+
 test('„Abbrechen“ drops staged agent defaults', async ({ page }) => {
   await page.goto('/');
   let dialog = await openSettings(page);

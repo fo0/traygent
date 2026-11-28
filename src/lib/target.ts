@@ -4,6 +4,7 @@
  * the user types; Rust classifies again and has the last word. Shared test
  * vectors: fixtures/targets.json.
  */
+import { folderName } from './agents';
 import type { GithubState, RepoRef, RepoSummary } from './types';
 import { WINDOWS_ABSOLUTE } from './validation';
 
@@ -83,6 +84,28 @@ export function matchRepos(
     if (words.every((word) => text.includes(word))) found.push(repo);
   }
   return found;
+}
+
+/** At most this many recent folders under the repository suggestions. */
+const FOLDER_SUGGESTION_LIMIT = 3;
+
+/**
+ * The recent folders whose folder name (the last segment, rule 3) holds
+ * every word of the query, case-insensitive, in their order (newest first).
+ */
+export function matchFolders(
+  folders: readonly string[],
+  query: string,
+  limit = FOLDER_SUGGESTION_LIMIT,
+): string[] {
+  const words = query.toLowerCase().split(/\s+/).filter(Boolean);
+  if (!words.length) return [];
+  return folders
+    .filter((folder) => {
+      const name = folderName(folder).toLowerCase();
+      return words.every((word) => name.includes(word));
+    })
+    .slice(0, limit);
 }
 
 /** A connected account whose listing is older than 15 minutes and not loading. */
